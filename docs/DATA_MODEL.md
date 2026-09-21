@@ -1,4 +1,8 @@
-# Modelo PostgreSQL previsto (H1/H2; no migración activa en H0)
+# Modelo PostgreSQL — contrato por hitos
+H1 implementa identidad, empleados, invitaciones y soporte de auditoría/idempotencia: ver
+`supabase/README.md` y `supabase/migrations/20260921000100_identity.sql`. El resto sigue previsto
+para H2-H5. No hay proyección employee_state ni eventos en H1.
+Membresías y empleados añaden `version bigint >= 1` para concurrencia optimista.
 ## Convenciones y constraints
 UUID PK mediante gen_random_uuid(); organization_id UUID NOT NULL en toda fila tenant.
 Cada tabla referenciable tiene UNIQUE(organization_id,id); FK tenant compuestas y ON DELETE RESTRICT.
@@ -78,7 +82,7 @@ Identidad humana se obtiene de auth.uid(); ninguna RPC acepta un actor arbitrari
 | request_export | rango, employee_id opcional, formato | job_id; propio o gestores del tenant |
 | kiosk_record_event | challenge y request_id | Recibo mínimo; solo gateway autenticado con rol dedicado |
 
-H1 definirá invitaciones Auth de un solo uso: token hash privado, tenant/rol/email destino ligados,
+H1 implementa invitaciones de un solo uso: token hash privado, tenant/rol/email destino ligados,
 TTL 24 h, aceptación por identidad verificada, sin autoasignar rol desde signup. No crea employees
 sin consentimiento administrativo; provisioning de kiosco separado. H0 no invita ni crea cuentas.
 Errores estables: UNAUTHENTICATED, FORBIDDEN (sin revelar existencia ajena), INVALID_INPUT,

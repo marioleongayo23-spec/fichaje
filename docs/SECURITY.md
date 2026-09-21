@@ -28,7 +28,7 @@ Auditoría propia por RPC proyecta columnas seguras y filtra employee_id; no exp
 ## RPC
 Funciones SECURITY DEFINER: owner dedicado sin superuser ni BYPASSRLS para mutaciones; políticas
 de ese rol acotadas y comprobación explícita de actor+tenant. Helper de membresía usa rol técnico
-separado con SELECT solo memberships para evitar recursión. Objetos schema-qualified, search_path='',
+separado con SELECT solo organizations/memberships para comprobar empresa activa y evitar recursión. Objetos schema-qualified, search_path='',
 sin SQL dinámico, auth.uid no NULL, argumentos/longitudes validados. Revocar EXECUTE de PUBLIC/anon.
 No permitir al rol técnico cambiar roles, desactivar triggers o concederse permisos.
 Revalidar organización/membresía/empleado en transacción; expected_version y FK compuestas.

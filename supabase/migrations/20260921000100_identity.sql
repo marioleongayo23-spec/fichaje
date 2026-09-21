@@ -2,10 +2,10 @@
 create schema if not exists private;
 revoke all on schema private from public, anon, authenticated;
 revoke create on schema public from public, anon, authenticated;
-do $$ begin if not exists(select 1 from pg_roles where rolname='fichaje_reader') then create role fichaje_reader; end if; end $$;
-alter role fichaje_reader nologin nosuperuser nocreatedb nocreaterole noinherit nobypassrls;
-do $$ begin if not exists(select 1 from pg_roles where rolname='fichaje_writer') then create role fichaje_writer; end if; end $$;
-alter role fichaje_writer nologin nosuperuser nocreatedb nocreaterole noinherit nobypassrls;
+do $$ begin if not exists(select 1 from pg_roles where rolname='fichaje_reader') then create role fichaje_reader nologin noinherit; end if; end $$;
+do $$ begin if exists(select 1 from pg_roles where rolname='fichaje_reader' and (rolcanlogin or rolsuper or rolcreatedb or rolcreaterole or rolinherit or rolbypassrls)) then raise exception 'UNSAFE_TECHNICAL_ROLE'; end if; end $$;
+do $$ begin if not exists(select 1 from pg_roles where rolname='fichaje_writer') then create role fichaje_writer nologin noinherit; end if; end $$;
+do $$ begin if exists(select 1 from pg_roles where rolname='fichaje_writer' and (rolcanlogin or rolsuper or rolcreatedb or rolcreaterole or rolinherit or rolbypassrls)) then raise exception 'UNSAFE_TECHNICAL_ROLE'; end if; end $$;
 grant fichaje_reader, fichaje_writer to postgres;
 grant usage on schema public, private, auth to fichaje_reader, fichaje_writer;
 grant create on schema public,private to fichaje_reader,fichaje_writer;
@@ -77,7 +77,7 @@ create table private.invitations (
  foreign key(organization_id,created_by) references public.memberships(organization_id,id) on delete restrict
 );
 -- Explicit privileges also override Supabase's default public-schema grants.
-revoke all on all tables in schema public from anon, authenticated;
+revoke all on all tables in schema public from public, anon, authenticated, service_role;
 revoke all on all tables in schema private from public, anon, authenticated;
 grant select on public.organizations,public.memberships,public.employees,public.audit_log to authenticated;
 grant select on public.organizations,public.memberships to fichaje_reader;

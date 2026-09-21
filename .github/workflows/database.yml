@@ -21,7 +21,7 @@ jobs:
         with:
           version: 2.117.0
       - name: Start isolated local Supabase
-        run: supabase start -x realtime,imgproxy,edge-runtime,logflare,vector,supavisor
+        run: supabase start -x realtime,imgproxy,edge-runtime,logflare,vector,supavisor > /dev/null
       - name: Rebuild from empty database
         run: supabase db reset --local --no-seed
       - name: Real SQL and RLS tests
