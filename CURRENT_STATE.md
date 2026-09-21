@@ -2,7 +2,8 @@
 ## Hito autorizado
 HITO 0 Bootstrap aprobado por el usuario e integrado en `main` mediante PR #1 el 2026-09-21.
 Rama de origen: `astra/hito-0-bootstrap`. Merge: `f9a02bb150b424d9cf0a47b741496c997b7bc085`.
-HITO 1 NO autorizado ni iniciado.
+HITO 1 autorizado por el usuario el 2026-09-21; implementación en `astra/hito-1-identidad-rls`.
+No autorizado HITO 2 ni merge de H1.
 
 ## Entregado
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -38,5 +39,26 @@ Checksums internos PASS; bundle restaurado en repositorio vacío y `main` restau
 `c177548662735fa257390e6775f2731d7f01fe98`. Copia diaria a Drive programada en ChatGPT a las
 05:00 Europe/Madrid. Backup PostgreSQL sigue bloqueado.
 
+## HITO 1 — identidad y aislamiento
+ESTADO: BLOCKED hasta disponer de resultados de CI DB real.
+Rama: `astra/hito-1-identidad-rls`, base `39ff3e041e49396fa177e13a0b2e4ebbef034da6`.
+
+Entregado: Supabase local CLI 2.117.0 / PostgreSQL 17; migración de organizaciones,
+membresías, empleados sin email, vínculo Auth opcional, roles y FK compuestas; RLS/FORCE RLS,
+GRANT mínimos, helpers técnicos, bootstrap privado, transferencia OWNER atómica, revocación,
+invitaciones ligadas a identidad verificada/tenant/rol y TTL. Auditoría e idempotencia para
+mutaciones H1, bloqueo por organización y versiones. No motor horario ni UI.
+Contrato y comandos reproducibles: `supabase/README.md`.
+
+Evidencias pendientes: workflow `Database H1`: `supabase start`, `supabase db reset --local
+--no-seed`, `supabase test db`, `python3 tests/integration/h1.py`. Fixture SQL con dos
+organizaciones × tres roles; integración con GoTrue/JWT/PostgREST/Storage reales y
+concurrencia HTTP. Sin mocks RLS/Auth JavaScript. CI H0 también debe seguir verde.
+Entorno de edición sin Docker/PostgreSQL; no atribuirle ejecución DB local.
+
+Límites: solo stack local efímero CI, datos sintéticos. No proyecto Supabase remoto, producción,
+secretos GitHub, envío de invitaciones, kiosco, informes ni diseño visual. Baja tenant bloquea
+JWT previo por RLS/RPC; no revoca sesiones globales de otras organizaciones. Backup DB sigue bloqueado.
+
 ## Siguiente paso
-Autorizar HITO 1 en rama independiente: identidad, tenants, membresías, roles, RLS y pruebas DB reales.
+Completar evidencias de CI, dejar PR H1 contra main para revisión y detenerse; no merge ni H2.

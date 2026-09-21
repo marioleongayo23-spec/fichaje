@@ -1,0 +1,33 @@
+name: Database H1
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: db-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  database:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+      - name: Start isolated local Supabase
+        run: supabase start -x realtime,imgproxy,edge-runtime,logflare,vector,supavisor
+      - name: Rebuild from empty database
+        run: supabase db reset --local --no-seed
+      - name: Real SQL and RLS tests
+        run: supabase test db
+      - name: Real Auth, REST, Storage and concurrency tests
+        run: python3 tests/integration/h1.py
+      - name: Stop local containers
+        if: always()
+        run: supabase stop --no-backup

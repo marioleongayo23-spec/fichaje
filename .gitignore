@@ -12,3 +12,6 @@ backups/
 rclone.conf
 .supabase/
 .DS_Store
+supabase/.temp/
+supabase/.branches/
+__pycache__/
