@@ -1,7 +1,9 @@
 # Backup y recuperación
-## Estado H0
-Solo código. Workflow manual, ejecutable tras merge en main, sin schedule ni job PostgreSQL.
-No hay credenciales ni Drive configurado. No se ha hecho backup de datos reales.
+## Estado tras OPS-01
+El repositorio genera un backup privado automáticamente cada día a las 01:30 UTC y también permite
+ejecución manual. GitHub Actions conserva el artefacto 14 días. El workflow no conoce credenciales
+de Google Drive ni ejecuta backup PostgreSQL. Una automatización externa de ChatGPT copia el último
+artefacto válido al Drive privado del proyecto después de la ejecución nocturna.
 `backup_database.sh` termina 2 incondicionalmente, incluso con variables; activarlo exige PR aprobado.
 
 ## Repositorio
@@ -17,15 +19,14 @@ Genera directory único con repository.bundle, snapshot.tar.gz, manifest.txt, re
 Rclone copy --immutable y check --download verifican upload; nunca sync ni borrado remoto.
 Un fallo remoto puede dejar directorio parcial: no considerarlo recuperable hasta validar SHA256SUMS.
 
-## Drive preparado, no conectado
-Crear destino privado con acceso mínimo y credenciales rclone fuera del repo. Solo al autorizar:
-Actions Secrets `RCLONE_CONFIG` (contenido completo del config con token) y `RCLONE_DESTINATION`
-(p.ej. `gdrive:Fichaje/backups/repository`). No ponerlos en Variables públicas ni argumentos/logs.
-Ejecutar workflow manual en main con upload_drive=true. Sin Secrets falla, no finge éxito.
-Local: RCLONE_CONFIG apunta a archivo chmod 600 fuera del checkout y RCLONE_DESTINATION al destino;
-BACKUP_UPLOAD_DRIVE=1 habilita upload de código. Credenciales distintas para datos futuros.
-Rotación futura: 30 diarios + 12 mensuales según COMPLIANCE; actualmente sin automatismo de purga.
-Monitorizar resultado Actions; no inferir copia exitosa solo porque se ejecutó un job.
+## Copia secundaria en Google Drive
+Destino privado: `Fichaje APP - BACKUP/01 - Repo Snapshots`. GitHub Actions no recibe tokens de
+Google: genera y verifica el bundle/snapshot y lo publica como artefacto privado temporal. Una
+automatización de ChatGPT, usando las conexiones autorizadas de GitHub y Google Drive, descarga el
+último artefacto exitoso y lo sube a esa carpeta, conservando el ZIP de artefacto como unidad de
+recuperación. Debe verificar metadata de Drive tras la subida y avisar si falta un backup exitoso.
+No usar `sync`, no borrar copias remotas automáticamente y no almacenar credenciales en el repo.
+Rotación objetivo futura: 30 diarios + 12 mensuales según COMPLIANCE; actualmente sin purga automática.
 
 ## Restore del código
 En ubicación aislada y con Git disponible:
