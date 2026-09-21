@@ -11,7 +11,8 @@ it('keeps CI unprivileged and repository backup scheduled/manual, with no databa
   expect(ci.permissions).toEqual({ contents: 'read' });
   expect(ciText).not.toContain('secrets.');
 
-  expect(Object.keys(backup.on).sort()).toEqual(['schedule', 'workflow_dispatch']);
+  expect(Object.keys(backup.on).sort()).toEqual(['push', 'schedule', 'workflow_dispatch']);
+  expect(backup.on.push.branches).toEqual(['main']);
   expect(backup.on.schedule).toEqual([{ cron: '30 1 * * *' }]);
   expect(Object.keys(backup.jobs)).toEqual(['repository']);
   expect(backup.permissions).toEqual({ contents: 'read' });
