@@ -29,10 +29,14 @@ Normativa base enlazada y fechada; revisar convenio/sector y requisitos vigentes
 No añadir Secrets ni activar backup DB en este hito. No hacer merge automático.
 
 ## OPS-01 — backup online
-En curso en rama `ops/01-online-backup`: backup privado de repositorio programado diariamente a
-01:30 UTC y disponible manualmente, sin credenciales Google en GitHub. El artefacto se conserva 14 días.
-La copia secundaria a Google Drive se realizará mediante automatización ChatGPT con las conexiones
-autorizadas, en `Fichaje APP - BACKUP/01 - Repo Snapshots`. Backup PostgreSQL sigue bloqueado.
+PASS. PR #2 integrado en `main`. Backup privado generado en cada push a main, diariamente a
+01:30 UTC y manualmente; artefacto GitHub conservado 14 días, sin credenciales Google en GitHub.
+Primera copia secundaria subida y verificada en `Fichaje APP - BACKUP/01 - Repo Snapshots`.
+Artefacto GitHub run 35619934149: SHA-256
+`545bd31a02ec4afe66e3c87daa0b89c2297867c992bd2a2d6f837bfa5c5e38a7`.
+Checksums internos PASS; bundle restaurado en repositorio vacío y `main` restaurado coincide con
+`c177548662735fa257390e6775f2731d7f01fe98`. Copia diaria a Drive programada en ChatGPT a las
+05:00 Europe/Madrid. Backup PostgreSQL sigue bloqueado.
 
 ## Siguiente paso
-Cerrar OPS-01 con CI verde, merge y primera copia verificada en Drive. Después autorizar HITO 1.
+Autorizar HITO 1 en rama independiente: identidad, tenants, membresías, roles, RLS y pruebas DB reales.
