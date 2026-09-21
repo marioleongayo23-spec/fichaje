@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.env*
+!.env.example
+backups/
+*.bundle
+*.dump
+*.sql.gz
+*.age
+*.tar.gz
+rclone.conf
+.supabase/
+.DS_Store
