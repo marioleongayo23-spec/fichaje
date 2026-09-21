@@ -36,6 +36,14 @@ No confiar en JWT user_metadata ni organization_id recibido sin comprobación.
 Toda alta, baja, invitación y cambio de rol es idempotente, auditado y mantiene un OWNER activo.
 Alta de la primera organización por flujo controlado servidor; no signup público autootorgado.
 
+### Adaptadores Auth de H1
+El esquema Auth pertenece a Supabase. `private.request_uid()` y
+`private.verified_auth_email(uuid)` son adaptadores escalares de lectura, propiedad de postgres,
+con search_path vacío y EXECUTE explícito: identidad actual para los helpers/RLS y email
+verificado/no bloqueado solo para el escritor. No consultan ni modifican tablas tenant.
+Los helpers de membresía mantienen propietario lector mínimo y las mutaciones propietario
+escritor sin BYPASSRLS. No se heredan roles autenticados ni service_role para acceder a Auth.
+
 ## Kiosco sin email (H4)
 OWNER/ADMIN provisiona dispositivo: identidad Auth técnica única, sin memberships; token renovable
 solo en dispositivo autorizado y revocable. Gateway valida JWT, device_id activo, tenant y caducidad.

@@ -50,6 +50,11 @@ los contenedores al terminar. Un check pendiente/fallido bloquea H1.
 
 `fichaje_reader` y `fichaje_writer` son NOLOGIN, NOSUPERUSER, NOBYPASSRLS, sin miembros cliente.
 El lector solo consulta organizaciones y membresías; el helper obtiene exclusivamente auth.uid().
+Supabase protege el esquema Auth y su RLS. Dos adaptadores escalares privados propiedad de
+postgres forman el puente de lectura: `request_uid()` devuelve solo auth.uid();
+`verified_auth_email(uuid)` devuelve solo el email de una identidad verificada/no bloqueada,
+y solo el escritor puede ejecutarlo. Ninguno lee ni modifica datos tenant. No se concede a
+roles técnicos acceso directo a auth.users ni herencia de authenticated/service_role.
 El escritor tiene políticas internas y permisos acotados; RPC SECURITY DEFINER con search_path
 vacío valida toda autoridad. Esos roles no tienen CREATE en schemas ni gestión de roles.
 `private` no está expuesto por API ni tiene USAGE cliente; helpers autorizados se usan en RLS.

@@ -7,11 +7,24 @@ do $$ begin if exists(select 1 from pg_roles where rolname='fichaje_reader' and 
 do $$ begin if not exists(select 1 from pg_roles where rolname='fichaje_writer') then create role fichaje_writer nologin noinherit; end if; end $$;
 do $$ begin if exists(select 1 from pg_roles where rolname='fichaje_writer' and (rolcanlogin or rolsuper or rolcreatedb or rolcreaterole or rolinherit or rolbypassrls)) then raise exception 'UNSAFE_TECHNICAL_ROLE'; end if; end $$;
 grant fichaje_reader, fichaje_writer to postgres;
-grant usage on schema public, private, auth to fichaje_reader, fichaje_writer;
+grant usage on schema public, private to fichaje_reader, fichaje_writer;
 grant create on schema public,private to fichaje_reader,fichaje_writer;
-grant execute on function auth.uid() to fichaje_reader, fichaje_writer;
 alter default privileges in schema public revoke execute on functions from public;
 alter default privileges in schema private revoke execute on functions from public;
+-- Supabase owns auth schema/RLS. These two postgres-owned scalar read adapters are
+-- the only privileged bridge; no tenant reads/writes and no credentials are returned.
+create function private.request_uid() returns uuid
+language sql stable security definer set search_path='' as $$ select auth.uid() $$;
+revoke all on function private.request_uid() from public,anon,authenticated,service_role;
+grant execute on function private.request_uid() to fichaje_reader,fichaje_writer,authenticated;
+create function private.verified_auth_email(p_user uuid) returns text
+language sql stable security definer set search_path='' as $$
+ select lower(email) from auth.users where id=p_user and email_confirmed_at is not null
+ and (banned_until is null or banned_until<statement_timestamp())
+$$;
+revoke all on function private.verified_auth_email(uuid) from public,anon,authenticated,service_role;
+grant execute on function private.verified_auth_email(uuid) to fichaje_writer;
+
 create type public.member_role as enum ('OWNER','ADMIN','EMPLOYEE');
 create table public.organizations (
  id uuid primary key default gen_random_uuid(),
@@ -84,8 +97,7 @@ grant select on public.organizations,public.memberships to fichaje_reader;
 grant select,insert,update on public.organizations,public.memberships,public.employees to fichaje_writer;
 grant select,insert on public.audit_log,private.idempotency_records to fichaje_writer;
 grant select,insert,update on private.invitations to fichaje_writer;
--- Only verified Auth attributes are read; no user_metadata authorization.
-grant select(id,email,email_confirmed_at,banned_until) on auth.users to fichaje_writer;
+
 alter table public.organizations enable row level security;
 alter table public.organizations force row level security;
 create policy writer_access on public.organizations to fichaje_writer using (true) with check (true);
@@ -111,7 +123,7 @@ create policy reader_access on public.memberships for select to fichaje_reader u
 create function private.current_role(p_org uuid) returns public.member_role
 language sql stable security definer set search_path = '' as $$
  select m.role from public.memberships m join public.organizations o on o.id=m.organization_id
- where m.organization_id=p_org and m.auth_user_id=(select auth.uid()) and m.active and o.status='ACTIVE'
+ where m.organization_id=p_org and m.auth_user_id=(select private.request_uid()) and m.active and o.status='ACTIVE'
 $$;
 alter function private.current_role(uuid) owner to fichaje_reader;
 revoke all on function private.current_role(uuid) from public,anon;
@@ -121,11 +133,11 @@ create policy organization_read on public.organizations for select to authentica
  using(private.current_role(id) is not null);
 create policy membership_read on public.memberships for select to authenticated
  using(private.current_role(organization_id) in ('OWNER','ADMIN') or
- (private.current_role(organization_id)='EMPLOYEE' and auth_user_id=(select auth.uid()) and active));
+ (private.current_role(organization_id)='EMPLOYEE' and auth_user_id=(select private.request_uid()) and active));
 create policy employee_read on public.employees for select to authenticated
  using(private.current_role(organization_id) in ('OWNER','ADMIN') or
  (private.current_role(organization_id)='EMPLOYEE' and membership_id in
- (select m.id from public.memberships m where m.organization_id=employees.organization_id and m.auth_user_id=(select auth.uid()) and m.active)));
+ (select m.id from public.memberships m where m.organization_id=employees.organization_id and m.auth_user_id=(select private.request_uid()) and m.active)));
 create policy audit_read on public.audit_log for select to authenticated
  using(private.current_role(organization_id) in ('OWNER','ADMIN'));
 
@@ -163,7 +175,7 @@ create function private.authorize(p_org uuid) returns public.member_role
 language plpgsql set search_path='' as $$
 declare v_role public.member_role;
 begin
- if auth.uid() is null then raise exception using errcode='42501',message='UNAUTHENTICATED'; end if;
+ if private.request_uid() is null then raise exception using errcode='42501',message='UNAUTHENTICATED'; end if;
  -- Cheap denial before taking a lock on an unrelated organization.
  if private.current_role(p_org) is null then raise exception using errcode='42501',message='FORBIDDEN'; end if;
  perform 1 from public.organizations where id=p_org and status='ACTIVE' for update;
@@ -177,7 +189,7 @@ declare v_row private.idempotency_records;
 begin
  if p_request is null then raise exception using errcode='22023',message='INVALID_INPUT'; end if;
  select * into v_row from private.idempotency_records
- where organization_id=p_org and principal_kind='USER' and principal_id=auth.uid() and operation=p_operation and key=p_request;
+ where organization_id=p_org and principal_kind='USER' and principal_id=private.request_uid() and operation=p_operation and key=p_request;
  if FOUND then
   if v_row.payload_sha256<>encode(sha256(convert_to(p_payload::text,'UTF8')),'hex')
   then raise exception using errcode='22023',message='IDEMPOTENCY_CONFLICT'; end if;
@@ -189,9 +201,9 @@ create function private.receipt(p_org uuid,p_request uuid,p_operation text,p_pay
 returns jsonb language plpgsql set search_path='' as $$
 begin
  insert into public.audit_log(organization_id,actor_kind,actor_id,action,entity_type,entity_id,request_id)
- values(p_org,'USER',auth.uid(),p_operation,p_entity,p_id,p_request);
+ values(p_org,'USER',private.request_uid(),p_operation,p_entity,p_id,p_request);
  insert into private.idempotency_records(organization_id,principal_kind,principal_id,operation,key,payload_sha256,response)
- values(p_org,'USER',auth.uid(),p_operation,p_request,encode(sha256(convert_to(p_payload::text,'UTF8')),'hex'),p_response);
+ values(p_org,'USER',private.request_uid(),p_operation,p_request,encode(sha256(convert_to(p_payload::text,'UTF8')),'hex'),p_response);
  return p_response;
 end $$;
 revoke all on function private.authorize(uuid),private.replay(uuid,uuid,text,jsonb),private.receipt(uuid,uuid,text,jsonb,jsonb,text,uuid) from public,anon,authenticated;
@@ -212,7 +224,7 @@ begin
   then raise exception using errcode='22023',message='IDEMPOTENCY_CONFLICT'; end if;
   return p_org;
  end if;
- if not exists(select 1 from auth.users where id=p_owner and email_confirmed_at is not null and (banned_until is null or banned_until<clock_timestamp()))
+ if private.verified_auth_email(p_owner) is null
  then raise exception using errcode='22023',message='INVALID_INPUT'; end if;
  insert into public.organizations(id,name) values(p_org,btrim(p_name));
  insert into public.memberships(organization_id,auth_user_id,role) values(p_org,p_owner,'OWNER');
@@ -286,10 +298,10 @@ begin
  v_result:=private.replay(p_organization_id,p_request_id,'transfer_ownership',v_payload);
  if v_result is not null then return v_result; end if;
  if v_role<>'OWNER' then raise exception using errcode='42501',message='FORBIDDEN'; end if;
- select * into v_target from public.memberships where organization_id=p_organization_id and id=p_new_owner_membership_id and active and auth_user_id<>auth.uid();
+ select * into v_target from public.memberships where organization_id=p_organization_id and id=p_new_owner_membership_id and active and auth_user_id<>private.request_uid();
  if not FOUND then raise exception using errcode='42501',message='FORBIDDEN'; end if;
  if p_expected_version is null or v_target.version<>p_expected_version then raise exception using errcode='40001',message='VERSION_CONFLICT'; end if;
- update public.memberships set role='ADMIN',version=version+1 where organization_id=p_organization_id and auth_user_id=auth.uid();
+ update public.memberships set role='ADMIN',version=version+1 where organization_id=p_organization_id and auth_user_id=private.request_uid();
  update public.memberships set role='OWNER',version=version+1 where organization_id=p_organization_id and id=v_target.id;
  return private.receipt(p_organization_id,p_request_id,'transfer_ownership',v_payload,jsonb_build_object('id',v_target.id,'version',v_target.version+1),'memberships',v_target.id);
 end $$;
@@ -309,7 +321,7 @@ begin
  if p_email is null or length(p_email) not between 3 and 254 or p_email<>lower(btrim(p_email)) or position('@' in p_email)<2
  or p_role is null or p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$'
  then raise exception using errcode='22023',message='INVALID_INPUT'; end if;
- select id into v_actor from public.memberships where organization_id=p_organization_id and auth_user_id=auth.uid();
+ select id into v_actor from public.memberships where organization_id=p_organization_id and auth_user_id=private.request_uid();
  insert into private.invitations(organization_id,email,role,token_hash,created_by)
  values(p_organization_id,p_email,p_role,p_token_hash,v_actor) returning id into v_id;
  return private.receipt(p_organization_id,p_request_id,'create_invitation',v_payload,jsonb_build_object('id',v_id),'invitations',v_id);
@@ -320,20 +332,19 @@ create function public.accept_invitation(p_organization_id uuid,p_request_id uui
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare v_inv private.invitations; v_email text; v_id uuid; v_result jsonb; v_payload jsonb;
 begin
- if auth.uid() is null then raise exception using errcode='42501',message='UNAUTHENTICATED'; end if;
+ if private.request_uid() is null then raise exception using errcode='42501',message='UNAUTHENTICATED'; end if;
  if p_token is null or p_token !~ '^[0-9a-f]{64}$' then raise exception using errcode='42501',message='FORBIDDEN'; end if;
  v_payload:=jsonb_build_array(encode(sha256(convert_to(p_token,'UTF8')),'hex'));
  select * into v_inv from private.invitations where organization_id=p_organization_id and token_hash=v_payload->>0;
  if not FOUND then raise exception using errcode='42501',message='FORBIDDEN'; end if;
  perform 1 from public.organizations where id=p_organization_id and status='ACTIVE' for update;
  if not FOUND then raise exception using errcode='42501',message='FORBIDDEN'; end if;
- select lower(email) into v_email from auth.users where id=auth.uid() and email_confirmed_at is not null
- and (banned_until is null or banned_until<clock_timestamp());
+ v_email:=private.verified_auth_email(private.request_uid());
  if v_email is null or v_email<>v_inv.email then raise exception using errcode='42501',message='FORBIDDEN'; end if;
  -- Re-read after serialization. A consumed token only permits same-user/same-request replay while active.
  select * into v_inv from private.invitations where id=v_inv.id and organization_id=p_organization_id;
  if v_inv.accepted_by is not null then
-  if v_inv.accepted_by<>auth.uid() or private.current_role(p_organization_id) is null
+  if v_inv.accepted_by<>private.request_uid() or private.current_role(p_organization_id) is null
   then raise exception using errcode='42501',message='FORBIDDEN'; end if;
   v_result:=private.replay(p_organization_id,p_request_id,'accept_invitation',v_payload);
   if v_result is not null then return v_result; end if;
@@ -346,10 +357,10 @@ begin
  v_result:=private.replay(p_organization_id,p_request_id,'accept_invitation',v_payload);
  if v_result is not null then return v_result; end if;
  -- Existing memberships, including revoked ones, cannot be reactivated through invitations.
- if exists(select 1 from public.memberships where organization_id=p_organization_id and auth_user_id=auth.uid())
+ if exists(select 1 from public.memberships where organization_id=p_organization_id and auth_user_id=private.request_uid())
  then raise exception using errcode='42501',message='FORBIDDEN'; end if;
- insert into public.memberships(organization_id,auth_user_id,role) values(p_organization_id,auth.uid(),v_inv.role) returning id into v_id;
- update private.invitations set accepted_by=auth.uid() where id=v_inv.id and organization_id=p_organization_id;
+ insert into public.memberships(organization_id,auth_user_id,role) values(p_organization_id,private.request_uid(),v_inv.role) returning id into v_id;
+ update private.invitations set accepted_by=private.request_uid() where id=v_inv.id and organization_id=p_organization_id;
  return private.receipt(p_organization_id,p_request_id,'accept_invitation',v_payload,jsonb_build_object('id',v_id,'version',1),'memberships',v_id);
 end $$;
 alter function public.manage_employee(uuid,uuid,uuid,bigint,text,text,uuid,boolean) owner to fichaje_writer;
