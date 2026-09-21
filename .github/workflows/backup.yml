@@ -1,5 +1,7 @@
 name: Repository backup
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
   schedule:
     # 01:30 UTC = 02:30 CET / 03:30 CEST. Drive copy runs later from ChatGPT.
