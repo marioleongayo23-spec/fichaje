@@ -1,0 +1,46 @@
+# Arquitectura
+## Componentes y fronteras
+React + TypeScript + Vite: cliente no fiable. PWA diferida hasta aprobar lógica.
+Cloudflare Pages alojará únicamente estáticos; no se configura cuenta, dominio ni despliegue H0.
+Supabase Auth identifica usuarios; PostgreSQL decide permisos, estados, tiempos y transacciones.
+PostgREST expone lecturas RLS y RPC permitidas. Supabase Edge Function futura solo para gateway
+kiosco/exportaciones: secretos aislados del bundle; no sustituye autorizaciones en PostgreSQL.
+GitHub Actions valida cambios y permite backup manual de código, sin despliegues.
+
+## Multiempresa
+Un proyecto Supabase y esquema compartido para pilotos; no una base por cliente.
+Todas las tablas de negocio llevan organization_id NOT NULL, índices empezando por tenant y
+FK compuestas (organization_id, id). La selección del tenant en UI es solo una preferencia.
+Membresía activa consultada en DB en cada petición; no confiar en user_metadata, rol enviado,
+JWT antiguo con claim de rol ni en un filtro frontend. Recursos privados en schema private.
+RLS habilitada y forzada; matriz en SECURITY. Ningún acceso de soporte global implícito.
+
+## Transacción de fichaje (futuro H2)
+1. Validar identidad; bloquear organización y membresía activas en modo compartido para
+   serializar revocaciones. Administrar permisos usa bloqueo exclusivo en el mismo orden.
+2. Resolver empleado dentro de tenant; bloquear fila employee_state FOR UPDATE (creada al alta).
+3. Buscar clave idempotente con principal+tenant+operación; misma clave/digest devuelve
+   respuesta previa solo tras revalidar permisos; digest distinto devuelve IDEMPOTENCY_CONFLICT.
+4. Verificar expected_version. Otra clave con versión antigua: VERSION_CONFLICT sin evento.
+5. Validar transición; obtener reloj servidor; insertar evento inmutable, auditoría, respuesta
+   idempotente y actualizar proyección con versión incrementada, todo en una transacción.
+6. Commit; ACK. Error revierte todas las escrituras. Bloqueos acotados (5 s), TIMEOUT reintentable
+   con misma clave; máximo 3 reintentos con jitter. Nunca reintentar con clave nueva automáticamente.
+Orden de bloqueos para todas las mutaciones: organización → membresías por UUID → empleado/estado
+por UUID → petición. Evitar locks globales y deadlocks; ningún I/O externo durante transacción.
+
+## Consistencia
+READ COMMITTED + bloqueos explícitos y constraints para escrituras; serializar correcciones y fichajes
+con el mismo estado. Recalcular proyección sobre todo el intervalo afectado antes de commit.
+Exportaciones snapshot consistentes. Logs de éxito atómicos con acción; fallos de autenticación
+se registran de forma independiente con límites de tamaño y sin datos secretos.
+No Redis, colas ni microservicios para dos pilotos. Límite piloto objetivo: 2 empresas × 100 empleados;
+probar p95 <1 s en 20 peticiones simultáneas, sin prometer SLA hasta medir.
+
+## Estado H0
+Cliente Supabase lazy, validación de configuración y página de texto sin diseño. No tablas de negocio,
+RPC, RLS, Auth real, worker PWA ni gateway operativos. Directorio supabase reservado para H1.
+Referencias: [Claves públicas Supabase](https://supabase.com/docs/guides/getting-started/api-keys),
+[RLS Supabase](https://supabase.com/docs/guides/database/postgres/row-level-security),
+[funciones DB](https://supabase.com/docs/guides/database/functions),
+[bloqueos PostgreSQL](https://www.postgresql.org/docs/current/explicit-locking.html).
