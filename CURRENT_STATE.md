@@ -1,7 +1,8 @@
 # CURRENT_STATE — 2026-09-21
 ## Hito autorizado
-HITO 0 Bootstrap, rama `astra/hito-0-bootstrap`, PR contra `main`.
-Implementación terminada; pendiente revisión/aprobación del usuario. HITO 1 NO autorizado.
+HITO 0 Bootstrap aprobado por el usuario e integrado en `main` mediante PR #1 el 2026-09-21.
+Rama de origen: `astra/hito-0-bootstrap`. Merge: `f9a02bb150b424d9cf0a47b741496c997b7bc085`.
+HITO 1 NO autorizado ni iniciado.
 
 ## Entregado
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -28,4 +29,4 @@ Normativa base enlazada y fechada; revisar convenio/sector y requisitos vigentes
 No añadir Secrets ni activar backup DB en este hito. No hacer merge automático.
 
 ## Siguiente paso
-Revisar PR y aprobar H0. Solo con autorización expresa iniciar H1 en otra rama.
+Esperar autorización expresa del usuario para iniciar H1 en otra rama.
