@@ -1,12 +1,11 @@
-name: Repository backup (manual)
+name: Repository backup
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      upload_drive:
-        description: 'Upload repository backup to configured private Drive'
-        type: boolean
-        required: true
-        default: false
+  schedule:
+    # 01:30 UTC = 02:30 CET / 03:30 CEST. Drive copy runs later from ChatGPT.
+    - cron: '30 1 * * *'
 permissions:
   contents: read
 concurrency:
@@ -14,7 +13,6 @@ concurrency:
   cancel-in-progress: false
 jobs:
   repository:
-    # Secrets only consumed by reviewed code on main. No schedule and no database job.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -23,35 +21,17 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Install rclone only when requested
-        if: inputs.upload_drive
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install --no-install-recommends -y rclone
       - name: Create and verify repository backup
         env:
-          BACKUP_UPLOAD_DRIVE: ${{ inputs.upload_drive && '1' || '0' }}
-          RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONFIG }}
-          RCLONE_DESTINATION: ${{ secrets.RCLONE_DESTINATION }}
+          BACKUP_UPLOAD_DRIVE: '0'
         run: |
           set -euo pipefail
           umask 077
-          if [[ "$BACKUP_UPLOAD_DRIVE" == 1 ]]; then
-            test -n "$RCLONE_CONFIG_CONTENT"
-            test -n "$RCLONE_DESTINATION"
-            export RCLONE_CONFIG="$RUNNER_TEMP/fichaje-rclone.conf"
-            trap 'rm -f -- "$RCLONE_CONFIG"' EXIT
-            printf '%s' "$RCLONE_CONFIG_CONTENT" > "$RCLONE_CONFIG"
-          fi
-          unset RCLONE_CONFIG_CONTENT
           bash scripts/backup_repo.sh "$RUNNER_TEMP/fichaje-backups"
-      - name: Retain private repository artifacts
+      - name: Retain private repository artifact
         uses: actions/upload-artifact@v4
         with:
           name: repository-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/fichaje-backups/
           retention-days: 14
           if-no-files-found: error
-      - name: Cleanup temporary configuration
-        if: always()
-        run: rm -f -- "$RUNNER_TEMP/fichaje-rclone.conf"

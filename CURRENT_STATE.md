@@ -28,5 +28,11 @@ service worker ni configuración Cloudflare/producción. Backup remoto real y re
 Normativa base enlazada y fechada; revisar convenio/sector y requisitos vigentes antes de piloto.
 No añadir Secrets ni activar backup DB en este hito. No hacer merge automático.
 
+## OPS-01 — backup online
+En curso en rama `ops/01-online-backup`: backup privado de repositorio programado diariamente a
+01:30 UTC y disponible manualmente, sin credenciales Google en GitHub. El artefacto se conserva 14 días.
+La copia secundaria a Google Drive se realizará mediante automatización ChatGPT con las conexiones
+autorizadas, en `Fichaje APP - BACKUP/01 - Repo Snapshots`. Backup PostgreSQL sigue bloqueado.
+
 ## Siguiente paso
-Esperar autorización expresa del usuario para iniciar H1 en otra rama.
+Cerrar OPS-01 con CI verde, merge y primera copia verificada en Drive. Después autorizar HITO 1.
