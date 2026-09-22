@@ -4,7 +4,9 @@ HITO 0 Bootstrap aprobado por el usuario e integrado en `main` mediante PR #1 el
 Rama de origen: `astra/hito-0-bootstrap`. Merge: `f9a02bb150b424d9cf0a47b741496c997b7bc085`.
 HITO 1 aprobado por el usuario e integrado en `main` mediante PR #4 el 2026-09-22.
 Rama de origen: `astra/hito-1-identidad-rls`. Merge: `ffd12c689824886abd8ba6f1e836057fc43ee9a8`.
-HITO 2 autorizado y en validación en PR #5; no integrado.
+HITO 2 aprobado por el usuario e integrado en `main` mediante PR #5 el 2026-09-22.
+Rama de origen: `astra/hito-2-motor-horario`. Merge: `e4edd0d451627d6cd6e25aafc31819a77ee76116`.
+HITO 3 no autorizado ni iniciado.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -111,9 +113,9 @@ El commit posterior solo registra estas evidencias. Los Checks del PR muestran a
 validación automática sobre ese último commit. H1 aprobado e integrado posteriormente por autorización expresa del usuario; H2 se autorizó después.
 
 ## HITO 2 — motor horario
-ESTADO: PASS — implementación y validación completas; pendiente de revisión/aprobación del usuario.
+ESTADO: PASS — HITO 2 aprobado por el usuario y PR #5 integrado en `main`.
 Rama `astra/hito-2-motor-horario`, base `4ce37bda1e02124def77e0c6e89e2d069e65df21`.
-PR [#5](https://github.com/marioleongayo23-spec/fichaje/pull/5) abierto, sin merge. H3 no iniciado.
+PR [#5](https://github.com/marioleongayo23-spec/fichaje/pull/5) integrado en `main`. H3 no iniciado.
 
 Entregado: work_policies/asignaciones append-only, employee_state con alta/backfill atómicos,
 work_sessions/time_events inmutables, record_time_event y consulta operativa de estado.
@@ -166,4 +168,4 @@ Serialización conservadora por tenant, documentada. No H3, kiosco, informes H5,
 producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 
 ## Siguiente paso
-Esperar revisión y aprobación de HITO 2 en PR #5. No hacer merge ni iniciar HITO 3 sin autorización.
+Trabajo detenido tras el merge de PR #5. Esperar autorización expresa para HITO 3.
