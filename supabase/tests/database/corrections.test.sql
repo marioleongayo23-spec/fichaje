@@ -40,6 +40,20 @@ select throws_ok($$delete from public.time_events$$,'42501',null,'H3 cannot dele
 select throws_ok($$truncate public.time_events$$,'42501',null,'H3 cannot truncate originals');
 select throws_ok($$select private.correction_scope('52000000-0000-0000-0000-000000000002','54000000-0000-0000-0000-000000000003')$$,'42501','FORBIDDEN','cross-tenant scope denied');
 reset role;
+
+-- Decision scope remains employee-scoped even with omitted procedural filters.
+insert into public.correction_requests(id,organization_id,employee_id,submitted_by_membership_id,base_version,reason,proposal,created_at)
+values('55000000-0000-0000-0000-000000000001','52000000-0000-0000-0000-000000000001','54000000-0000-0000-0000-000000000002','53000000-0000-0000-0000-000000000002',0,'Synthetic','[]',clock_timestamp());
+select set_config('request.jwt.claims','{"sub":"51000000-0000-0000-0000-000000000001","role":"authenticated"}',true);
+set local role fichaje_correction;
+select private.correction_scope('52000000-0000-0000-0000-000000000001','54000000-0000-0000-0000-000000000002','55000000-0000-0000-0000-000000000001');
+select is((select count(*)::int from private.employee_state),1,'decision technical reader remains scoped to one employee');
+with changed as (update private.employee_state set version=99 where employee_id='54000000-0000-0000-0000-000000000001' returning *) select is((select count(*)::int from changed),0,'decision capability cannot update other employee');
+with changed as (update private.employee_state set version=99 where organization_id='52000000-0000-0000-0000-000000000002' returning *) select is((select count(*)::int from changed),0,'decision capability cannot update another tenant');
+select throws_ok($$update private.employee_state set organization_id='52000000-0000-0000-0000-000000000002'$$,'42501',null,'decision cannot move projection to foreign tenant');
+select throws_ok($$update private.employee_state set employee_id='54000000-0000-0000-0000-000000000001'$$,'42501',null,'decision cannot move projection to other employee');
+select throws_ok($$insert into public.correction_decisions(organization_id,employee_id,request_id,decision,actor_membership_id,reason,created_at) values('52000000-0000-0000-0000-000000000001','54000000-0000-0000-0000-000000000002','55000000-0000-0000-0000-000000000001','APPROVE','53000000-0000-0000-0000-000000000002','Synthetic',clock_timestamp())$$,'42501',null,'RLS decision actor cannot be forged after a valid gate');
+reset role;
 grant update,delete,truncate on public.correction_requests to fichaje_correction;
 set local role fichaje_correction;
 select throws_ok($$update public.correction_requests set id=id$$,null,null,'immutable correction_requests survives accidental grant: update');
@@ -64,5 +78,19 @@ select throws_ok($$update public.time_events set id=id$$,null,null,'immutable ti
 select throws_ok($$delete from public.time_events$$,null,null,'immutable time_events survives accidental grant: delete');
 select throws_ok($$truncate public.time_events$$,null,null,'immutable time_events survives accidental grant: truncate');
 reset role;
+
+-- A corrected/empty effective projection must not erase original clock high-water.
+insert into public.work_policies(id,organization_id,version,timezone,break_counts_as_work,valid_from,created_by,created_at)
+select '56000000-0000-0000-0000-000000000001',organization_id,1,'Europe/Madrid',false,clock_timestamp(),id,clock_timestamp()
+from public.memberships where organization_id='52000000-0000-0000-0000-000000000001' and role='OWNER';
+insert into public.work_sessions(id,organization_id,employee_id,policy_id,timezone,created_at)
+values('57000000-0000-0000-0000-000000000001','52000000-0000-0000-0000-000000000001','54000000-0000-0000-0000-000000000002','56000000-0000-0000-0000-000000000001','Europe/Madrid',clock_timestamp());
+insert into public.time_events(organization_id,employee_id,session_id,sequence,event_type,server_at,actor_membership_id,source,request_id)
+values('52000000-0000-0000-0000-000000000001','54000000-0000-0000-0000-000000000002','57000000-0000-0000-0000-000000000001',42,'CLOCK_IN',clock_timestamp()+interval '1 day','53000000-0000-0000-0000-000000000002','WEB',gen_random_uuid());
+select set_config('request.jwt.claims','{"sub":"51000000-0000-0000-0000-000000000002","role":"authenticated"}',true);
+set local role authenticated;
+select throws_ok($$select public.record_time_event('52000000-0000-0000-0000-000000000001',gen_random_uuid(),'54000000-0000-0000-0000-000000000002','CLOCK_IN',0)$$,'22023','CLOCK_REGRESSION','empty effective projection cannot hide regression against original server timestamp');
+reset role;
+select is((select count(*)::int from public.time_events),1,'clock high-water regression creates no original');
 select * from finish();
 rollback;

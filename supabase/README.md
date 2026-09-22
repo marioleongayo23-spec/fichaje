@@ -166,6 +166,7 @@ INVALID_TIMELINE, INVALID_ORDINAL o FUTURE_TIME.
 La aprobación incrementa versión exactamente una vez, conserva last_sequence (máximo
 original) y reconstruye estado/sesión/última hora efectiva. Un historial totalmente VOID
 puede tener last_event_at null aun con last_sequence>0. ADD puede dar hora efectiva con
-last_sequence=0. Este es el único ajuste de constraint de la proyección H2; sus RPC no
-cambian. Evidencia original/ajustes/solicitud/decisión es append-only. Rollback incluye
+last_sequence=0. Este es el único ajuste de constraint de la proyección H2. Su RPC de fichaje
+añade únicamente la comparación del reloj contra el máximo server_at original, para que
+corregir/VOID no reduzca la protección CLOCK_REGRESSION; permisos y gates no cambian. Evidencia original/ajustes/solicitud/decisión es append-only. Rollback incluye
 sesiones creadas, auditoría e idempotencia. No clasificaciones de horas en este contrato.
