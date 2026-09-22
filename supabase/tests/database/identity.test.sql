@@ -118,7 +118,9 @@ select throws_ok($test$insert into public.employees(organization_id,code,display
 select throws_ok($test$update public.memberships set active=false where id=md5('m11')::uuid$test$,'23514','LAST_OWNER','ROLE-03 last owner cannot deactivate');
 select throws_ok($test$delete from public.memberships where organization_id=md5('o1')::uuid and role='OWNER'$test$,'23503',NULL,'ROLE-03 owner deletion restricted by FK');
 insert into auth.users(id,email,email_confirmed_at) values(md5('lonely')::uuid,'lonely@example.invalid',clock_timestamp());
+set constraints all deferred;
 select private.bootstrap_organization(md5('lonelyorg')::uuid,'Lonely',md5('lonely')::uuid,gen_random_uuid());
+set constraints all immediate;
 select throws_ok($test$delete from public.memberships where organization_id=md5('lonelyorg')::uuid$test$,'23514','LAST_OWNER','ROLE-03 last owner deletion invariant');
 select throws_ok($test$update public.audit_log set action='tampered'$test$,'42501','IMMUTABLE','audit append only');
 reset role;
