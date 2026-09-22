@@ -66,6 +66,9 @@ por gestor con alcance y recibo auditados; no enlaces públicos ni un cuarto rol
 Empleados sin email reciben copia impresa o descarga asistida individual, sin exponer directorio en kiosco.
 Ficheros temporales privados 24 h, enlace firmado 5 min y autorización al emitirlo; nunca cache pública.
 
+## Operación observable y segura antes de producción
+OPS-02 es obligatorio entre H6 y H7: telemetría, health checks, canaries sintéticos, comprobación de invariantes, alertas y autorrecuperación acotada. El sistema puede reintentar operaciones idempotentes, hacer rollback/redeploy y reconstruir proyecciones declaradas reconstruibles desde fuentes inmutables. Nunca puede corregir autónomamente `time_events`, decisiones/ajustes aprobados ni historia laboral. La IA puede diagnosticar y proponer cambios revisables, no mutar producción.
+
 ## Límites de lanzamiento
 No prometer universalidad sectorial: validar convenio, pausas computables, parciales, turnos y
-obligaciones especiales de cada piloto. Bloquea comercialización hasta H7 aprobado.
+obligaciones especiales de cada piloto. Bloquea comercialización hasta OPS-02 y H7 aprobados.
