@@ -37,6 +37,17 @@ se registran de forma independiente con límites de tamaño y sin datos secretos
 No Redis, colas ni microservicios para dos pilotos. Límite piloto objetivo: 2 empresas × 100 empleados;
 probar p95 <1 s en 20 peticiones simultáneas, sin prometer SLA hasta medir.
 
+## Observabilidad y autorrecuperación — OPS-02
+Antes de H7 habrá una capa operativa separada del dominio: telemetría estructurada, métricas, health checks, canaries sintéticos, comprobadores de invariantes y control de salud de releases. Debe correlacionar por `request_id`, operación y SHA/release sin registrar payloads laborales, JWT, PIN, tokens ni secretos.
+
+Canary: tenant/empleados exclusivamente sintéticos y aislados ejecutan periódicamente el flujo CLOCK_IN → BREAK_START → BREAK_END → CLOCK_OUT y validan respuesta, RLS, auditoría e idempotencia. Nunca usar datos de clientes como sonda.
+
+Invariantes read-only comprueban, entre otras, unicidad de sesión abierta, coherencia `employee_state` frente al timeline efectivo, secuencias, relación evento/audit/idempotencia y ausencia de referencias cross-tenant. Una desviación alerta y puede bloquear una ruta afectada; no autoriza a inventar ni modificar horas.
+
+Self-healing permitido: retry con la misma clave idempotente y backoff, reinicio/redeploy de infraestructura, rollback de release degradada, reintento de jobs y reconstrucción de proyecciones declaradas reconstruibles desde fuentes inmutables. Self-healing prohibido: UPDATE/DELETE/REPLACE automático de `time_events`, decisiones/ajustes laborales o cualquier dato histórico con significado jurídico.
+
+La promoción de release será CI → staging → pruebas sintéticas → canary → health gate → producción. H7 no puede aprobarse sin OPS-02 PASS y un fallo inducido en staging que demuestre detección, alerta y rollback seguro.
+
 ## Estado H0
 Cliente Supabase lazy, validación de configuración y página de texto sin diseño. No tablas de negocio,
 RPC, RLS, Auth real, worker PWA ni gateway operativos. Directorio supabase reservado para H1.
