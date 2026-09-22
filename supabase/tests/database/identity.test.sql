@@ -36,6 +36,7 @@ select ok((not pg_has_role('authenticated','fichaje_writer','MEMBER')),'no role 
 select ok((not has_schema_privilege('authenticated','private','USAGE')),'private schema hidden');
 select ok((not exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','private') and p.prosecdef and not coalesce(p.proconfig @> array['search_path=""'],false))),'definer search paths empty');
 reset role;
+delete from private.mutation_context;
 select set_config('request.jwt.claims',jsonb_build_object('sub',md5('u11')::uuid,'role','authenticated')::text,true);
 set local role authenticated;
 select ok(((select count(*) from public.organizations)=1),'TEN-01 1 OWNER own organization');
@@ -47,6 +48,7 @@ select throws_ok($test$select public.manage_employee(md5('o2')::uuid,gen_random_
 select throws_ok($test$update public.memberships set role='OWNER'$test$,'42501',NULL,'ROLE-01 1 OWNER direct write denied');
 select throws_ok($test$truncate public.employees$test$,'42501',NULL,'1 OWNER truncate denied');
 reset role;
+delete from private.mutation_context;
 select set_config('request.jwt.claims',jsonb_build_object('sub',md5('u12')::uuid,'role','authenticated')::text,true);
 set local role authenticated;
 select ok(((select count(*) from public.organizations)=1),'TEN-01 1 ADMIN own organization');
@@ -58,6 +60,7 @@ select throws_ok($test$select public.manage_employee(md5('o2')::uuid,gen_random_
 select throws_ok($test$update public.memberships set role='OWNER'$test$,'42501',NULL,'ROLE-01 1 ADMIN direct write denied');
 select throws_ok($test$truncate public.employees$test$,'42501',NULL,'1 ADMIN truncate denied');
 reset role;
+delete from private.mutation_context;
 select set_config('request.jwt.claims',jsonb_build_object('sub',md5('u13')::uuid,'role','authenticated')::text,true);
 set local role authenticated;
 select ok(((select count(*) from public.organizations)=1),'TEN-01 1 EMPLOYEE own organization');
@@ -69,6 +72,7 @@ select throws_ok($test$select public.manage_employee(md5('o2')::uuid,gen_random_
 select throws_ok($test$update public.memberships set role='OWNER'$test$,'42501',NULL,'ROLE-01 1 EMPLOYEE direct write denied');
 select throws_ok($test$truncate public.employees$test$,'42501',NULL,'1 EMPLOYEE truncate denied');
 reset role;
+delete from private.mutation_context;
 select set_config('request.jwt.claims',jsonb_build_object('sub',md5('u21')::uuid,'role','authenticated')::text,true);
 set local role authenticated;
 select ok(((select count(*) from public.organizations)=1),'TEN-01 2 OWNER own organization');
@@ -80,6 +84,7 @@ select throws_ok($test$select public.manage_employee(md5('o1')::uuid,gen_random_
 select throws_ok($test$update public.memberships set role='OWNER'$test$,'42501',NULL,'ROLE-01 2 OWNER direct write denied');
 select throws_ok($test$truncate public.employees$test$,'42501',NULL,'2 OWNER truncate denied');
 reset role;
+delete from private.mutation_context;
 select set_config('request.jwt.claims',jsonb_build_object('sub',md5('u22')::uuid,'role','authenticated')::text,true);
 set local role authenticated;
 select ok(((select count(*) from public.organizations)=1),'TEN-01 2 ADMIN own organization');
@@ -91,6 +96,7 @@ select throws_ok($test$select public.manage_employee(md5('o1')::uuid,gen_random_
 select throws_ok($test$update public.memberships set role='OWNER'$test$,'42501',NULL,'ROLE-01 2 ADMIN direct write denied');
 select throws_ok($test$truncate public.employees$test$,'42501',NULL,'2 ADMIN truncate denied');
 reset role;
+delete from private.mutation_context;
 select set_config('request.jwt.claims',jsonb_build_object('sub',md5('u23')::uuid,'role','authenticated')::text,true);
 set local role authenticated;
 select ok(((select count(*) from public.organizations)=1),'TEN-01 2 EMPLOYEE own organization');
@@ -102,11 +108,13 @@ select throws_ok($test$select public.manage_employee(md5('o1')::uuid,gen_random_
 select throws_ok($test$update public.memberships set role='OWNER'$test$,'42501',NULL,'ROLE-01 2 EMPLOYEE direct write denied');
 select throws_ok($test$truncate public.employees$test$,'42501',NULL,'2 EMPLOYEE truncate denied');
 reset role;
+delete from private.mutation_context;
 select set_config('request.jwt.claims',jsonb_build_object('sub',md5('u13')::uuid,'role','authenticated')::text,true);
 set local role authenticated;
 select throws_ok($test$select public.manage_membership(md5('o1')::uuid,gen_random_uuid(),md5('m13')::uuid,1,'ADMIN',true)$test$,'42501','FORBIDDEN','ROLE-01 no self elevation');
 select throws_ok($test$select public.manage_employee(md5('o1')::uuid,gen_random_uuid(),md5('evil')::uuid,0,'X','X',null,true)$test$,'42501','FORBIDDEN','employee cannot create employees');
 reset role;
+delete from private.mutation_context;
 select set_config('request.jwt.claims',jsonb_build_object('sub',md5('u12')::uuid,'role','authenticated')::text,true);
 set local role authenticated;
 select throws_ok($test$select public.manage_membership(md5('o1')::uuid,gen_random_uuid(),md5('m11')::uuid,1,'EMPLOYEE',false)$test$,'42501','FORBIDDEN','ROLE-02 ADMIN cannot manage OWNER');
@@ -114,6 +122,7 @@ select throws_ok($test$select public.manage_membership(md5('o1')::uuid,gen_rando
 select throws_ok($test$select public.transfer_ownership(md5('o1')::uuid,gen_random_uuid(),md5('m13')::uuid,1)$test$,'42501','FORBIDDEN','ROLE-02 ADMIN cannot transfer');
 select throws_ok($test$select public.manage_employee(md5('o1')::uuid,gen_random_uuid(),md5('evil')::uuid,0,'X','X',md5('m23')::uuid,true)$test$,'42501','FORBIDDEN','TEN-04 RPC foreign membership');
 reset role;
+delete from private.mutation_context;
 select throws_ok($test$insert into public.employees(organization_id,code,display_name,membership_id) values(md5('o1')::uuid,'BAD','BAD',md5('m23')::uuid)$test$,'23503',NULL,'TEN-04 composite FK rejects cross tenant');
 select throws_ok($test$update public.memberships set active=false where id=md5('m11')::uuid$test$,'23514','LAST_OWNER','ROLE-03 last owner cannot deactivate');
 select throws_ok($test$delete from public.memberships where organization_id=md5('o1')::uuid and role='OWNER'$test$,'23503',NULL,'ROLE-03 owner deletion restricted by FK');
@@ -124,6 +133,7 @@ set constraints all immediate;
 select throws_ok($test$delete from public.memberships where organization_id=md5('lonelyorg')::uuid$test$,'23514','LAST_OWNER','ROLE-03 last owner deletion invariant');
 select throws_ok($test$update public.audit_log set action='tampered'$test$,'42501','IMMUTABLE','audit append only');
 reset role;
+delete from private.mutation_context;
 select set_config('request.jwt.claims',jsonb_build_object('sub',md5('u11')::uuid,'role','authenticated')::text,true);
 set local role authenticated;
 set constraints all deferred;
@@ -133,16 +143,19 @@ select ok(((select role from public.memberships where id=md5('m12')::uuid)='OWNE
 select public.transfer_ownership(md5('o1')::uuid,md5('transfer')::uuid,md5('m12')::uuid,1);
 select ok(((select count(*) from public.audit_log where action='transfer_ownership')=1),'transfer replay no duplicate audit');
 reset role;
+delete from private.mutation_context;
 select set_config('request.jwt.claims',jsonb_build_object('sub',md5('u12')::uuid,'role','authenticated')::text,true);
 set local role authenticated;
 select public.manage_membership(md5('o1')::uuid,md5('revoke')::uuid,md5('m11')::uuid,2,'ADMIN',false);
 reset role;
+delete from private.mutation_context;
 select set_config('request.jwt.claims',jsonb_build_object('sub',md5('u11')::uuid,'role','authenticated')::text,true);
 set local role authenticated;
 select ok(((select count(*) from public.organizations)=0),'ROLE-04 stale identity loses tenant');
 select ok(((select count(*) from public.employees)=0),'ROLE-04 stale identity loses rows');
 select throws_ok($test$select public.transfer_ownership(md5('o1')::uuid,md5('transfer')::uuid,md5('m12')::uuid,1)$test$,'42501','FORBIDDEN','revoked principal cannot replay receipt');
 reset role;
+delete from private.mutation_context;
 select set_config('request.jwt.claims',jsonb_build_object('sub',md5('u12')::uuid,'role','authenticated')::text,true);
 set local role authenticated;
 select public.manage_employee(md5('o1')::uuid,md5('create')::uuid,md5('created')::uuid,0,'NEW','No email',null,true);
@@ -152,6 +165,7 @@ select ok(((select count(*) from public.audit_log where action='manage_employee'
 select throws_ok($test$select public.manage_employee(md5('o1')::uuid,md5('create')::uuid,md5('created')::uuid,0,'OTHER','No email',null,true)$test$,'22023','IDEMPOTENCY_CONFLICT','payload mismatch rejected');
 select throws_ok($test$select public.manage_employee(md5('o1')::uuid,gen_random_uuid(),md5('created')::uuid,0,'NEW','No email',null,true)$test$,'40001','VERSION_CONFLICT','stale version rejected');
 reset role;
+delete from private.mutation_context;
 set local role anon;
 select throws_ok($test$select * from public.organizations$test$,'42501',NULL,'TEN-06 anon no organizations');
 select throws_ok($test$select * from public.memberships$test$,'42501',NULL,'TEN-06 anon no memberships');
@@ -160,9 +174,11 @@ select throws_ok($test$select * from public.audit_log$test$,'42501',NULL,'TEN-06
 select throws_ok($test$select public.manage_employee(md5('o1')::uuid,gen_random_uuid(),md5('x')::uuid,0,'X','X',null,true)$test$,'42501',NULL,'TEN-06 anon no RPC');
 select throws_ok($test$select * from private.idempotency_records$test$,'42501',NULL,'anon no private rows');
 reset role;
+delete from private.mutation_context;
 select set_config('request.jwt.claims',jsonb_build_object('sub',md5('u12')::uuid,'role','authenticated')::text,true);
 set local role authenticated;
 select throws_ok($test$select private.bootstrap_organization(md5('x')::uuid,'X',md5('u12')::uuid,gen_random_uuid())$test$,'42501',NULL,'no public OWNER bootstrap');
 reset role;
+delete from private.mutation_context;
 select * from finish();
 rollback;

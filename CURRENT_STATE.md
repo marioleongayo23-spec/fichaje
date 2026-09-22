@@ -40,7 +40,7 @@ Checksums internos PASS; bundle restaurado en repositorio vacío y `main` restau
 05:00 Europe/Madrid. Backup PostgreSQL sigue bloqueado.
 
 ## HITO 1 — identidad y aislamiento
-ESTADO: PASS en pruebas H1; pendiente de revisión/aprobación del usuario. PR #4 abierto contra main.
+ESTADO: BLOCKED — H1 no aprobado. Correcciones SEC-H1-01 y AUD-H1-01 pendientes de nueva CI. PR #4 permanece abierto.
 Rama: `astra/hito-1-identidad-rls`, base `39ff3e041e49396fa177e13a0b2e4ebbef034da6`.
 
 Entregado: Supabase local CLI 2.117.0 / PostgreSQL 17; migración de organizaciones,
@@ -78,6 +78,17 @@ además la ejecución automática sobre ese commit.
 Límites: solo stack local efímero CI, datos sintéticos. No proyecto Supabase remoto, producción,
 secretos GitHub, envío de invitaciones, kiosco, informes ni diseño visual. Baja tenant bloquea
 JWT previo por RLS/RPC; no revoca sesiones globales de otras organizaciones. Backup DB sigue bloqueado.
+
+## Revisión SEC-H1-01 / AUD-H1-01
+Segunda migración: capacidad de tenant protegida por xid8/backend/principal, sin GUC como
+fuente de autorización; escritor ordinario sin acceso global. Guard solo lee identidad/invitaciones
+y emite contexto; bootstrap y aceptación tienen roles separados, NOLOGIN/NOBYPASSRLS, políticas
+acotadas y GRANT específicos. Scope ordinario no puede cambiar de tenant dentro de la transacción.
+Los contextos de transacciones finalizadas nunca autorizan otra transacción; se limpian al siguiente bind.
+Auditoría before/after de role, active, membership_id y versiones; transferencia con ambas membresías.
+Sin email, token, nombre ni payload completo. Pruebas negativas del rol técnico y de función
+intencionadamente sin filtro; reconstrucción exclusiva desde audit en SQL y REST real.
+Ejecución SQL/integración/CI de estas correcciones pendiente; la evidencia anterior no las acredita.
 
 ## Siguiente paso
 Revisar y aprobar PR #4. Trabajo detenido en H1; no merge ni H2 sin autorización.

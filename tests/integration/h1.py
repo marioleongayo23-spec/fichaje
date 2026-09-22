@@ -172,6 +172,31 @@ code, _ = accept(orgs[1], owner, token2)
 check(code == 200, 'same Auth identity joins second organization')
 code, _ = rpc('manage_employee', owner['token'], employee_args(orgs[1]))
 check(code == 403, 'OWNER in A remains EMPLOYEE in B')
+# AUD-H1-01: reconstruct security transitions using only the real REST audit endpoint.
+audit_user = account('audit-subject')
+audit_token, _, _ = invite(org, owner, audit_user, 'EMPLOYEE')
+code, audit_member = accept(org, audit_user, audit_token)
+check(code == 200, 'AUD subject provisioned through real invitation')
+for version, role, active in [(1, 'ADMIN', False), (2, 'EMPLOYEE', True)]:
+    code, _ = rpc('manage_membership', owner['token'], dict(p_organization_id=org,p_request_id=uid(),
+        p_membership_id=audit_member['id'],p_expected_version=version,p_role=role,p_active=active))
+    check(code == 200, 'AUD successive role/state mutation')
+code, history = api('/rest/v1/audit_log?select=safe_details&action=eq.manage_membership&entity_id=eq.' + audit_member['id'], owner['token'])
+check(code == 200 and sorted([x['safe_details'] for x in history], key=lambda x:x['after']['version']) == [
+    {'before': {'role':'EMPLOYEE','active':True,'version':1}, 'after': {'role':'ADMIN','active':False,'version':2}},
+    {'before': {'role':'ADMIN','active':False,'version':2}, 'after': {'role':'EMPLOYEE','active':True,'version':3}}],
+    'AUD role/state reconstructed exclusively from audit REST rows')
+audit_employee = employee_args(org, audit_member['id'])
+code, _ = rpc('manage_employee', owner['token'], audit_employee)
+check(code == 200, 'AUD employee with linkage created')
+code, _ = rpc('manage_employee', owner['token'], {**audit_employee, 'p_request_id':uid(),
+    'p_expected_version':1,'p_membership_id':None,'p_active':False})
+check(code == 200, 'AUD employee linkage/state changed')
+code, history = api('/rest/v1/audit_log?select=safe_details&action=eq.manage_employee&entity_id=eq.' + audit_employee['p_employee_id'], owner['token'])
+changes = sorted([x['safe_details'] for x in history], key=lambda x:x['after']['version'])
+check(code == 200 and changes[1] == {'before': {'membership_id':audit_member['id'],'active':True,'version':1},
+    'after': {'membership_id':None,'active':False,'version':2}}, 'AUD linkage reconstructed without querying employee table')
+
 # Concurrent idempotent writes, real independent HTTP/DB transactions.
 args = employee_args(org)
 with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
@@ -225,10 +250,21 @@ check(code == 403, 'revoked issuer invitation invalid')
 transfer = dict(p_organization_id=org,p_request_id=uid(),p_new_owner_membership_id=employee['membership'],p_expected_version=1)
 code, response = rpc('transfer_ownership', owner['token'], transfer)
 check(code == 200, 'atomic ownership transfer')
+code_audit, entries = api('/rest/v1/audit_log?select=safe_details&action=eq.transfer_ownership&request_id=eq.' + transfer['p_request_id'], employee['token'])
+changes = entries[0]['safe_details']['changes'] if code_audit == 200 and entries else []
+check(len(changes) == 2 and changes[0]['membership_id'] == owner['membership']
+      and changes[0]['before']['role'] == 'OWNER' and changes[0]['after']['role'] == 'ADMIN'
+      and changes[1]['membership_id'] == employee['membership']
+      and changes[1]['before']['role'] == 'EMPLOYEE' and changes[1]['after']['role'] == 'OWNER',
+      'AUD OWNER transfer reconstructs both parties from audit')
+code_audit, entries = api('/rest/v1/audit_log?select=safe_details', employee['token'])
+check(code_audit == 200 and not any(word in json.dumps(entries) for word in ['email','token','payload','display_name','example.invalid']),
+      'AUD security evidence excludes sensitive fields')
 code, replay = rpc('transfer_ownership', owner['token'], transfer)
 check(code == 200 and replay == response, 'previous owner can replay same transfer')
 code, _ = rpc('transfer_ownership', owner['token'], {**transfer,'p_request_id':uid()})
 check(code == 403, 'previous owner cannot transfer again')
 code, _ = rpc('manage_membership', employee['token'], dict(p_organization_id=org,p_request_id=uid(),p_membership_id=employee['membership'],p_expected_version=2,p_role='EMPLOYEE',p_active=False))
 check(code == 403, 'new OWNER cannot remove own ownership')
+check(sql('select count(*) from private.mutation_context where transaction_id=pg_current_xact_id();') == '0', 'SEC previous transaction capability cannot be reused')
 print(f'PASS: {checks} real integration checks. Synthetic data only; local stack destroyed by CI.', flush=True)
