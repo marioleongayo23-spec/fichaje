@@ -62,6 +62,13 @@ credenciales de empleado. Solicitudes de corrección asistidas autentican emplea
 PIN reduce fricción pero no prueba presencia física ni evita que se comparta; empresa debe aceptar
 riesgo y procedimiento antes del piloto. Sin conexión no confirmar fichaje.
 
+## Observabilidad segura — OPS-02
+Telemetría y alertas siguen minimización y least privilege. Registrar solo lo necesario para operar: `request_id`, operación, release/commit, clase de error, latencia y referencias técnicas acotadas. No registrar JWT, refresh tokens, PIN, challenges, emails, motivos de corrección, payloads de fichaje/exportación ni contenido laboral completo. Acceso a dashboards/logs restringido y auditado; retención definida antes de producción.
+
+La observabilidad no crea un canal de soporte global que eluda RLS. Las sondas funcionales usan únicamente tenant sintético; los checks de invariantes sobre producción son read-only y tenant-scoped o agregados sin contenido personal. Alertas deben evitar enumeración cross-tenant.
+
+Un agente automático o IA puede diagnosticar, proponer tests/fixes y abrir cambios revisables, pero no obtiene autoridad para editar historia laboral en producción. Rollback/restart/retry solo bajo reglas previamente probadas; cualquier reparación de proyección se deriva de fuente inmutable y deja evidencia operativa.
+
 ## Amenazas y respuesta
 - Tenant spoofing, referencias cruzadas, invitaciones y roles: RLS + FK + pruebas con dos tenants.
 - Doble clic/replay/carreras: clave persistente + locks + versión + transacción.
