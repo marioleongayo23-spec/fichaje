@@ -66,7 +66,7 @@ def account(label, verified=True):
     if not verified:
         return {'id': user['id'], 'email': email}
     code, session = api('/auth/v1/token?grant_type=password', data={'email': email, 'password': password})
-    assert code == 200, 'Real password sign-in failed'
+    assert code == 200, f"Real password sign-in failed: HTTP {code}, code={session.get('error_code', 'unknown')}"
     return {'id': user['id'], 'email': email, 'token': session['access_token']}
 
 
