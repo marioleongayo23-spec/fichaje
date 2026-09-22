@@ -167,5 +167,8 @@ guard real, sin sustituir reloj/RPC. Timeout usa proxy local que pierde el ACK t
 Serialización conservadora por tenant, documentada. No H3, kiosco, informes H5, UI/PWA,
 producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 
+## OPS-02 — observabilidad y resiliencia (planificado)
+Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
+
 ## Siguiente paso
-Trabajo detenido tras el merge de PR #5. Esperar autorización expresa para HITO 3.
+Trabajo detenido tras el merge de PR #5. Esperar autorización expresa para HITO 3. OPS-02 se implementará después de H6 y antes de H7.
