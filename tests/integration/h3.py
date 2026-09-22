@@ -160,6 +160,20 @@ code,_=decide(request,admin)
 check(code==403,'COR-02 affected manager cannot approve another manager request')
 code,_=decide(request,owner)
 check(code==403,'COR-02 sole other manager cannot approve own submission: no exception')
+# Rebinding an employee must not bypass personal independence: snapshot and
+# immutable original actor remain evidence even after the current link is removed.
+admin_code=sql(f"select code from public.employees where id='{admin['employee']}';")
+args=dict(p_organization_id=org,p_request_id=uid(),p_employee_id=admin['employee'],p_expected_version=1,p_code=admin_code,p_display_name='Synthetic admin',p_membership_id=None,p_active=True)
+code,r=rpc('manage_employee',owner['token'],args); assert code==200,r
+code,_=decide(request,admin)
+check(code==403,'COR-02 unlink after submission cannot bypass affected-manager independence')
+# A fresh request after unlink is still personally affected through original actor.
+args2=dict(p_organization_id=org,p_request_id=uid(),p_employee_id=admin['employee'],p_base_version=1,p_reason='Synthetic after unlink',p_operations=[op('CLOCK_OUT',aentry['session_id'],now())])
+code,r=rpc('submit_correction',owner['token'],args2); assert code==200,r
+code,_=decide(r['correction_request_id'],admin)
+check(code==403,'COR-02 unlink before submission cannot bypass immutable original actor')
+args.update(p_request_id=uid(),p_expected_version=2,p_membership_id=admin['membership'])
+code,r=rpc('manage_employee',owner['token'],args); assert code==200,r
 # Owner submits own -> other admin can decide.
 oentry=clock('CLOCK_IN',owner)
 request,_=submit([op('CLOCK_OUT',oentry['session_id'],now())],u=owner)
@@ -258,8 +272,9 @@ for table in ['correction_requests','correction_decisions','event_adjustments']:
     check(code==200 and rows==[],'same tenant other employee read denied '+table)
     code,_=api('/rest/v1/'+table,None); check(code in (401,403),'anonymous read denied '+table)
     for method in ['POST','PATCH','DELETE']:
-        code,_=api('/rest/v1/'+table,admin['token'],{} if method!='DELETE' else None,method)
-        check(code==403,'direct '+method+' denied '+table)
+        payload={'created_at':'2000-01-01T00:00:00Z'} if method=='PATCH' else {'id':uid()} if method=='POST' else None
+        code,err=api('/rest/v1/'+table,admin['token'],payload,method)
+        check(code==403,f'direct {method} denied {table}: {code}, {err}')
 check(timeline(token=other['token'])==[],'effective timeline RPC cannot leak foreign tenant')
 check(timeline(u=owner,token=user['token'])==[],'effective timeline RPC cannot leak another employee')
 # Revocation takes shared H1 tenant lock; waiting approval must recheck identity.

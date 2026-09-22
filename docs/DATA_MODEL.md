@@ -100,3 +100,7 @@ server_at original/created_at del ajuste. Se conserva la evidencia de autor y fu
 La proyección separa last_sequence original de last_event_at efectivo, permitiendo historia
 completamente anulada o formada solo por ADD. Se preserva el contrato de independencia;
 hour_classifications no es necesario para correcciones y no se implementa en H3.
+
+`correction_requests.affected_membership_id` conserva el vínculo al presentar la solicitud
+(FK tenant, nullable sin Auth). La independencia considera vínculo actual, vínculo
+capturado, solicitante y autor de originales; una reasignación no borra esta evidencia.

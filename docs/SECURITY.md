@@ -140,3 +140,8 @@ Bind único antes del lock de organización; revalidación después del lock, in
 de recuperar recibos. No excepciones para un único gestor. Lector de timeline separado,
 solo lectura y RLS propio/gestor; sin mutación. Originales y cuatro tablas de evidencia
 mantienen triggers de inmutabilidad. Todos los FK de ajuste incluyen tenant y empleado.
+
+La independencia también conserva el vínculo afectado capturado al solicitar y comprueba
+el autor de fichajes originales mediante el lector RLS. Desvincular/reasignar el empleado
+antes o después de solicitar no permite al autor de esos fichajes aprobarlos. El guard
+no gana lectura global de eventos; el helper lector solo ve el historial autorizado.

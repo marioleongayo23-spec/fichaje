@@ -9,14 +9,15 @@ alter table private.mutation_context add constraint mutation_context_route_check
 
 create table public.correction_requests (
  id uuid primary key default gen_random_uuid(), organization_id uuid not null,
- employee_id uuid not null, submitted_by_membership_id uuid not null,
+ employee_id uuid not null, submitted_by_membership_id uuid not null, affected_membership_id uuid,
  base_version bigint not null check(base_version>=0),
  reason text not null check(length(btrim(reason)) between 1 and 1000),
  proposal jsonb not null check(jsonb_typeof(proposal)='array' and octet_length(proposal::text)<=65536),
  created_at timestamptz not null,
  unique(organization_id,id), unique(organization_id,employee_id,id),
  foreign key(organization_id,employee_id) references public.employees(organization_id,id) on delete restrict,
- foreign key(organization_id,submitted_by_membership_id) references public.memberships(organization_id,id) on delete restrict
+ foreign key(organization_id,submitted_by_membership_id) references public.memberships(organization_id,id) on delete restrict,
+ foreign key(organization_id,affected_membership_id) references public.memberships(organization_id,id) on delete restrict
 );
 create table public.correction_decisions (
  id uuid primary key default gen_random_uuid(), organization_id uuid not null, employee_id uuid not null,
@@ -67,12 +68,31 @@ do $$ declare t text; begin
   execute format('create trigger immutable before update or delete or truncate on public.%I for each statement execute function private.immutable_record()',t);
  end loop;
 end $$;
+-- Dedicated read-only owner, with the same own/manager RLS as authenticated.
+grant select on public.time_events,public.correction_decisions,public.event_adjustments to fichaje_state_reader;
+do $$ declare t text; begin
+ foreach t in array array['time_events','correction_decisions','event_adjustments'] loop
+  execute format('create policy timeline_read on public.%I for select to fichaje_state_reader using(private.current_role(organization_id) is not null and exists(select 1 from public.employees e where e.organization_id=%I.organization_id and e.id=%I.employee_id))',t,t,t);
+ end loop;
+end $$;
+grant create on schema public to fichaje_state_reader;
+grant create on schema private to fichaje_state_reader;
+create function private.was_clock_actor(p_org uuid,p_employee uuid) returns boolean
+language sql stable security definer set search_path='' as $$
+ select exists(select 1 from public.time_events e join public.memberships m
+ on m.organization_id=e.organization_id and m.id=e.actor_membership_id
+ where e.organization_id=p_org and e.employee_id=p_employee and m.auth_user_id=private.request_uid())
+$$;
+alter function private.was_clock_actor(uuid,uuid) owner to fichaje_state_reader;
+revoke all on function private.was_clock_actor(uuid,uuid) from public,anon,authenticated,service_role;
+grant execute on function private.was_clock_actor(uuid,uuid) to fichaje_guard;
+revoke create on schema private from fichaje_state_reader;
 -- Guard only validates identity and independence; no correction write grants.
 grant select on public.correction_requests to fichaje_guard;
 create policy guard_read on public.correction_requests for select to fichaje_guard using(true);
 create function private.correction_access(p_org uuid,p_employee uuid,p_request uuid default null) returns uuid
 language plpgsql security definer set search_path='' as $$
-declare actor uuid; role public.member_role; affected uuid; requester uuid;
+declare actor uuid; role public.member_role; affected uuid; requester uuid; affected_at_submit uuid;
 begin
  role:=private.current_role(p_org);
  if role is null then raise exception using errcode='42501',message='FORBIDDEN'; end if;
@@ -81,9 +101,10 @@ begin
  if not FOUND or (role='EMPLOYEE' and affected is distinct from actor) then
   raise exception using errcode='42501',message='FORBIDDEN'; end if;
  if p_request is not null then
-  select submitted_by_membership_id into requester from public.correction_requests
+  select submitted_by_membership_id,affected_membership_id into requester,affected_at_submit from public.correction_requests
   where organization_id=p_org and employee_id=p_employee and id=p_request;
-  if not FOUND or role not in ('OWNER','ADMIN') or actor=requester or actor=affected then
+  if not FOUND or role not in ('OWNER','ADMIN') or actor=requester or actor=affected or actor=affected_at_submit
+   or private.was_clock_actor(p_org,p_employee) then
    raise exception using errcode='42501',message='FORBIDDEN'; end if;
  end if;
  return actor;
@@ -100,6 +121,17 @@ end $$;
 alter function private.correction_scope(uuid,uuid,uuid) owner to fichaje_guard;
 revoke all on function private.correction_scope(uuid,uuid,uuid) from public,anon,authenticated,service_role;
 grant execute on function private.correction_scope(uuid,uuid,uuid) to fichaje_correction;
+create function private.correction_affected(p_org uuid,p_employee uuid) returns uuid
+language plpgsql security definer set search_path='' as $$
+declare affected uuid;
+begin
+ perform private.correction_access(p_org,p_employee);
+ select membership_id into affected from public.employees where organization_id=p_org and id=p_employee;
+ return affected;
+end $$;
+alter function private.correction_affected(uuid,uuid) owner to fichaje_guard;
+revoke all on function private.correction_affected(uuid,uuid) from public,anon,authenticated,service_role;
+grant execute on function private.correction_affected(uuid,uuid) to fichaje_correction;
 -- Request resolution returns only an authorized subject, never an arbitrary tenant row.
 create function private.correction_subject(p_org uuid,p_request uuid) returns uuid
 language plpgsql security definer set search_path='' as $$
@@ -144,7 +176,8 @@ create policy correction_decision_insert on public.correction_decisions for inse
  and actor_membership_id=private.correction_access(organization_id,employee_id,request_id));
 create policy correction_submit on public.correction_requests for insert to fichaje_correction
  with check(organization_id=private.scoped_tenant('correction_submit') and employee_id=private.scoped_subject('correction_submit')
- and submitted_by_membership_id=private.correction_access(organization_id,employee_id));
+ and submitted_by_membership_id=private.correction_access(organization_id,employee_id)
+ and affected_membership_id is not distinct from private.correction_affected(organization_id,employee_id));
 create policy correction_state on private.employee_state for update to fichaje_correction
  using(organization_id=private.scoped_tenant('correction_decide') and employee_id=private.scoped_subject('correction_decide'))
  with check(organization_id=private.scoped_tenant('correction_decide') and employee_id=private.scoped_subject('correction_decide'));
@@ -182,7 +215,7 @@ language sql stable set search_path='' as $$
  where a.operation<>'VOID' and not exists(select 1 from a successor where successor.supersedes_adjustment_id=a.id)
 $$;
 revoke all on function private.effective_timeline(uuid,uuid,timestamptz) from public,anon,authenticated,service_role;
-grant execute on function private.effective_timeline(uuid,uuid,timestamptz) to fichaje_correction;
+grant execute on function private.effective_timeline(uuid,uuid,timestamptz) to fichaje_correction,fichaje_state_reader;
 
 -- Pure validation over the real persisted candidate (rolled back on any error).
 create function private.validate_timeline(p_org uuid,p_employee uuid,p_now timestamptz) returns jsonb
@@ -301,8 +334,8 @@ begin
  if s.version<>p_base_version then raise exception using errcode='PT409',message='VERSION_CONFLICT'; end if;
  t:=clock_timestamp();
  perform private.validate_operations(p_organization_id,p_employee_id,p_operations,t);
- insert into public.correction_requests(id,organization_id,employee_id,submitted_by_membership_id,base_version,reason,proposal,created_at)
- values(v_id,p_organization_id,p_employee_id,actor,p_base_version,btrim(p_reason),p_operations,t);
+ insert into public.correction_requests(id,organization_id,employee_id,submitted_by_membership_id,affected_membership_id,base_version,reason,proposal,created_at)
+ values(v_id,p_organization_id,p_employee_id,actor,private.correction_affected(p_organization_id,p_employee_id),p_base_version,btrim(p_reason),p_operations,t);
  r:=jsonb_build_object('correction_request_id',v_id,'request_id',p_request_id,'base_version',s.version);
  return private.correction_receipt(p_organization_id,p_employee_id,p_request_id,'submit_correction',payload,r,'correction_requests',v_id,t,
  jsonb_build_object('base_version',s.version,'operations',jsonb_array_length(p_operations),'submitted_by_membership_id',actor));
@@ -375,15 +408,6 @@ end $$;
 alter function public.decide_correction(uuid,uuid,uuid,text,text) owner to fichaje_correction;
 revoke all on function public.decide_correction(uuid,uuid,uuid,text,text) from public,anon,service_role;
 grant execute on function public.decide_correction(uuid,uuid,uuid,text,text) to authenticated;
--- Dedicated read-only owner, with the same own/manager RLS as authenticated.
-grant select on public.time_events,public.correction_decisions,public.event_adjustments to fichaje_state_reader;
-do $$ declare t text; begin
- foreach t in array array['time_events','correction_decisions','event_adjustments'] loop
-  execute format('create policy timeline_read on public.%I for select to fichaje_state_reader using(private.current_role(organization_id) is not null and exists(select 1 from public.employees e where e.organization_id=%I.organization_id and e.id=%I.employee_id))',t,t,t);
- end loop;
-end $$;
-grant execute on function private.effective_timeline(uuid,uuid,timestamptz) to fichaje_state_reader;
-grant create on schema public to fichaje_state_reader;
 create function public.get_effective_timeline(p_organization_id uuid,p_employee_id uuid,p_cutoff timestamptz default 'infinity')
 returns table(event_id uuid,adjustment_id uuid,session_id uuid,event_type public.time_action,server_at timestamptz,effective_at timestamptz,ordinal bigint,source text,actor_membership_id uuid)
 language sql stable security definer set search_path='' as $$
