@@ -4,7 +4,7 @@ HITO 0 Bootstrap aprobado por el usuario e integrado en `main` mediante PR #1 el
 Rama de origen: `astra/hito-0-bootstrap`. Merge: `f9a02bb150b424d9cf0a47b741496c997b7bc085`.
 HITO 1 aprobado por el usuario e integrado en `main` mediante PR #4 el 2026-09-22.
 Rama de origen: `astra/hito-1-identidad-rls`. Merge: `ffd12c689824886abd8ba6f1e836057fc43ee9a8`.
-HITO 2 no autorizado ni iniciado.
+HITO 2 autorizado y en validación en PR #5; no integrado.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -108,7 +108,7 @@ Evidencia de las correcciones ejecutada el 2026-09-22, código `43a2b6f418aca4d0
   revertido con ROLLBACK. El primer intento del run final falló antes de tests por puerto 54324
   ocupado en el runner; el segundo completó toda la validación sin cambiar código ni omitir tests.
 El commit posterior solo registra estas evidencias. Los Checks del PR muestran además la nueva
-validación automática sobre ese último commit. H1 aprobado e integrado posteriormente por autorización expresa del usuario; H2 no iniciado.
+validación automática sobre ese último commit. H1 aprobado e integrado posteriormente por autorización expresa del usuario; H2 se autorizó después.
 
 ## HITO 2 — motor horario (en validación)
 Autorizado por el usuario. Rama `astra/hito-2-motor-horario`, base `4ce37bda1e02124def77e0c6e89e2d069e65df21`.
@@ -119,6 +119,15 @@ locks compatibles con H1, RLS/FK, reloj único tras lock y CLOCK_REGRESSION.
 H1 permanece intacto. Sin H3, kiosco, informes, UI, PWA, producción ni datos reales.
 Pruebas nuevas SQL y Auth/REST real; h2.py ejecuta primero la suite completa H1.
 CI reconstruye desde vacío y destruye el stack al terminar. Evidencia pendiente.
+Continuación desde `a75f7c7fa7704f87d642d004884195e084918d68`, mismo PR #5:
+- Causa del 403 prematuro: authorize de H1 emite capacidad member solo para gestores.
+- Migración aditiva H2 con fichaje_clock, capacidad clock ligada a tenant/empleado/principal/
+  transacción y revalidación tras el lock compartido con H1. No amplía member_scope ni writer.
+- Estado consultado mediante fichaje_state_reader sin privilegios de escritura.
+- Pruebas negativas nuevas de permisos, scope, aislamiento e inmutabilidad; regresión
+  POLICY_REQUIRED y empleado inactivo en integración real.
+- Primera CI general del cambio `e753b8c`: PASS; DB en ejecución. Sin PASS de H2 todavía.
+
 
 ## Siguiente paso
 Completar validación H2 y revisión del PR. No hacer merge ni iniciar H3.

@@ -48,8 +48,10 @@ def assign(p, employee=None):
 def snapshot():
     return sql(f"select jsonb_build_array((select to_jsonb(s) from private.employee_state s where employee_id='{user['employee']}'),(select count(*) from public.time_events where employee_id='{user['employee']}'),(select count(*) from public.work_sessions where employee_id='{user['employee']}'),(select count(*) from private.idempotency_records where operation='record_time_event' and organization_id='{org}'),(select count(*) from public.audit_log where action='record_time_event' and organization_id='{org}'));")
 
+before = snapshot()
 code, err = call('CLOCK_IN',0)
 check(code == 400 and err['message']=='POLICY_REQUIRED', f'no invented default work policy: HTTP {code}, {err}')
+check(snapshot()==before, 'missing policy leaves state/session/event/audit/idempotency unchanged')
 for zone in ['Europe/Not_A_Zone','CET','+02:00',None]:
     code, _ = rpc('create_work_policy',owner['token'],dict(p_organization_id=org,p_request_id=uid(),p_timezone=zone,p_break_counts_as_work=False))
     check(code >= 400, 'invalid/non-IANA timezone rejected')
@@ -241,6 +243,23 @@ code, state=rpc('get_employee_state',user['token'],dict(p_organization_id=org,p_
 check(code==200 and state['incident']=='OPEN_SESSION' and state['state']=='WORKING','open session explicitly incomplete without invented hours')
 code, _=rpc('get_employee_state',user['token'],dict(p_organization_id=org,p_employee_id=owner['employee']))
 check(code==403,'state read own-only')
+
+# Disabled employee must not clock or recover a receipt, without revoking membership.
+code, _=rpc('manage_employee',owner['token'],dict(p_organization_id=org,p_request_id=uid(),
+    p_employee_id=user['employee'],p_expected_version=1,p_code='h2-worker',
+    p_display_name='Synthetic employee',p_membership_id=user['membership'],p_active=False))
+assert code==200
+before=snapshot()
+code, err=call('CLOCK_OUT',version)
+check(code==403 and err['message']=='FORBIDDEN' and snapshot()==before,'inactive employee cannot clock')
+code, _=rpc('record_time_event',user['token'],args)
+check(code==403,'inactive employee cannot replay committed clock receipt')
+code, state=rpc('get_employee_state',user['token'],dict(p_organization_id=org,p_employee_id=user['employee']))
+check(code==200 and state['state']=='WORKING','inactive employee retains authorized state read')
+code, _=rpc('manage_employee',owner['token'],dict(p_organization_id=org,p_request_id=uid(),
+    p_employee_id=user['employee'],p_expected_version=2,p_code='h2-worker',
+    p_display_name='Synthetic employee',p_membership_id=user['membership'],p_active=True))
+assert code==200
 
 # RACE-03 H1 revocation wins tenant lock first, waiting clock/replay must fail.
 revoke_sql=fr'''begin;

@@ -100,7 +100,9 @@ RPC nuevas (todas con prefijo `p_` en argumentos):
 - `get_employee_state(organization_id, employee_id)`: propio o gestor; devuelve versión,
   secuencia, sesión abierta y `OPEN_SESSION` mientras esté incompleta. No calcula horas.
 
-Orden de locks: autorización/contexto y organización H1 → employee_state FOR UPDATE.
+Orden de locks: capability clock propia → organización (mismo lock H1) → revalidación
+de autorización → employee_state FOR UPDATE. El bind/limpieza de contextos no se repite
+bajo el lock de organización. create/assign policy siguen usando el gate de gestores H1.
 La serialización por tenant también ordena idempotencia entre empleados y revocaciones.
 Es conservadora: empleados distintos del mismo tenant esperan entre sí; optimización
 solo con evidencia futura. Nueva alta crea proyección con trigger invoker; backfill OUT
@@ -113,3 +115,8 @@ CLOCK_REGRESSION rechaza sin escrituras, visible como error operativo a quien ll
 una alerta externa persistente queda pendiente de observabilidad del piloto H7.
 UTC para intervalos, zona IANA fijada para día local de entrada. No hay cierres
 por medianoche/duración, ni totales inventados, ni informes H5 anticipados.
+
+El 403 prematuro de EMPLOYEE se corrige mediante una migración aditiva de capacidad clock;
+no se amplía member_scope. RLS limita el nuevo rol técnico al tenant y empleado propios.
+La consulta de estado usa otro rol de solo lectura; no presta privilegios de fichaje.
+`clock_capability.test.sql` prueba también el rol técnico sin filtros de aplicación.

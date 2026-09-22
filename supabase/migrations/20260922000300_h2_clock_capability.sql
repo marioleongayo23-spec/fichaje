@@ -87,8 +87,10 @@ begin
  perform private.clock_scope(p_organization_id,p_employee_id);
  perform 1 from public.organizations where id=p_organization_id and status='ACTIVE' for update;
  if not FOUND then raise exception using errcode='42501',message='FORBIDDEN'; end if;
- -- Revalidate membership/employee after the same tenant lock used by H1 revocation.
- perform private.clock_scope(p_organization_id,p_employee_id);
+ -- Revalidate after the H1 tenant lock. Do not bind/delete contexts again
+ -- while holding it: a waiting transaction may hold a context-cleanup row lock.
+ if private.current_role(p_organization_id) is null then
+  raise exception using errcode='42501',message='FORBIDDEN'; end if;
  select m.id into actor from public.memberships m join public.employees e
  on e.organization_id=m.organization_id and e.membership_id=m.id
  where m.organization_id=p_organization_id and m.auth_user_id=private.request_uid() and m.active and e.active and e.id=p_employee_id;
