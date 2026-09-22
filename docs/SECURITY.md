@@ -128,3 +128,15 @@ no se repite limpieza de contextos bajo el lock de organización, evitando inver
 El guard añade solo lectura de employees para validar el vínculo; no recibe mutaciones tenant.
 `fichaje_state_reader` solo lee el estado propio o el autorizado a gestores mediante RLS;
 no emite capabilities ni escribe. Desactivar empleado bloquea fichaje/replay, no borra historial.
+
+### H3 — capacidades de corrección
+`fichaje_correction` NOLOGIN/NOINHERIT/NOBYPASSRLS no hereda H1/H2 ni puede invocar sus
+gates, alterar identidad o insertar/modificar originales. Dos rutas protegidas acotadas a
+tenant/empleado: `correction_submit` solo inserta solicitudes; `correction_decide` permite
+las decisiones, ajustes, sesiones añadidas y proyección. RLS valida además identidad del
+solicitante y la independencia del decisor en cada INSERT de solicitud/decisión.
+El guard solo gana lectura de solicitudes para validar esas reglas, sin DML de negocio.
+Bind único antes del lock de organización; revalidación después del lock, incluso antes
+de recuperar recibos. No excepciones para un único gestor. Lector de timeline separado,
+solo lectura y RLS propio/gestor; sin mutación. Originales y cuatro tablas de evidencia
+mantienen triggers de inmutabilidad. Todos los FK de ajuste incluyen tenant y empleado.

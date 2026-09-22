@@ -49,7 +49,7 @@ create table public.event_adjustments (
  check((operation='ADD' and target_event_id is null and supersedes_adjustment_id is null)
  or (operation<>'ADD' and (target_event_id is not null or supersedes_adjustment_id is not null))),
  check((operation='VOID' and effective_at is null and event_type is null and ordinal is null)
- or (operation<>'VOID' and effective_at is not null and isfinite(effective_at) and event_type is not null and ordinal>0))
+ or (operation<>'VOID' and effective_at is not null and isfinite(effective_at) and event_type is not null and ordinal is not null and ordinal>0))
 );
 create unique index adjustment_successor on public.event_adjustments(organization_id,supersedes_adjustment_id) where supersedes_adjustment_id is not null;
 create unique index adjustment_first on public.event_adjustments(organization_id,target_event_id) where target_event_id is not null and supersedes_adjustment_id is null;
@@ -135,12 +135,16 @@ do $$ declare t text; begin
  foreach t in array array['public.work_sessions','public.time_events','private.employee_state','public.employee_policy_assignments','public.correction_requests','public.correction_decisions','public.event_adjustments'] loop
   execute format('create policy correction_read on %s for select to fichaje_correction using(private.correction_scoped(organization_id,employee_id))',t);
  end loop;
- foreach t in array array['public.work_sessions','public.correction_decisions','public.event_adjustments'] loop
+ foreach t in array array['public.work_sessions','public.event_adjustments'] loop
   execute format('create policy correction_insert on %s for insert to fichaje_correction with check(organization_id=private.scoped_tenant(''correction_decide'') and employee_id=private.scoped_subject(''correction_decide''))',t);
  end loop;
 end $$;
+create policy correction_decision_insert on public.correction_decisions for insert to fichaje_correction
+ with check(organization_id=private.scoped_tenant('correction_decide') and employee_id=private.scoped_subject('correction_decide')
+ and actor_membership_id=private.correction_access(organization_id,employee_id,request_id));
 create policy correction_submit on public.correction_requests for insert to fichaje_correction
- with check(organization_id=private.scoped_tenant('correction_submit') and employee_id=private.scoped_subject('correction_submit'));
+ with check(organization_id=private.scoped_tenant('correction_submit') and employee_id=private.scoped_subject('correction_submit')
+ and submitted_by_membership_id=private.correction_access(organization_id,employee_id));
 create policy correction_state on private.employee_state for update to fichaje_correction
  using(organization_id=private.scoped_tenant('correction_decide') and employee_id=private.scoped_subject('correction_decide'))
  with check(organization_id=private.scoped_tenant('correction_decide') and employee_id=private.scoped_subject('correction_decide'));
@@ -239,7 +243,7 @@ begin
   end if;
   if op='VOID' then
    if x->>'effective_at' is not null or x->>'event_type' is not null or x->>'ordinal' is not null
-    or session is distinct from case when previous is null then original.session_id else prior.session_id end
+    or session is distinct from (case when previous is null then original.session_id else prior.session_id end)
    then raise exception using errcode='22023',message='INVALID_INPUT'; end if;
   else
    if x->>'event_type' is null or x->>'event_type' not in ('CLOCK_IN','BREAK_START','BREAK_END','CLOCK_OUT')
@@ -366,6 +370,7 @@ begin
  jsonb_build_object('correction_request_id',q.id,'decision',p_decision,'actor_membership_id',actor,'adjustment_ids',ids,
  'before',jsonb_build_object('state',s.state,'version',s.version,'open_session_id',s.open_session_id,'last_event_at',s.last_event_at),
  'after',case when p_decision='APPROVE' then projection||jsonb_build_object('version',s.version+1) else jsonb_build_object('state',s.state,'version',s.version,'open_session_id',s.open_session_id,'last_event_at',s.last_event_at) end));
+exception when unique_violation then raise exception using errcode='40001',message='VERSION_CONFLICT';
 end $$;
 alter function public.decide_correction(uuid,uuid,uuid,text,text) owner to fichaje_correction;
 revoke all on function public.decide_correction(uuid,uuid,uuid,text,text) from public,anon,service_role;

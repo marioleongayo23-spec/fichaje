@@ -120,3 +120,52 @@ El 403 prematuro de EMPLOYEE se corrige mediante una migración aditiva de capac
 no se amplía member_scope. RLS limita el nuevo rol técnico al tenant y empleado propios.
 La consulta de estado usa otro rol de solo lectura; no presta privilegios de fichaje.
 `clock_capability.test.sql` prueba también el rol técnico sin filtros de aplicación.
+
+## H3 — correcciones (PR #7)
+`python3 tests/integration/h3.py` ejecuta H1, H2 y H3 con GoTrue/PostgREST/Storage
+reales; `supabase test db` incluye todas las pruebas SQL. La CI reconstruye desde cero.
+
+- `submit_correction(p_organization_id, p_request_id, p_employee_id, p_base_version,
+  p_reason, p_operations)` devuelve `correction_request_id`, `base_version`, `request_id`.
+- `decide_correction(p_organization_id, p_request_id, p_correction_request_id,
+  p_decision, p_reason)` devuelve decisión, versión y UUID de ajustes en orden de propuesta.
+- `get_effective_timeline(p_organization_id, p_employee_id, p_cutoff default infinity)`
+  consulta evidencia propia o autorizada, con RLS. Corte por fecha de registro servidor,
+  no por hora propuesta; no es un informe de horas. No incluye pendientes/rechazadas.
+
+Motivos de solicitud y decisión: 1..1000 caracteres tras trim; operaciones: 1..100,
+JSON <=64 KiB, claves desconocidas rechazadas. `effective_at` debe incluir Z/offset;
+`timezone` debe ser IANA y coincidir con la sesión. `ordinal` entero positivo explícito
+para cada ADD/REPLACE; originales usan su `sequence`. Se ordena por `(effective_at,ordinal)`;
+una colisión se rechaza, nunca se desempata por UUID. Intervalos cero son válidos.
+
+Ejemplo de `p_operations` (UUID/hora ilustrativos, reemplazar por valores reales):
+```json
+[{"operation":"REPLACE","target_event_id":"UUID_ORIGINAL",
+  "supersedes_adjustment_id":"UUID_AJUSTE_VIGENTE",
+  "session_id":"UUID_SESION","event_type":"CLOCK_OUT",
+  "effective_at":"2026-09-22T17:00:00+02:00","timezone":"Europe/Madrid","ordinal":2}]
+```
+Primera revisión del original omite supersedes; siguientes conservan target y referencian
+el ajuste vigente. ADD omite target/supersedes; una revisión de ADD omite target y referencia
+su ajuste vigente. VOID conserva sesión/referencias y omite tipo/hora/ordinal. Una revisión
+puede sustituir un VOID. Un conjunto atómico no puede revisar dos veces la misma hoja.
+ADD CLOCK_IN puede introducir un UUID de sesión nuevo: al aprobar se fija la política
+asignada vigente a la hora de entrada propuesta, o falla POLICY_REQUIRED. No se cambia
+una política/sesión original. La propuesta completa se valida antes de confirmar.
+
+Solicitud y decisión autorizan, ligan capability una vez, bloquean organización y
+revalidan acceso; aprobación bloquea además employee_state. Solicitante y empleado afectado
+no pueden decidir, ni con OWNER; requiere otro gestor. Rechazo también requiere independencia.
+`base_version` debe seguir vigente al enviar y decidir (incluso al rechazar).
+Mismo request_id/payload recupera recibo tras autorización; diferente payload:
+IDEMPOTENCY_CONFLICT. Nueva clave tras decisión: ALREADY_DECIDED; base/hoja obsoletas:
+VERSION_CONFLICT. Validación fallida no consume clave. Reconstrucción inválida:
+INVALID_TIMELINE, INVALID_ORDINAL o FUTURE_TIME.
+
+La aprobación incrementa versión exactamente una vez, conserva last_sequence (máximo
+original) y reconstruye estado/sesión/última hora efectiva. Un historial totalmente VOID
+puede tener last_event_at null aun con last_sequence>0. ADD puede dar hora efectiva con
+last_sequence=0. Este es el único ajuste de constraint de la proyección H2; sus RPC no
+cambian. Evidencia original/ajustes/solicitud/decisión es append-only. Rollback incluye
+sesiones creadas, auditoría e idempotencia. No clasificaciones de horas en este contrato.

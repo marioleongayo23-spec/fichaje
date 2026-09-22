@@ -223,7 +223,7 @@ session=uid(); t=now(); ops=[op('CLOCK_IN',session,t),op('CLOCK_OUT',session,t,o
 args=submit_args(ops)
 results=parallel(lambda _: rpc('submit_correction',user['token'],args))
 check(all(c==200 for c,r in results) and len({json.dumps(r,sort_keys=True) for c,r in results})==1,'20 simultaneous identical submissions persist one request/receipt')
-request=results[0][1]['correction_request_id']; dargs=decide_args(request)
+request=results[0][1]['correction_request_id']; dargs=decide_args(request); successful_decision_args=dargs.copy()
 results=parallel(lambda _:decide(request,args=dargs))
 check(all(c==200 for c,r in results) and len({json.dumps(r,sort_keys=True) for c,r in results})==1,'20 simultaneous identical approvals persist one decision/receipt')
 check(sql(f"select count(*) from public.event_adjustments a join public.correction_decisions d on d.id=a.decision_id where d.request_id='{request}';")=='2','same approval creates exactly the two intended adjustments')
@@ -232,6 +232,24 @@ session=uid(); t=now(); ops=[op('CLOCK_IN',session,t),op('CLOCK_OUT',session,t,o
 requests=[submit(ops)[0] for _ in range(20)]
 results=parallel(lambda i:decide(requests[i]))
 check(sum(c==200 for c,r in results)==1 and sum(r.get('message')=='VERSION_CONFLICT' for c,r in results)==19,'COR-03 20 proposals same base leave one approval and 19 conflicts')
+# Correction and ordinary clock share the same version/locks.
+session=uid(); t=now(); request,_=submit([op('CLOCK_IN',session,t),op('CLOCK_OUT',session,t,ordinal=2)])
+base=state()['version']
+clock_args=dict(p_organization_id=org,p_request_id=uid(),p_employee_id=user['employee'],p_action='CLOCK_IN',p_expected_version=base)
+results=parallel(lambda i:decide(request) if i==0 else rpc('record_time_event',user['token'],clock_args),2)
+check(sum(c==200 for c,r in results)==1 and sum(r.get('message')=='VERSION_CONFLICT' for c,r in results)==1,'H2 clock versus H3 approval: one shared-version winner')
+if state()['state']=='WORKING': clock('CLOCK_OUT')
+# A timeline containing only corrections has sequence zero; H2 can continue it.
+fresh_args=h.employee_args(org)
+code,fresh=rpc('manage_employee',admin['token'],fresh_args); assert code==200,fresh
+fresh_employee=fresh_args['p_employee_id']
+policy_id=sql(f"select policy_id from public.employee_policy_assignments where employee_id='{user['employee']}' limit 1;")
+code,r=rpc('assign_work_policy',admin['token'],dict(p_organization_id=org,p_request_id=uid(),p_employee_id=fresh_employee,p_policy_id=policy_id)); assert code==200,r
+session=uid(); t=now()
+fresh_submit=dict(p_organization_id=org,p_request_id=uid(),p_employee_id=fresh_employee,p_base_version=0,p_reason='Assisted synthetic request',p_operations=[op('CLOCK_IN',session,t)])
+code,r=rpc('submit_correction',owner['token'],fresh_submit); assert code==200,r
+code,r=decide(r['correction_request_id'],admin)
+check(code==200 and sql(f"select state||':'||last_sequence from private.employee_state where employee_id='{fresh_employee}';")=='WORKING:0','ADD-only employee without Auth supported via independent managers, no kiosk implementation')
 # RLS: all three evidence tables, raw writes, foreign and same-tenant private reads.
 for table in ['correction_requests','correction_decisions','event_adjustments']:
     code,rows=api('/rest/v1/'+table+'?organization_id=eq.'+org,other['token'])
@@ -264,5 +282,5 @@ while True:
 code,_=decide(request,args=dargs); assert proc.wait(timeout=15)==0
 check(code==403,'waiting approval revalidates permissions after concurrent H1 revocation')
 check(sql(f"select count(*) from public.correction_decisions where request_id='{request}';")=='0','revoked queued decision leaves no partial decision')
-code,_=decide(requests[0],args=decide_args(requests[0])); check(code==403,'revoked JWT cannot decide or obtain previous receipt')
+code,_=decide(successful_decision_args['p_correction_request_id'],args=successful_decision_args); check(code==403,'revoked JWT cannot decide or obtain previous receipt')
 print(f'PASS H3: {h.checks-start_checks} real integration checks; all H1 + H2 also passed.',flush=True)
