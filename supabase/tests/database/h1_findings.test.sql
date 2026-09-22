@@ -1,6 +1,8 @@
 begin;
 set local search_path=public,extensions;
 select no_plan();
+-- Test harness only; rolled back with fixtures. Production writer has no pgTAP access.
+grant usage on schema extensions to fichaje_writer;
 insert into auth.users(id,email,email_confirmed_at) values
  ('11111111-1111-1111-1111-111111111111','owner-a@example.invalid',clock_timestamp()),
  ('22222222-2222-2222-2222-222222222222','owner-b@example.invalid',clock_timestamp()),
