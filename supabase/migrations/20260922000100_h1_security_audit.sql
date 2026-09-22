@@ -168,7 +168,9 @@ begin
  then raise exception using errcode='23514',message='LAST_OWNER'; end if;
  return null;
 end $$;
+grant create on schema private to fichaje_reader;
 alter function private.require_owner() owner to fichaje_reader;
+revoke create on schema private from fichaje_reader;
 create or replace function private.authorize(p_org uuid) returns public.member_role
 language plpgsql set search_path='' as $$
 declare v_role public.member_role;

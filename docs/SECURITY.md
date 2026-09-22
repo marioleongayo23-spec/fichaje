@@ -75,3 +75,34 @@ Incidente: contener/revocar, preservar evidencia mínima, evaluar afectados y ob
 notificar al responsable sin dilación, documentar decisión y corrección. Ensayo obligatorio H7.
 Referencias: [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security),
 [Password storage OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
+
+### SEC-H1-01 — aislamiento del escritor por transacción
+La migración `20260922000100_h1_security_audit.sql` sustituye las políticas universales del
+escritor por `organization_id = private.scoped_tenant('member')` (id en la raíz).
+Sin contexto protegido no hay filas visibles ni INSERT permitido; WITH CHECK impide mover tenant.
+`private.mutation_context` liga xid8, backend, principal y ruta a un único tenant. No se utiliza
+un GUC como autoridad. El escritor no tiene SELECT/DML sobre el contexto, ni EXECUTE sobre
+su constructor genérico. Una segunda autorización a otro tenant en la misma transacción falla,
+incluso si la identidad pertenece a ambos. El contexto anterior nunca sirve en otra transacción;
+el siguiente bind limpia las filas visibles de transacciones ya terminadas (MVCC).
+
+`fichaje_guard` solo lee organizations/memberships/invitations y administra el contexto;
+no puede modificar datos tenant. Expone gates privados con validación de miembro gestor,
+o token+email verificado+tenant+emisor+caducidad para aceptación. `fichaje_bootstrap` y
+`fichaje_acceptor` son roles separados sin herencia entre rutas; sus políticas usan sus propios
+scopes y sus GRANT se limitan al alta requerida. La aceptación solo puede insertar la identidad
+actual con el rol invitado (nunca OWNER); bootstrap solo el OWNER verificado autorizado.
+Todos son NOLOGIN/NOBYPASSRLS, sin CREATE tras migrar. FORCE RLS se conserva.
+El constraint diferido de OWNER usa el lector técnico para comprobar la invariante aunque el
+scope de bootstrap ya se haya liberado. Las RPC ordinarias mantienen el lock de organización.
+Los tests con SET ROLE suponen el contexto JWT que PostgREST valida: no se ofrecen credenciales
+SQL ni acceso a SET ROLE/set_config mediante la API. El operador PostgreSQL sigue siendo privilegiado.
+
+### AUD-H1-01 — evidencia mínima reconstruible
+`safe_details.before/after` registra role/active/version para membresías y
+active/membership_id/version para empleados (before null en altas). La transferencia incluye
+`changes` con los UUID y before/after de ambas membresías. Las versiones ordenan inequívocamente
+los cambios aunque dos timestamps coincidan. Se conserva request_id para correlación e idempotencia.
+Alta OWNER y aceptación también registran la asignación inicial; invitación registra únicamente rol.
+No se incluye email, token, nombre, código de empleado ni payload completo. El audit se inserta
+con los datos bajo el mismo lock/transacción; un fallo revierte datos y recibo. Replays no duplican.

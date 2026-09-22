@@ -59,8 +59,21 @@ El escritor tiene políticas internas y permisos acotados; RPC SECURITY DEFINER 
 vacío valida toda autoridad. Esos roles no tienen CREATE en schemas ni gestión de roles.
 `private` no está expuesto por API ni tiene USAGE cliente; helpers autorizados se usan en RLS.
 Auditoría y recibos append-only; un administrador PostgreSQL sigue siendo privilegiado.
-La auditoría H1 registra actor, acción, entidad, request e instante, nunca token/email/payload.
+La auditoría H1 registra actor, acción, entidad, request, instante y before/after de seguridad, nunca token/email/payload.
 No se implementan proyección horaria, eventos, correcciones, kiosco, exportación ni UI.
 
 Referencias de comandos: [Supabase CLI](https://supabase.com/docs/reference/cli/introduction),
 [pruebas SQL](https://supabase.com/docs/guides/database/testing).
+
+## Correcciones de revisión H1
+
+SEC-H1-01 y AUD-H1-01 se aplican en la segunda migración. Ver detalles en `docs/SECURITY.md`.
+El escritor ordinario tiene contexto de tenant protegido por transacción; bootstrap y aceptación
+usan roles separados. El guard no escribe tablas tenant. Un GUC no puede autorizar un tenant.
+La suite `h1_findings.test.sql` ejercita el escritor directamente y una función defectuosa sin
+filtro, además de reconstruir role/active/vínculo y OWNER solo desde audit. La suite SQL anterior
+borra contexto exclusivamente como postgres al cambiar identidades simuladas dentro de su única
+transacción de test; esa facultad no está concedida al escritor ni a clientes.
+La integración real mantiene una transacción por request y verifica de nuevo la reconstrucción
+usando el endpoint REST de audit. El comando reproducible sigue siendo `supabase db reset
+--local --no-seed`, `supabase test db` y `python3 tests/integration/h1.py`.
