@@ -2,8 +2,9 @@
 ## Hito autorizado
 HITO 0 Bootstrap aprobado por el usuario e integrado en `main` mediante PR #1 el 2026-09-21.
 Rama de origen: `astra/hito-0-bootstrap`. Merge: `f9a02bb150b424d9cf0a47b741496c997b7bc085`.
-HITO 1 autorizado por el usuario el 2026-09-21; implementación en `astra/hito-1-identidad-rls`.
-No autorizado HITO 2 ni merge de H1.
+HITO 1 aprobado por el usuario e integrado en `main` mediante PR #4 el 2026-09-22.
+Rama de origen: `astra/hito-1-identidad-rls`. Merge: `ffd12c689824886abd8ba6f1e836057fc43ee9a8`.
+HITO 2 no autorizado ni iniciado.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -40,7 +41,7 @@ Checksums internos PASS; bundle restaurado en repositorio vacío y `main` restau
 05:00 Europe/Madrid. Backup PostgreSQL sigue bloqueado.
 
 ## HITO 1 — identidad y aislamiento
-ESTADO: PASS técnico de las correcciones SEC-H1-01 y AUD-H1-01. H1 no aprobado; PR #4 abierto, pendiente de revisión del usuario.
+ESTADO: PASS — H1 aprobado por el usuario y PR #4 integrado en `main`, incluidas las correcciones SEC-H1-01 y AUD-H1-01.
 Rama: `astra/hito-1-identidad-rls`, base `39ff3e041e49396fa177e13a0b2e4ebbef034da6`.
 
 Entregado: Supabase local CLI 2.117.0 / PostgreSQL 17; migración de organizaciones,
@@ -107,7 +108,7 @@ Evidencia de las correcciones ejecutada el 2026-09-22, código `43a2b6f418aca4d0
   revertido con ROLLBACK. El primer intento del run final falló antes de tests por puerto 54324
   ocupado en el runner; el segundo completó toda la validación sin cambiar código ni omitir tests.
 El commit posterior solo registra estas evidencias. Los Checks del PR muestran además la nueva
-validación automática sobre ese último commit. H1 sigue sin aprobación; no merge ni H2.
+validación automática sobre ese último commit. H1 aprobado e integrado posteriormente por autorización expresa del usuario; H2 no iniciado.
 
 ## Siguiente paso
-Revisar y aprobar PR #4. Trabajo detenido en H1; no merge ni H2 sin autorización.
+Trabajo detenido tras el merge de PR #4. Esperar autorización expresa para HITO 2.
