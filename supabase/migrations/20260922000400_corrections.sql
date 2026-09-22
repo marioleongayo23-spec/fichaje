@@ -130,7 +130,7 @@ create policy correction_lock on public.organizations to fichaje_correction
 grant select on public.work_sessions,public.time_events,private.employee_state,public.work_policies,public.employee_policy_assignments to fichaje_correction;
 grant insert on public.work_sessions,public.audit_log,private.idempotency_records to fichaje_correction;
 grant select on private.idempotency_records to fichaje_correction;
-grant update on private.employee_state to fichaje_correction;
+grant update(state,open_session_id,version,last_event_at) on private.employee_state to fichaje_correction;
 do $$ declare t text; begin
  foreach t in array array['public.work_sessions','public.time_events','private.employee_state','public.employee_policy_assignments','public.correction_requests','public.correction_decisions','public.event_adjustments'] loop
   execute format('create policy correction_read on %s for select to fichaje_correction using(private.correction_scoped(organization_id,employee_id))',t);
@@ -236,9 +236,9 @@ begin
     select * into prior from public.event_adjustments where organization_id=p_org and employee_id=p_employee and id=previous;
     if not FOUND then raise exception using errcode='42501',message='FORBIDDEN'; end if;
     if prior.target_event_id is distinct from target or exists(select 1 from public.event_adjustments where organization_id=p_org and supersedes_adjustment_id=previous)
-    then raise exception using errcode='40001',message='VERSION_CONFLICT'; end if;
+    then raise exception using errcode='PT409',message='VERSION_CONFLICT'; end if;
    elsif exists(select 1 from public.event_adjustments where organization_id=p_org and target_event_id=target) then
-    raise exception using errcode='40001',message='VERSION_CONFLICT';
+    raise exception using errcode='PT409',message='VERSION_CONFLICT';
    end if;
   end if;
   if op='VOID' then
@@ -298,7 +298,7 @@ begin
  if p_base_version is null or p_base_version<0 or p_reason is null or length(btrim(p_reason)) not between 1 and 1000
  then raise exception using errcode='22023',message='INVALID_INPUT'; end if;
  select * into strict s from private.employee_state where organization_id=p_organization_id and employee_id=p_employee_id;
- if s.version<>p_base_version then raise exception using errcode='40001',message='VERSION_CONFLICT'; end if;
+ if s.version<>p_base_version then raise exception using errcode='PT409',message='VERSION_CONFLICT'; end if;
  t:=clock_timestamp();
  perform private.validate_operations(p_organization_id,p_employee_id,p_operations,t);
  insert into public.correction_requests(id,organization_id,employee_id,submitted_by_membership_id,base_version,reason,proposal,created_at)
@@ -329,8 +329,8 @@ begin
  then raise exception using errcode='22023',message='INVALID_INPUT'; end if;
  select * into strict q from public.correction_requests where organization_id=p_organization_id and id=p_correction_request_id;
  if exists(select 1 from public.correction_decisions where organization_id=p_organization_id and request_id=q.id)
- then raise exception using errcode='40001',message='ALREADY_DECIDED'; end if;
- if q.base_version<>s.version then raise exception using errcode='40001',message='VERSION_CONFLICT'; end if;
+ then raise exception using errcode='PT409',message='ALREADY_DECIDED'; end if;
+ if q.base_version<>s.version then raise exception using errcode='PT409',message='VERSION_CONFLICT'; end if;
  t:=clock_timestamp();
  insert into public.correction_decisions(id,organization_id,employee_id,request_id,decision,actor_membership_id,reason,created_at)
  values(v_id,p_organization_id,employee,q.id,p_decision,actor,btrim(p_reason),t);
@@ -370,7 +370,7 @@ begin
  jsonb_build_object('correction_request_id',q.id,'decision',p_decision,'actor_membership_id',actor,'adjustment_ids',ids,
  'before',jsonb_build_object('state',s.state,'version',s.version,'open_session_id',s.open_session_id,'last_event_at',s.last_event_at),
  'after',case when p_decision='APPROVE' then projection||jsonb_build_object('version',s.version+1) else jsonb_build_object('state',s.state,'version',s.version,'open_session_id',s.open_session_id,'last_event_at',s.last_event_at) end));
-exception when unique_violation then raise exception using errcode='40001',message='VERSION_CONFLICT';
+exception when unique_violation then raise exception using errcode='PT409',message='VERSION_CONFLICT';
 end $$;
 alter function public.decide_correction(uuid,uuid,uuid,text,text) owner to fichaje_correction;
 revoke all on function public.decide_correction(uuid,uuid,uuid,text,text) from public,anon,service_role;

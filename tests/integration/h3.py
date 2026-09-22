@@ -117,7 +117,7 @@ r=approved([op('CLOCK_OUT',entry['session_id'],exit_event['server_at'],kind='REP
 leaf=r['adjustment_ids'][0]
 check(timeline()[1]['adjustment_id']==leaf,'COR-01 latest chain revision alone is effective')
 args=submit_args([replace]); code,err=rpc('submit_correction',user['token'],args)
-check(code==409 and err['message']=='VERSION_CONFLICT','COR-01 stale adjustment reference rejected even with current base_version')
+check(code==409 and err['message']=='VERSION_CONFLICT',f'COR-01 stale adjustment reference rejected even with current base_version: {code}, {err}')
 r=approved([op(None,entry['session_id'],kind='VOID',target=exit_event['event_id'],previous=leaf)])
 check(state()['state']=='WORKING' and state()['open_session_id']==entry['session_id'],'COR-01 VOID reopens real session without touching originals')
 close_time=now()

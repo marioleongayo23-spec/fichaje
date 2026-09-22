@@ -160,7 +160,8 @@ no pueden decidir, ni con OWNER; requiere otro gestor. Rechazo también requiere
 `base_version` debe seguir vigente al enviar y decidir (incluso al rechazar).
 Mismo request_id/payload recupera recibo tras autorización; diferente payload:
 IDEMPOTENCY_CONFLICT. Nueva clave tras decisión: ALREADY_DECIDED; base/hoja obsoletas:
-VERSION_CONFLICT. Validación fallida no consume clave. Reconstrucción inválida:
+VERSION_CONFLICT. H3 usa SQLSTATE PT409 para estos conflictos de negocio (HTTP 409),
+sin tratarlos como fallos transitorios de serialización. Validación fallida no consume clave. Reconstrucción inválida:
 INVALID_TIMELINE, INVALID_ORDINAL o FUTURE_TIME.
 
 La aprobación incrementa versión exactamente una vez, conserva last_sequence (máximo
