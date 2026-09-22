@@ -1,11 +1,11 @@
-# CURRENT_STATE — 2026-09-21
+# CURRENT_STATE — 2026-09-22
 ## Hito autorizado
 HITO 0 Bootstrap aprobado por el usuario e integrado en `main` mediante PR #1 el 2026-09-21.
 Rama de origen: `astra/hito-0-bootstrap`. Merge: `f9a02bb150b424d9cf0a47b741496c997b7bc085`.
 HITO 1 autorizado por el usuario el 2026-09-21; implementación en `astra/hito-1-identidad-rls`.
 No autorizado HITO 2 ni merge de H1.
 
-## Entregado
+## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
   estados, tiempo servidor, inmutabilidad/correcciones, audit, concurrencia/idempotencia y kiosco.
 - Contratos de exportación, retención, aceptación, recuperación y roadmap con puertas por hito.
@@ -21,9 +21,9 @@ Entorno local Node 24.19.0, npm 11.9.0, Linux.
 Suite: 21 tests (configuración/render, recuperación real de bundle sintético, shallow/dirty,
 fallo de verificación remota, bloqueo DB y contratos de workflows).
 El estado ejecutado de GitHub Actions se consulta en Checks del PR; no sustituirlo por resultado local.
-No hay pruebas SQL/RLS/Auth/kiosco reales: son criterios para H1-H5, no funcionalidad completada.
+En H0 no había pruebas SQL/RLS/Auth/kiosco reales. La evidencia de H1 figura más abajo.
 
-## Límites y decisiones pendientes
+## Límites registrados al cierre de H0
 No base remota, credenciales, Drive, datos personales reales, migraciones aplicadas, diseño visual,
 service worker ni configuración Cloudflare/producción. Backup remoto real y restore DB NO ensayados.
 Normativa base enlazada y fechada; revisar convenio/sector y requisitos vigentes antes de piloto.
@@ -40,7 +40,7 @@ Checksums internos PASS; bundle restaurado en repositorio vacío y `main` restau
 05:00 Europe/Madrid. Backup PostgreSQL sigue bloqueado.
 
 ## HITO 1 — identidad y aislamiento
-ESTADO: BLOCKED hasta disponer de resultados de CI DB real.
+ESTADO: PASS en pruebas H1; pendiente de revisión/aprobación del usuario. PR #4 abierto contra main.
 Rama: `astra/hito-1-identidad-rls`, base `39ff3e041e49396fa177e13a0b2e4ebbef034da6`.
 
 Entregado: Supabase local CLI 2.117.0 / PostgreSQL 17; migración de organizaciones,
@@ -50,15 +50,34 @@ invitaciones ligadas a identidad verificada/tenant/rol y TTL. Auditoría e idemp
 mutaciones H1, bloqueo por organización y versiones. No motor horario ni UI.
 Contrato y comandos reproducibles: `supabase/README.md`.
 
-Evidencias pendientes: workflow `Database H1`: `supabase start`, `supabase db reset --local
---no-seed`, `supabase test db`, `python3 tests/integration/h1.py`. Fixture SQL con dos
-organizaciones × tres roles; integración con GoTrue/JWT/PostgREST/Storage reales y
-concurrencia HTTP. Sin mocks RLS/Auth JavaScript. CI H0 también debe seguir verde.
-Entorno de edición sin Docker/PostgreSQL; no atribuirle ejecución DB local.
+Evidencia ejecutada el 2026-09-22, commit de código `08a7f79a89328f3c4ad5e2d116e1def35b03338a`:
+- [Database H1, run 35695686230](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35695686230): PASS.
+  Runner Ubuntu 24.04, Supabase CLI 2.117.0, PostgreSQL 17.6.1.167, GoTrue 2.196.0,
+  PostgREST 16.2 y Storage 1.72.1. `supabase start` y `supabase db reset --local --no-seed`
+  aplican la migración desde vacío; no seed ni base remota.
+  `supabase test db`: **85 pruebas SQL/pgTAP PASS**, dos organizaciones × tres roles,
+  RLS/FORCE, anon, FK/UUID/join/RPC cruzados, mínimo OWNER, transferencia y revocación.
+  `python3 tests/integration/h1.py`: **92 comprobaciones reales PASS**, cuentas sintéticas
+  creadas en GoTrue, login real y JWT usados contra PostgREST y Storage. Invitaciones de un uso,
+  expiración/identidad/emisor; identidad con roles distintos en dos tenants; 12 requests iguales
+  con un único recibo/audit; 12 versiones concurrentes con un ganador; fallo audit revierte datos
+  y recibo; revocación que toma el lock primero rechaza la escritura en espera y el JWT anterior.
+  Contenedores destruidos con `supabase stop --no-backup` al finalizar.
+- [CI general, run 35695686271](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35695686271): PASS.
+  npm ci, typecheck, lint, **21 tests**, build, sintaxis shell y whitespace.
+- Entorno de edición sin Docker/PostgreSQL: DB ejecutada realmente en CI, no aquí.
+  `npm ci && npm run check`, `bash -n scripts/*.sh`, `git diff --check`: PASS local.
+
+Fallos previos corregidos y revalidados: atributos de roles compatibles con el usuario de
+migraciones de Supabase; acceso a Auth mediante dos adaptadores privados de lectura (ver SECURITY);
+fixture OWNER con constraint diferida; proveedor email/password activo con signup público
+bloqueado. Ningún test desactivado ni RLS/Auth simulado en JavaScript.
+El commit posterior de cierre solo actualiza este documento; los Checks del PR registran
+además la ejecución automática sobre ese commit.
 
 Límites: solo stack local efímero CI, datos sintéticos. No proyecto Supabase remoto, producción,
 secretos GitHub, envío de invitaciones, kiosco, informes ni diseño visual. Baja tenant bloquea
 JWT previo por RLS/RPC; no revoca sesiones globales de otras organizaciones. Backup DB sigue bloqueado.
 
 ## Siguiente paso
-Completar evidencias de CI, dejar PR H1 contra main para revisión y detenerse; no merge ni H2.
+Revisar y aprobar PR #4. Trabajo detenido en H1; no merge ni H2 sin autorización.
