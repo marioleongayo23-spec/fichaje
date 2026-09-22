@@ -6,7 +6,7 @@ HITO 1 aprobado por el usuario e integrado en `main` mediante PR #4 el 2026-09-2
 Rama de origen: `astra/hito-1-identidad-rls`. Merge: `ffd12c689824886abd8ba6f1e836057fc43ee9a8`.
 HITO 2 aprobado por el usuario e integrado en `main` mediante PR #5 el 2026-09-22.
 Rama de origen: `astra/hito-2-motor-horario`. Merge: `e4edd0d451627d6cd6e25aafc31819a77ee76116`.
-HITO 3 no autorizado ni iniciado.
+HITO 3 autorizado, en implementación y validación; no aprobado ni integrado.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -168,4 +168,11 @@ Serialización conservadora por tenant, documentada. No H3, kiosco, informes H5,
 producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 
 ## Siguiente paso
-Trabajo detenido tras el merge de PR #5. Esperar autorización expresa para HITO 3.
+Completar únicamente HITO 3 y su validación real. No hacer merge ni iniciar H4.
+
+## HITO 3 — correcciones append-only
+ESTADO: en validación; no PASS hasta completar CI H1 + H2 + H3.
+Rama: `astra/hito-3-correcciones`, base `9f099e4446ff4aec1aae5db2d30e5abb027c9998`.
+Migración aditiva, solicitudes/decisiones/ajustes inmutables, capacidades aisladas,
+reconstrucción completa y pruebas reales COR-01..06. Sin UI, kiosco, informes,
+clasificaciones de horas, producción ni datos reales. No merge.
