@@ -49,7 +49,7 @@ def snapshot():
     return sql(f"select jsonb_build_array((select to_jsonb(s) from private.employee_state s where employee_id='{user['employee']}'),(select count(*) from public.time_events where employee_id='{user['employee']}'),(select count(*) from public.work_sessions where employee_id='{user['employee']}'),(select count(*) from private.idempotency_records where operation='record_time_event' and organization_id='{org}'),(select count(*) from public.audit_log where action='record_time_event' and organization_id='{org}'));")
 
 code, err = call('CLOCK_IN',0)
-check(code == 400 and err['message']=='POLICY_REQUIRED', 'no invented default work policy')
+check(code == 400 and err['message']=='POLICY_REQUIRED', f'no invented default work policy: HTTP {code}, {err}')
 for zone in ['Europe/Not_A_Zone','CET','+02:00',None]:
     code, _ = rpc('create_work_policy',owner['token'],dict(p_organization_id=org,p_request_id=uid(),p_timezone=zone,p_break_counts_as_work=False))
     check(code >= 400, 'invalid/non-IANA timezone rejected')
@@ -58,9 +58,44 @@ assign(madrid)
 assign(madrid,owner['employee'])
 canary = policy('Atlantic/Canary',True)
 
+# RACE-02 actual concurrent employee creation, including its initial projection.
+new_employee=h.employee_args(org)
+with concurrent.futures.ThreadPoolExecutor(max_workers=20) as pool:
+    barrier=threading.Barrier(20)
+    def create_same(_):
+        barrier.wait(timeout=10)
+        return rpc('manage_employee',owner['token'],new_employee)
+    creates=list(pool.map(create_same,range(20)))
+check(all(c==200 for c,r in creates) and len({r['id'] for c,r in creates})==1,
+      'RACE-02 20 concurrent creates return one employee')
+check(sql(f"select count(*) from private.employee_state where employee_id='{new_employee['p_employee_id']}';")=='1',
+      'RACE-02 exactly one initial state after concurrent creation')
+# TIME-01/04 effective time sampled AFTER waiting for the H1 tenant lock.
+lock_sql=fr'''begin;
+select 1 from public.organizations where id='{org}' for update;
+\echo CLOCK_LOCKED
+select pg_sleep(2);
+select 'RELEASE_AT='||clock_timestamp()::text;
+commit;
+'''
+proc=subprocess.Popen(['docker','exec','-i',h.CONTAINER,'psql','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1','-At'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+proc.stdin.write(lock_sql); proc.stdin.close()
+while True:
+    line=proc.stdout.readline()
+    if line.strip()=='CLOCK_LOCKED': break
+    assert line,'clock test failed to lock'
+code, after_wait=call('CLOCK_IN',0)
+assert code==200,(code,after_wait)
+remaining=proc.stdout.read(); assert proc.wait(timeout=15)==0
+release=next(line.split('=',1)[1] for line in remaining.splitlines() if line.startswith('RELEASE_AT='))
+from datetime import datetime
+check(datetime.fromisoformat(after_wait['server_at'])>=datetime.fromisoformat(release),
+      'TIME-01 effective timestamp sampled after lock, not at request/transaction start')
+code, closed=call('CLOCK_OUT',1); assert code==200
+
 # STATE-01: each of the twelve entries tested through the real RPC with fresh
 # expected_version. Legal prerequisites use the same production function.
-version = 0
+version = 2
 matrix = {'OUT':{'CLOCK_IN':'WORKING'}, 'WORKING':{'BREAK_START':'PAUSED','CLOCK_OUT':'OUT'},
           'PAUSED':{'BREAK_END':'WORKING','CLOCK_OUT':'OUT'}}
 valid = invalid = 0

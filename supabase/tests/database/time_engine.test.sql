@@ -16,9 +16,9 @@ select is((select count(*)::int from private.employee_state),2,'state created wi
 select ok(not exists(select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
  where c.relname in ('work_policies','employee_policy_assignments','work_sessions','time_events','employee_state')
  and n.nspname in ('public','private') and not(c.relrowsecurity and c.relforcerowsecurity)),'H2 all tenant tables FORCE RLS');
-select lives_ok($$select private.check_clock('2026-01-01Z','2026-01-01Z')$$,'TIME-04 equality permitted by production guard');
-select throws_ok($$select private.check_clock('2026-01-02Z','2026-01-01Z')$$,'22023','CLOCK_REGRESSION','TIME-05 regression rejected by production guard');
-select lives_ok($$select private.check_clock(null,'2026-01-01Z')$$,'first event has no predecessor');
+select lives_ok($$select private.check_clock('2026-01-01 00:00Z','2026-01-01 00:00Z')$$,'TIME-04 equality permitted by production guard');
+select throws_ok($$select private.check_clock('2026-01-02 00:00Z','2026-01-01 00:00Z')$$,'22023','CLOCK_REGRESSION','TIME-05 regression rejected by production guard');
+select lives_ok($$select private.check_clock(null,'2026-01-01 00:00Z')$$,'first event has no predecessor');
 -- No replacement of clock_timestamp, RPC body, RLS predicate or machine under test.
 -- Historical fixtures below use real timestamptz and IANA zone database in PostgreSQL.
 select is(extract(epoch from ('2026-03-30 00:00 Europe/Madrid'::timestamptz-'2026-03-29 00:00 Europe/Madrid'::timestamptz))::int,82800,'TIME-03 Madrid spring day 23h');
@@ -85,13 +85,40 @@ with intervals as (select event_type,server_at,lead(server_at) over(order by seq
 select is((select extract(epoch from sum(next_at-server_at) filter(where event_type='CLOCK_IN'))::int from intervals),9000,'paused exit: 2.5h working');
 with intervals as (select event_type,server_at,lead(server_at) over(order by sequence) as next_at from public.time_events where session_id='aaaaaaaa-2222-2222-2222-222222222222')
 select is((select extract(epoch from sum(next_at-server_at) filter(where event_type='BREAK_START'))::int from intervals),3600,'paused exit: pause ends at CLOCK_OUT, exactly 1h');
+insert into public.work_sessions(id,organization_id,employee_id,policy_id,timezone,created_at)
+select 'aaaaaaaa-3333-3333-3333-333333333333',organization_id,employee_id,policy_id,timezone,'2026-03-29 03:30+02'
+from public.work_sessions where id='aaaaaaaa-2222-2222-2222-222222222222';
 insert into public.time_events(organization_id,employee_id,session_id,sequence,event_type,server_at,actor_membership_id,source,request_id)
-select organization_id,employee_id,session_id,103,'CLOCK_IN',server_at,actor_membership_id,source,gen_random_uuid() from public.time_events where sequence=102;
-select is((select count(*)::int from public.time_events where session_id='aaaaaaaa-2222-2222-2222-222222222222' and server_at='2026-03-29 03:30+02'),2,'TIME-04 equal instants stored without timestamp uniqueness');
+select organization_id,employee_id,'aaaaaaaa-3333-3333-3333-333333333333',v.seq,v.action::public.time_action,server_at,actor_membership_id,source,gen_random_uuid()
+from public.time_events cross join (values(103,'CLOCK_IN'),(104,'CLOCK_OUT')) v(seq,action) where sequence=102;
+select is((select count(*)::int from public.time_events where session_id='aaaaaaaa-3333-3333-3333-333333333333' and server_at='2026-03-29 03:30+02'),2,'TIME-04 zero-length session stored in sequence order');
 -- No scheduled close: projection represents an open prior-day session indefinitely.
 update private.employee_state set state='PAUSED',open_session_id='aaaaaaaa-2222-2222-2222-222222222222',last_event_at='2026-03-29 01:30+01' where employee_id='aaaaaaaa-1111-1111-1111-111111111111';
 set local role authenticated;
 select is(public.get_employee_state('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','aaaaaaaa-1111-1111-1111-111111111111')->>'incident','OPEN_SESSION','TIME-02 prior-day session remains open, no synthetic hours');
+reset role;
+-- Real RPC closes a seeded prior-day open session across midnight, using the
+-- actual server clock; no RPC replacement or fake effective timestamp argument.
+delete from private.mutation_context;
+select set_config('request.jwt.claims','{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}',true);
+set local role authenticated;
+select public.create_work_policy('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',gen_random_uuid(),'Atlantic/Canary',true);
+reset role;
+insert into public.work_sessions(id,organization_id,employee_id,policy_id,timezone,created_at)
+select 'bbbbbbbb-2222-2222-2222-222222222222','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','bbbbbbbb-1111-1111-1111-111111111111',id,timezone,clock_timestamp()-interval '2 days'
+from public.work_policies where organization_id='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+insert into public.time_events(organization_id,employee_id,session_id,sequence,event_type,server_at,actor_membership_id,source,request_id)
+select s.organization_id,s.employee_id,s.id,v.seq,v.action::public.time_action,s.created_at+v.elapsed,m.id,'WEB',gen_random_uuid()
+from public.work_sessions s join public.memberships m on m.organization_id=s.organization_id
+cross join (values(1,'CLOCK_IN',interval '0 hours'),(2,'BREAK_START',interval '1 hour')) v(seq,action,elapsed)
+where s.id='bbbbbbbb-2222-2222-2222-222222222222';
+update private.employee_state set state='PAUSED',version=2,last_sequence=2,open_session_id='bbbbbbbb-2222-2222-2222-222222222222',last_event_at=clock_timestamp()-interval '1 day'
+where organization_id='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+set local role authenticated;
+select is(public.get_employee_state('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','bbbbbbbb-1111-1111-1111-111111111111')->>'state','PAUSED','night shift has not auto-closed');
+select is(public.record_time_event('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',gen_random_uuid(),'bbbbbbbb-1111-1111-1111-111111111111','CLOCK_OUT',2)->>'state','OUT','TIME-02 real RPC closes overnight paused shift');
+select is((select string_agg(event_type::text,',' order by sequence) from public.time_events),'CLOCK_IN,BREAK_START,CLOCK_OUT','overnight originals contain only explicit actions');
+select is((select count(distinct session_id)::int from public.time_events),1,'overnight close keeps original session');
 reset role;
 select * from finish();
 rollback;
