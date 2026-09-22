@@ -1,4 +1,4 @@
-name: Database H1
+name: Database H1 + H2
 on:
   pull_request:
     branches: [main]
@@ -27,7 +27,7 @@ jobs:
       - name: Real SQL and RLS tests
         run: supabase test db
       - name: Real Auth, REST, Storage and concurrency tests
-        run: python3 tests/integration/h1.py
+        run: python3 tests/integration/h2.py
       - name: Stop local containers
         if: always()
         run: supabase stop --no-backup

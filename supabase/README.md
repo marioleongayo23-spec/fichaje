@@ -77,3 +77,39 @@ transacción de test; esa facultad no está concedida al escritor ni a clientes.
 La integración real mantiene una transacción por request y verifica de nuevo la reconstrucción
 usando el endpoint REST de audit. El comando reproducible sigue siendo `supabase db reset
 --local --no-seed`, `supabase test db` y `python3 tests/integration/h1.py`.
+
+## H2 — motor horario
+
+`python3 tests/integration/h2.py` ejecuta H1 completo y después H2. CI conserva
+`supabase db reset --local --no-seed` + `supabase test db` antes de la integración.
+No hay mocks de SQL/RLS. Fechas históricas DST se insertan como fixtures privilegiadas
+revertidas al acabar pgTAP; el guard real valida igualdad. La regresión se prueba
+contra la RPC sin modificar el reloj, adelantando solo la proyección de test.
+El timeout tras commit usa un proxy local que pierde el ACK de PostgREST real.
+
+RPC nuevas (todas con prefijo `p_` en argumentos):
+- `create_work_policy(organization_id, request_id, timezone, break_counts_as_work)`:
+  OWNER/ADMIN; versión secuencial por tenant, vigente desde servidor; IANA validada.
+- `assign_work_policy(organization_id, request_id, employee_id, policy_id,
+  effective_from = null)`: OWNER/ADMIN; null = ahora servidor, sin retroactividad;
+  no admite dos asignaciones en el mismo instante. Gana la última vigente al entrar.
+- `record_time_event(organization_id, request_id, employee_id, action, expected_version)`:
+  solo empleado propio activo (también para gestores). Versión inicial 0; no acepta
+  hora ni actor ni sesión cliente. Recibo con event_id/session_id/server_at/state/
+  version/sequence/request_id. Debe recibirse ACK para confirmar; timeout = desconocido.
+- `get_employee_state(organization_id, employee_id)`: propio o gestor; devuelve versión,
+  secuencia, sesión abierta y `OPEN_SESSION` mientras esté incompleta. No calcula horas.
+
+Orden de locks: autorización/contexto y organización H1 → employee_state FOR UPDATE.
+La serialización por tenant también ordena idempotencia entre empleados y revocaciones.
+Es conservadora: empleados distintos del mismo tenant esperan entre sí; optimización
+solo con evidencia futura. Nueva alta crea proyección con trigger invoker; backfill OUT
+para empleados H1. El estado se preserva al editar/desactivar el empleado.
+Las RPC H1, sus privilegios y sus capabilities no se sustituyen ni amplían.
+
+Sesión y política permanecen fijas al entrar; salida pausada no inserta BREAK_END.
+Secuencia/versión avanzan una unidad por evento. Se permite igualdad de instantes.
+CLOCK_REGRESSION rechaza sin escrituras, visible como error operativo a quien llama;
+una alerta externa persistente queda pendiente de observabilidad del piloto H7.
+UTC para intervalos, zona IANA fijada para día local de entrada. No hay cierres
+por medianoche/duración, ni totales inventados, ni informes H5 anticipados.

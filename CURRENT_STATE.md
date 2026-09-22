@@ -110,5 +110,15 @@ Evidencia de las correcciones ejecutada el 2026-09-22, código `43a2b6f418aca4d0
 El commit posterior solo registra estas evidencias. Los Checks del PR muestran además la nueva
 validación automática sobre ese último commit. H1 aprobado e integrado posteriormente por autorización expresa del usuario; H2 no iniciado.
 
+## HITO 2 — motor horario (en validación)
+Autorizado por el usuario. Rama `astra/hito-2-motor-horario`, base `4ce37bda1e02124def77e0c6e89e2d069e65df21`.
+ESTADO: BLOCKED — pendiente de ejecutar y superar CI real; no se declara PASS local.
+Migración aditiva: políticas/asignaciones inmutables, proyección inicial transaccional,
+sesiones/eventos, record_time_event, estado operativo, idempotencia/auditoría atómicas,
+locks compatibles con H1, RLS/FK, reloj único tras lock y CLOCK_REGRESSION.
+H1 permanece intacto. Sin H3, kiosco, informes, UI, PWA, producción ni datos reales.
+Pruebas nuevas SQL y Auth/REST real; h2.py ejecuta primero la suite completa H1.
+CI reconstruye desde vacío y destruye el stack al terminar. Evidencia pendiente.
+
 ## Siguiente paso
-Trabajo detenido tras el merge de PR #4. Esperar autorización expresa para HITO 2.
+Completar validación H2 y revisión del PR. No hacer merge ni iniciar H3.
