@@ -4,7 +4,7 @@ HITO 0 Bootstrap aprobado por el usuario e integrado en `main` mediante PR #1 el
 Rama de origen: `astra/hito-0-bootstrap`. Merge: `f9a02bb150b424d9cf0a47b741496c997b7bc085`.
 HITO 1 aprobado por el usuario e integrado en `main` mediante PR #4 el 2026-09-22.
 Rama de origen: `astra/hito-1-identidad-rls`. Merge: `ffd12c689824886abd8ba6f1e836057fc43ee9a8`.
-HITO 2 no autorizado ni iniciado.
+HITO 2 autorizado y en validación en PR #5; no integrado.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -108,7 +108,62 @@ Evidencia de las correcciones ejecutada el 2026-09-22, código `43a2b6f418aca4d0
   revertido con ROLLBACK. El primer intento del run final falló antes de tests por puerto 54324
   ocupado en el runner; el segundo completó toda la validación sin cambiar código ni omitir tests.
 El commit posterior solo registra estas evidencias. Los Checks del PR muestran además la nueva
-validación automática sobre ese último commit. H1 aprobado e integrado posteriormente por autorización expresa del usuario; H2 no iniciado.
+validación automática sobre ese último commit. H1 aprobado e integrado posteriormente por autorización expresa del usuario; H2 se autorizó después.
+
+## HITO 2 — motor horario
+ESTADO: PASS — implementación y validación completas; pendiente de revisión/aprobación del usuario.
+Rama `astra/hito-2-motor-horario`, base `4ce37bda1e02124def77e0c6e89e2d069e65df21`.
+PR [#5](https://github.com/marioleongayo23-spec/fichaje/pull/5) abierto, sin merge. H3 no iniciado.
+
+Entregado: work_policies/asignaciones append-only, employee_state con alta/backfill atómicos,
+work_sessions/time_events inmutables, record_time_event y consulta operativa de estado.
+Cinco transiciones legales, salida desde WORKING/PAUSED sin BREAK_END sintético, múltiples
+sesiones, secuencia/versionado por empleado, política/zona fijadas por sesión y reloj efectivo
+muestreado una sola vez tras el lock. Idempotencia persistente, auditoría y proyección atómicas.
+Sin cierres automáticos; sesiones abiertas indican OPEN_SESSION sin inventar totales.
+
+Continuación desde `a75f7c7fa7704f87d642d004884195e084918d68`, misma rama y PR:
+- El 403 prematuro provenía de usar authorize/member_scope de H1, reservado a gestores.
+  Migración aditiva con fichaje_clock y capability clock por tenant/empleado/principal/xid/backend.
+  El EMPLOYEE válido sin política recibe ahora **400 POLICY_REQUIRED** sin escrituras parciales.
+- Gates/capabilities y mutaciones H1 conservados. No se amplía el writer administrativo.
+  Nuevo rol sin LOGIN/BYPASSRLS/herencia ni escritura de identidad; RLS/FORCE y grants mínimos.
+  fichaje_state_reader solo consulta estado propio o autorizado a gestores.
+- Orden: bind una vez → lock organización compartido con H1 → revalidación de acceso →
+  lock employee_state → replay/máquina/reloj/escrituras. No repetir limpieza de contextos
+  bajo el lock de organización. La primera revisión falló RACE-01; corregido y revalidado.
+- Desactivar empleado o membresía impide fichajes y replay; el empleado inactivo con
+  membresía activa conserva lectura autorizada de su estado.
+
+Evidencia real del código `4819abb0c4122d5d76582bad4615753667dd6e1d`, 2026-09-22:
+- [Database H1 + H2, run 35741052549](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35741052549): PASS.
+  Ubuntu 24.04, Supabase CLI 2.117.0, stack local PostgreSQL 17/Auth/REST/Storage.
+  `supabase db reset --local --no-seed` aplica las cuatro migraciones desde vacío.
+  `supabase test db`: **180 pruebas SQL/pgTAP PASS** (106 H1, 43 motor H2, 31 capability H2).
+  `python3 tests/integration/h2.py`: **102 checks H1 + 70 checks H2 PASS**,
+  con login GoTrue real y JWT contra PostgREST/Storage, sin mocks de RLS.
+  Contenedores destruidos al finalizar con `supabase stop --no-backup`.
+- [CI general, run 35741052373](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35741052373): PASS.
+  npm ci, typecheck, lint, **21 tests**, build, sintaxis shell y whitespace.
+- El commit posterior únicamente registra esta evidencia. Ver Checks del PR para la
+  ejecución automática adicional sobre ese commit documental; no modifica código probado.
+
+Cobertura de salida H2:
+| Criterio | Evidencia |
+|---|---|
+| STATE-01 | Las 12 celdas por RPC real: 5 legales y 7 rechazadas sin efectos; salida pausada preserva originales |
+| TIME-01..05 | Hora cliente rechazada; muestra posterior al lock; medianoche y DST Madrid/Canarias en SQL; igualdad; regresión sin escrituras |
+| IDEM-01..04 | 20 requests iguales, un evento/recibo/audit; payload distinto rechazado; timeout tras commit recupera recibo; revocado no puede replay |
+| RACE-01..04 | 20 altas simultáneas, una proyección; 20 UUID distintos/misma versión: 1 éxito y 19 VERSION_CONFLICT; revocación gana lock; sin deadlocks |
+| ATOM-01 | Fallo forzado de audit revierte evento, proyección, sesión y recibo; reintento tras rollback válido |
+| IMM-01 | UPDATE/DELETE/TRUNCATE denegados a cliente y roles técnicos; triggers mantienen inmutabilidad aun con grants accidentales |
+| Aislamiento | Cruces tenant/empleado/RPC/join/UUID denegados; GUC falsa no autoriza; clock no puede adquirir scope administrativo ni modificar identidad |
+
+Límites: solo datos sintéticos y stack CI efímero. El entorno de edición no tiene Docker/PostgreSQL;
+no se afirma ejecución DB local aquí. DST/igualdad usan fixtures SQL privilegiadas revertidas y
+guard real, sin sustituir reloj/RPC. Timeout usa proxy local que pierde el ACK tras commit real.
+Serialización conservadora por tenant, documentada. No H3, kiosco, informes H5, UI/PWA,
+producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 
 ## Siguiente paso
-Trabajo detenido tras el merge de PR #4. Esperar autorización expresa para HITO 2.
+Esperar revisión y aprobación de HITO 2 en PR #5. No hacer merge ni iniciar HITO 3 sin autorización.

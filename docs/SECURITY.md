@@ -106,3 +106,18 @@ los cambios aunque dos timestamps coincidan. Se conserva request_id para correla
 Alta OWNER y aceptación también registran la asignación inicial; invitación registra únicamente rol.
 No se incluye email, token, nombre, código de empleado ni payload completo. El audit se inserta
 con los datos bajo el mismo lock/transacción; un fallo revierte datos y recibo. Replays no duplican.
+
+### H2 — fichaje propio sin capacidad administrativa
+`private.member_scope`, `private.authorize` y los permisos H1 permanecen sin cambios:
+un EMPLOYEE no recibe capacidad member. `fichaje_clock` es un rol NOLOGIN/NOINHERIT/
+NOBYPASSRLS separado, sin escritura de empleados/membresías/políticas.
+El guard verifica empleado propio activo, membresía activa y tenant activo antes de emitir
+capacidad clock ligada a xid8/backend/principal/tenant y employee_id. El rol no puede crear,
+borrar ni reasignar el contexto ni invocar gates H1. RLS restringe estado/sesiones/eventos al
+empleado de esa capacidad; audit y recibos solo aceptan la operación record_time_event.
+Tras obtener el lock de organización compartido con H1 se revalidan organización, membresía
+y empleado antes del replay; después se bloquea employee_state. El bind ocurre una sola vez:
+no se repite limpieza de contextos bajo el lock de organización, evitando invertir locks.
+El guard añade solo lectura de employees para validar el vínculo; no recibe mutaciones tenant.
+`fichaje_state_reader` solo lee el estado propio o el autorizado a gestores mediante RLS;
+no emite capabilities ni escribe. Desactivar empleado bloquea fichaje/replay, no borra historial.
