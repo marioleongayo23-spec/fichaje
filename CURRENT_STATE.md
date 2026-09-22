@@ -40,7 +40,7 @@ Checksums internos PASS; bundle restaurado en repositorio vacío y `main` restau
 05:00 Europe/Madrid. Backup PostgreSQL sigue bloqueado.
 
 ## HITO 1 — identidad y aislamiento
-ESTADO: BLOCKED — H1 no aprobado. Correcciones SEC-H1-01 y AUD-H1-01 pendientes de nueva CI. PR #4 permanece abierto.
+ESTADO: PASS técnico de las correcciones SEC-H1-01 y AUD-H1-01. H1 no aprobado; PR #4 abierto, pendiente de revisión del usuario.
 Rama: `astra/hito-1-identidad-rls`, base `39ff3e041e49396fa177e13a0b2e4ebbef034da6`.
 
 Entregado: Supabase local CLI 2.117.0 / PostgreSQL 17; migración de organizaciones,
@@ -88,7 +88,26 @@ Los contextos de transacciones finalizadas nunca autorizan otra transacción; se
 Auditoría before/after de role, active, membership_id y versiones; transferencia con ambas membresías.
 Sin email, token, nombre ni payload completo. Pruebas negativas del rol técnico y de función
 intencionadamente sin filtro; reconstrucción exclusiva desde audit en SQL y REST real.
-Ejecución SQL/integración/CI de estas correcciones pendiente; la evidencia anterior no las acredita.
+Evidencia de las correcciones ejecutada el 2026-09-22, código `43a2b6f418aca4d0a353773ae84c3d03262810f7`:
+- [Database H1, run 35729889526, intento 2](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35729889526/attempts/2): PASS.
+  `supabase start` y `supabase db reset --local --no-seed` aplican ambas migraciones desde vacío.
+  **106 tests SQL/pgTAP PASS**: 85 existentes y 21 de los hallazgos; sin contexto no hay lectura,
+  GUC falsificada no autoriza, writer no fabrica/borra contexto ni cambia de tenant, lectura/INSERT/
+  UPDATE/movimiento de fila cruzados bloqueados incluso con identidad miembro de ambos tenants.
+  Una función SECURITY DEFINER intencionadamente sin filtro sigue limitada por RLS.
+  Audit permite reconstruir dos cambios consecutivos de role/active y vínculo, además de ambas
+  partes de la transferencia OWNER; replay no duplica evidencia.
+  **102 comprobaciones de integración real PASS**: Auth/GoTrue, JWT, PostgREST, Storage,
+  concurrencia, revocación y rollback; reconstrucción audit por REST sin leer la entidad actual.
+  Stack local efímero y datos sintéticos; contenedores destruidos al finalizar.
+- [CI general, run 35729889498](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35729889498): PASS,
+  21 tests, typecheck, lint, build, shell y whitespace.
+- Fallos intermedios resueltos: permiso CREATE temporal para cambiar propietario del trigger;
+  USAGE de extensions concedido al writer solo dentro de la transacción de fixtures pgTAP y
+  revertido con ROLLBACK. El primer intento del run final falló antes de tests por puerto 54324
+  ocupado en el runner; el segundo completó toda la validación sin cambiar código ni omitir tests.
+El commit posterior solo registra estas evidencias. Los Checks del PR muestran además la nueva
+validación automática sobre ese último commit. H1 sigue sin aprobación; no merge ni H2.
 
 ## Siguiente paso
 Revisar y aprobar PR #4. Trabajo detenido en H1; no merge ni H2 sin autorización.
