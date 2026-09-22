@@ -54,6 +54,13 @@ objetos Storage por separado. Roles gestionados, extensiones, claves de firma Au
 proveedor no se recuperan de un simple pg_dump. Restaurar con procedimientos compatibles Supabase,
 no reemplazar roles gestionados sin evaluación. Validar Auth con sesiones revocadas y rotar claves si incidente.
 
+## OPS-02 — detección y autorrecuperación
+Antes del piloto, la operación debe vigilar disponibilidad y errores de frontend/API/Auth/PostgreSQL, latencia del fichaje, fallos de jobs y frescura/éxito de backups. Un backup fallido, ausente o no verificable genera alerta; éxito de upload no equivale a restore probado.
+
+Recuperaciones automáticas admitidas: retry idempotente con la misma clave, reinicio/redeploy de servicios, rollback a release previamente sana, reintento de jobs y reconstrucción de proyecciones reconstruibles desde eventos/ajustes inmutables. Deben ser acotadas, observables y repetibles. Nunca modificar automáticamente `time_events`, correcciones aprobadas ni horas efectivas para "arreglar" una inconsistencia.
+
+En staging se inducirá al menos una release degradada/fallo controlado para demostrar: detección, alerta, preservación de evidencia, rollback y retorno del canary a verde. Una deriva de invariantes bloquea auto-reparaciones no expresamente autorizadas y escala a revisión humana.
+
 ## Restore DB futuro / puerta H7
 1. Contener incidente, parar escrituras, preservar evidencia y seleccionar punto consistente.
 2. Verificar checksum; descifrar en stream hacia pg_restore en entorno aislado compatible, sin acceso público.
