@@ -11,6 +11,7 @@ Astra implementa. Leer este archivo y CURRENT_STATE.md al iniciar cada sesión.
 - Toda mutación: autorización servidor, idempotencia y concurrencia controlada.
 - V1 sin biometría, fotos, ubicación, nóminas, vacaciones ni HR general. Kiosco sin email.
 - Nunca secretos, datos reales, dumps, PIN o tokens en git, logs, artefactos públicos o frontend.
+- OPS-02 es puerta obligatoria antes de H7: observabilidad, canaries, invariantes, alertas y self-healing seguro. Ninguna automatización/IA puede reescribir fichajes originales, correcciones aprobadas o historia laboral.
 - Cambios mínimos; tests obligatorios. No PASS con fallos o comprobaciones obligatorias pendientes.
 - Actualizar CURRENT_STATE.md con alcance real, evidencias y limitaciones. Diseño documentado no equivale a implementación probada.
 - Validación H0: npm ci && npm run check; bash -n scripts/*.sh; git diff --check.

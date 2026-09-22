@@ -26,7 +26,10 @@ No dar PASS a seguridad multiempresa o lógica SQL en H0: aún no implementadas.
 | EXP-01..05 / H5 | Export propio/empresa; snapshot consistente bajo corrección concurrente; fórmulas neutralizadas; DST/abiertos visibles; link expira sin listado público |
 | RET-01..04 / H5 | No purgar antes plazo; hold bloquea; purge autorizado con manifiesto; restore reaplica bajas/purgas |
 | PWA-01..03 / H6 | Offline sin ACK falso; caché no contiene API/tokens; accesibilidad teclado/lector y móvil |
+| OBS-01..07 / OPS-02 | Errores centralizados con release/request_id sin secretos; métricas API/Auth/DB/fichaje; health checks; canary sintético CLOCK_IN→BREAK_START→BREAK_END→CLOCK_OUT; invariantes detectan deriva; alerta real ante fallo inducido; aislamiento de telemetría por tenant |
+| RES-01..04 / OPS-02 | Retry solo de operaciones idempotentes; rollback automático de release degradada probado en staging; proyecciones reconstruibles reparables desde fuente inmutable con evidencia; frescura/éxito de backups vigilados y alertados |
 | REC-01..03 / H7 | Restaurar repo y DB cifrada en entorno vacío, comprobar RLS/Auth/Storage; medir RPO/RTO; clave ausente falla sin dump plano |
 
 Desactivar test o simular una aserción RLS en JavaScript no satisface puerta DB.
+OPS-02 no puede alterar automáticamente `time_events`, decisiones/ajustes aprobados ni otra historia laboral. Los self-healings permitidos se limitan a infraestructura, reintentos idempotentes, rollback de release y proyecciones explícitamente reconstruibles.
 Evidencia de cada hito: comando, entorno, resultado y limitación en CURRENT_STATE y PR.

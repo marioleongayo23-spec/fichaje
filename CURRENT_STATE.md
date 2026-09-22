@@ -167,12 +167,15 @@ guard real, sin sustituir reloj/RPC. Timeout usa proxy local que pierde el ACK t
 Serialización conservadora por tenant, documentada. No H3, kiosco, informes H5, UI/PWA,
 producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 
+## OPS-02 — observabilidad y resiliencia (planificado)
+Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
+
 ## Siguiente paso
-Completar únicamente HITO 3 y su validación real. No hacer merge ni iniciar H4.
+Completar únicamente HITO 3 y su validación real. No hacer merge ni iniciar H4. OPS-02 se implementará después de H6 y antes de H7.
 
 ## HITO 3 — correcciones append-only
 ESTADO: en validación; no PASS hasta completar CI H1 + H2 + H3.
-Rama: `astra/hito-3-correcciones`, base `9f099e4446ff4aec1aae5db2d30e5abb027c9998`.
+Rama `astra/hito-3-correcciones`; PR #7. Base H2 y actualización documental OPS-02 conservada.
 Migración aditiva, solicitudes/decisiones/ajustes inmutables, capacidades aisladas,
 reconstrucción completa y pruebas reales COR-01..06. Sin UI, kiosco, informes,
 clasificaciones de horas, producción ni datos reales. No merge.
