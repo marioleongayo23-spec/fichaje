@@ -16,8 +16,9 @@ create table public.hour_classifications (
  overtime_seconds bigint not null check(overtime_seconds>=0),
  basis_version bigint not null check(basis_version>=0),
  reason text not null check(length(btrim(reason)) between 1 and 1000),
- actor_membership_id uuid not null, created_at timestamptz not null,
+ actor_membership_id uuid not null, request_id uuid not null, created_at timestamptz not null,
  unique(organization_id,id), unique(organization_id,employee_id,id),
+ unique(organization_id,actor_membership_id,request_id),
  foreign key(organization_id,employee_id) references public.employees(organization_id,id) on delete restrict,
  foreign key(organization_id,actor_membership_id) references public.memberships(organization_id,id) on delete restrict,
  foreign key(organization_id,employee_id,previous_id)
@@ -158,10 +159,11 @@ returns jsonb language sql stable set search_path='' as $$
     from private.effective_timeline(p_org,e.id,p_cutoff) x where x.session_id=s.id),'[]'::jsonb)
   ) order by s.created_at,s.id) from public.work_sessions s
    join public.work_policies w on w.organization_id=s.organization_id and w.id=s.policy_id
-   left join public.time_events entry on entry.organization_id=s.organization_id and entry.session_id=s.id
-    and entry.event_type='CLOCK_IN' and entry.server_at<=p_cutoff
+   left join lateral (select min(x.effective_at) as effective_at
+    from private.effective_timeline(p_org,e.id,p_cutoff) x
+    where x.session_id=s.id and x.event_type='CLOCK_IN') entry on true
    where s.organization_id=p_org and s.employee_id=e.id and s.created_at<=p_cutoff
-    and ((coalesce(entry.server_at,s.created_at) at time zone p_zone)::date between p_start and p_end)
+    and ((coalesce(entry.effective_at,s.created_at) at time zone p_zone)::date between p_start and p_end)
   ),'[]'::jsonb),
   'correction_requests',coalesce((select jsonb_agg(jsonb_build_object('request',to_jsonb(r),
    'decision',to_jsonb(d)) order by r.created_at,r.id) from public.correction_requests r
@@ -264,12 +266,28 @@ create function public.classify_hours(p_organization_id uuid,p_request_id uuid,p
  p_local_month date,p_previous_id uuid,p_basis_version bigint,p_regular_seconds bigint,
  p_complementary_seconds bigint,p_overtime_seconds bigint,p_reason text)
 returns jsonb language plpgsql security definer set search_path='' as $$
-declare actor uuid; previous public.hour_classifications; computed record; current_version bigint;
+declare actor uuid; previous public.hour_classifications; replay public.hour_classifications;
+ computed record; current_version bigint;
  new_id uuid; t timestamptz;
 begin
  actor:=private.report_scope(p_organization_id,p_employee_id);
  if private.current_role(p_organization_id) not in ('OWNER','ADMIN') then
   raise exception using errcode='42501',message='FORBIDDEN'; end if;
+ if p_employee_id is null or p_local_month is null then
+  raise exception using errcode='22023',message='INVALID_INPUT'; end if;
+ perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_organization_id::text||p_employee_id::text||p_local_month::text,0));
+ select * into replay from public.hour_classifications where organization_id=p_organization_id
+  and actor_membership_id=actor and request_id=p_request_id;
+ if FOUND then
+  if replay.employee_id is distinct from p_employee_id or replay.local_month is distinct from p_local_month
+   or replay.previous_id is distinct from p_previous_id or replay.basis_version is distinct from p_basis_version
+   or replay.regular_seconds is distinct from p_regular_seconds
+   or replay.complementary_seconds is distinct from p_complementary_seconds
+   or replay.overtime_seconds is distinct from p_overtime_seconds or replay.reason is distinct from p_reason then
+   raise exception using errcode='22023',message='IDEMPOTENCY_CONFLICT'; end if;
+  return jsonb_build_object('id',replay.id,'basis_version',replay.basis_version,
+   'computable_seconds',replay.regular_seconds+replay.complementary_seconds+replay.overtime_seconds);
+ end if;
  if p_request_id is null or p_employee_id is null or p_local_month is null or extract(day from p_local_month)<>1
   or p_local_month>=date_trunc('month',clock_timestamp())::date or
   p_regular_seconds is null or p_complementary_seconds is null or p_overtime_seconds is null or
@@ -278,7 +296,6 @@ begin
   raise exception using errcode='22023',message='INVALID_INPUT'; end if;
  -- Same employee lock namespace for concurrent classifications; unique indexes
  -- additionally enforce one initial entry and one successor per revision.
- perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_organization_id::text||p_employee_id::text||p_local_month::text,0));
  select version into current_version from private.employee_state where organization_id=p_organization_id and employee_id=p_employee_id;
  if current_version is distinct from p_basis_version then raise exception using errcode='40001',message='VERSION_CONFLICT'; end if;
  select * into computed from private.computable_month(p_organization_id,p_employee_id,p_local_month,clock_timestamp());
@@ -292,9 +309,9 @@ begin
  if previous.id is distinct from p_previous_id then raise exception using errcode='40001',message='VERSION_CONFLICT'; end if;
  t:=clock_timestamp();
  insert into public.hour_classifications(organization_id,employee_id,local_month,previous_id,
-  regular_seconds,complementary_seconds,overtime_seconds,basis_version,reason,actor_membership_id,created_at)
+  regular_seconds,complementary_seconds,overtime_seconds,basis_version,reason,actor_membership_id,request_id,created_at)
  values(p_organization_id,p_employee_id,p_local_month,p_previous_id,p_regular_seconds,
-  p_complementary_seconds,p_overtime_seconds,p_basis_version,p_reason,actor,t) returning id into new_id;
+  p_complementary_seconds,p_overtime_seconds,p_basis_version,p_reason,actor,p_request_id,t) returning id into new_id;
  insert into public.audit_log(organization_id,actor_kind,actor_id,employee_id,action,entity_type,entity_id,
   request_id,server_at,safe_details) values(p_organization_id,'USER',private.request_uid(),p_employee_id,
   'classify_hours','hour_classifications',new_id,p_request_id,t,jsonb_build_object('basis_version',p_basis_version));

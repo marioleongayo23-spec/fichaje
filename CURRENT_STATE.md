@@ -11,7 +11,7 @@ Rama de origen: `astra/hito-3-correcciones`. Merge: `a848c1c5adef50ada215d736208
 HITO 4 aprobado por el usuario, incluida SEC-H4-01, e integrado en `main` mediante PR #8 el 2026-09-23.
 Rama de origen: `astra/hito-4-kiosco`. Merge: `76922f352a64f3bbf0d1d7ece2c7ae155f58d1a0`.
 
-## Entregado en H0
+HITO 5 autorizado el 2026-09-23; trabajo en `astra/hito-5-informes-retencion`, PR #9 en borrador. No aprobado ni integrado.\n\n## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
   estados, tiempo servidor, inmutabilidad/correcciones, audit, concurrencia/idempotencia y kiosco.
 - Contratos de exportación, retención, aceptación, recuperación y roadmap con puertas por hito.
@@ -303,3 +303,11 @@ Evidencia del código `a820a417d03b543ebb8ff7470cffc0ee3e07c755`:
 - Verificación local: npm run check, Deno check/test, Python compile, shell y whitespace PASS. DB/Auth se ejecutaron en CI, no se simularon localmente.
 Este commit documental registra la evidencia anterior y no cambia código probado.
 PR #8 integrado por autorización expresa del usuario. Sin iniciar H5 ni OPS-02; sin producción, secretos reales ni datos reales. OPS-02 permanece después de H6 y antes de H7. Trabajo detenido.
+
+## HITO 5 — trabajo en curso
+ESTADO: FAIL / INCOMPLETO. PR #9 es borrador y no se debe integrar.
+Implementados parcialmente: snapshot materializado, clasificación append-only, paquete real CSV/JSON/PDF,
+worker y firmador privados, holds append-only y purga operativa acotada.
+Pendiente: purga legal de historia laboral, tombstones y restore PostgreSQL con replay, entrega a terceros
+con recibo, pruebas completas EXP-01..05/RET-01..04, concurrencia de snapshot y regresión integral.
+No hay producción, datos reales, secretos reales ni backup DB. OPS-02 permanece después de H6 y antes de H7.

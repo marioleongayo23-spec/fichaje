@@ -21,8 +21,8 @@ select ok((select bool_and(relrowsecurity and relforcerowsecurity) from pg_class
   'private.legal_holds'::regclass,'private.retention_runs'::regclass)), 'H5 tables FORCE RLS');
 select ok(not exists(select 1 from pg_roles where rolname in ('fichaje_report','fichaje_export_worker')
  and (rolcanlogin or rolsuper or rolbypassrls or rolinherit or rolcreatedb or rolcreaterole)), 'H5 technical roles restricted');
-select hasnt_table_privilege('authenticated','private.export_jobs','SELECT','clients cannot read raw jobs');
-select hasnt_table_privilege('service_role','private.legal_holds','SELECT','service role cannot read holds');
+select ok(not has_table_privilege('authenticated','private.export_jobs','SELECT'),'clients cannot read raw jobs');
+select ok(not has_table_privilege('service_role','private.legal_holds','SELECT'),'service role cannot read holds');
 select is((select public from storage.buckets where id='fichaje-evidence'),false,'private evidence bucket');
 select set_config('request.jwt.claims','{"sub":"81000000-0000-0000-0000-000000000002","role":"authenticated"}',true);
 set local role authenticated;
