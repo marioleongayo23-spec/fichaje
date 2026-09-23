@@ -8,7 +8,7 @@ HITO 2 aprobado por el usuario e integrado en `main` mediante PR #5 el 2026-09-2
 Rama de origen: `astra/hito-2-motor-horario`. Merge: `e4edd0d451627d6cd6e25aafc31819a77ee76116`.
 HITO 3 aprobado por el usuario e integrado en `main` mediante PR #7 el 2026-09-23.
 Rama de origen: `astra/hito-3-correcciones`. Merge: `a848c1c5adef50ada215d7362089db5da3ebf3f8`.
-HITO 4 no autorizado ni iniciado.
+HITO 4 autorizado el 2026-09-23, en implementación en `astra/hito-4-kiosco`.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -173,7 +173,7 @@ producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
 
 ## Siguiente paso
-Trabajo detenido tras el merge de PR #7. Esperar autorización expresa para HITO 4. OPS-02 se implementará después de H6 y antes de H7.
+Completar HITO 4 y validar KIO-01..07 con regresión H1/H2/H3. OPS-02 se implementará después de H6 y antes de H7.
 
 ## HITO 3 — correcciones append-only
 ESTADO: PASS — HITO 3 aprobado por el usuario y PR #7 integrado en `main`.
@@ -228,4 +228,13 @@ Checks ejecutan de nuevo toda la suite sin cambiar el código probado.
 
 Límites: datos exclusivamente sintéticos y stack CI efímero. Sin UI/PWA, kiosco H4, informes H5,
 clasificaciones de horas, producción, datos reales ni configuración remota. Backup DB bloqueado.
-PR #7 integrado por autorización expresa del usuario. H4 no iniciado. Trabajo detenido.
+PR #7 integrado por autorización expresa del usuario. H4 autorizado posteriormente; ver sección siguiente.
+
+
+
+## HITO 4 — kiosco seguro (en curso)
+ESTADO: BLOCKED — pendiente de completar validación real; no se declara PASS.
+Rama `astra/hito-4-kiosco`, base main `4d2a40d09be431fd1f8cafe1365c7b71b8b520bf`.
+Migración aditiva, gateway Deno server-only y tests reales en preparación. Motor H2/H3
+extraído a función invoker común, sin segundo motor ni cambios de permisos H1/H3.
+Sin producción, UI/PWA, H5 o OPS-02. Evidencias finales pendientes de CI desde base vacía.
