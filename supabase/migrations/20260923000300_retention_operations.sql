@@ -3,6 +3,7 @@ create role fichaje_retention nologin noinherit nobypassrls;
 grant fichaje_retention to postgres;
 grant usage,create on schema private to fichaje_retention;
 grant usage on schema public to fichaje_retention;
+grant usage on schema storage to fichaje_retention;
 grant select,insert on private.legal_holds,private.retention_runs to fichaje_retention;
 grant insert on public.audit_log to fichaje_retention;
 grant select,delete on private.kiosk_challenges,private.auth_attempt_buckets,

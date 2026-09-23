@@ -18,11 +18,12 @@ create table public.hour_classifications (
  reason text not null check(length(btrim(reason)) between 1 and 1000),
  actor_membership_id uuid not null, request_id uuid not null, created_at timestamptz not null,
  unique(organization_id,id), unique(organization_id,employee_id,id),
+ unique(organization_id,employee_id,local_month,id),
  unique(organization_id,actor_membership_id,request_id),
  foreign key(organization_id,employee_id) references public.employees(organization_id,id) on delete restrict,
  foreign key(organization_id,actor_membership_id) references public.memberships(organization_id,id) on delete restrict,
- foreign key(organization_id,employee_id,previous_id)
-  references public.hour_classifications(organization_id,employee_id,id) on delete restrict
+ foreign key(organization_id,employee_id,local_month,previous_id)
+  references public.hour_classifications(organization_id,employee_id,local_month,id) on delete restrict
 );
 create unique index hour_classification_successor on public.hour_classifications(organization_id,previous_id)
  where previous_id is not null;
@@ -118,6 +119,9 @@ grant execute on function private.scoped_tenant(text),private.scoped_subject(tex
 grant select on public.employees,public.memberships,public.work_sessions,public.work_policies,
  public.time_events,public.correction_requests,public.correction_decisions,public.event_adjustments,
  public.hour_classifications to fichaje_report;
+grant select,update(id) on public.organizations to fichaje_report;
+create policy report_organization_lock on public.organizations to fichaje_report
+ using(id=private.scoped_tenant('report')) with check(id=private.scoped_tenant('report'));
 grant select,insert on private.export_jobs to fichaje_report;
 grant insert on public.hour_classifications,public.audit_log to fichaje_report;
 create policy report_jobs on private.export_jobs to fichaje_report
@@ -275,6 +279,11 @@ begin
   raise exception using errcode='42501',message='FORBIDDEN'; end if;
  if p_employee_id is null or p_local_month is null then
   raise exception using errcode='22023',message='INVALID_INPUT'; end if;
+ -- Shared lock with clocks and corrections: basis_version and totals are
+ -- validated against the same committed employee history.
+ perform 1 from public.organizations where id=p_organization_id and status='ACTIVE' for update;
+ if not FOUND or private.current_role(p_organization_id) not in ('OWNER','ADMIN') then
+  raise exception using errcode='42501',message='FORBIDDEN'; end if;
  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_organization_id::text||p_employee_id::text||p_local_month::text,0));
  select * into replay from public.hour_classifications where organization_id=p_organization_id
   and actor_membership_id=actor and request_id=p_request_id;
