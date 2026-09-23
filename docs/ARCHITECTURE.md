@@ -55,3 +55,20 @@ Referencias: [Claves públicas Supabase](https://supabase.com/docs/guides/gettin
 [RLS Supabase](https://supabase.com/docs/guides/database/postgres/row-level-security),
 [funciones DB](https://supabase.com/docs/guides/database/functions),
 [bloqueos PostgreSQL](https://www.postgresql.org/docs/current/explicit-locking.html).
+
+## H4 — frontera de kiosco implementada
+Gateway Deno server-only en `supabase/functions/kiosk`; contrato y variables en
+`supabase/README.md`. Validación de JWT vía Auth, Argon2id local y rol SQL dedicado
+sin tablas/grants administrativos. Supabase Auth admin limitado a provisioning y
+compensación de cuentas técnicas; nunca acceso universal a datos laborales.
+No I/O externo bajo lock PostgreSQL: Auth/preflight/provisioning fuera de la transacción
+final, que revalida permisos. Pepper en secret store servidor; CI solo valores aleatorios
+efímeros. PIN de entrega cifrado para clave pública del gestor, no respuesta en claro.
+Motor H2/H3 compartido por función invoker, autorizaciones separadas para Web y KIOSK.
+No se despliega ni diseña UI, PWA, H5 u OPS-02 en este hito.
+
+SEC-H4-01: la defensa de red recibe solo el peer TCP del runtime Deno, normalizado
+y HMAC-SHA256 por tenant con `KIOSK_NETWORK_SECRET` independiente del pepper.
+Cabeceras de red no se usan. Tras un proxy el peer es el proxy, sin inferir IP
+original; metadata no confiable/no disponible deniega autenticación. Contrato,
+limitaciones de despliegue y umbral adicional 60/15 min en SECURITY.md.

@@ -8,7 +8,7 @@ HITO 2 aprobado por el usuario e integrado en `main` mediante PR #5 el 2026-09-2
 Rama de origen: `astra/hito-2-motor-horario`. Merge: `e4edd0d451627d6cd6e25aafc31819a77ee76116`.
 HITO 3 aprobado por el usuario e integrado en `main` mediante PR #7 el 2026-09-23.
 Rama de origen: `astra/hito-3-correcciones`. Merge: `a848c1c5adef50ada215d7362089db5da3ebf3f8`.
-HITO 4 no autorizado ni iniciado.
+HITO 4 implementado y validado en `astra/hito-4-kiosco`; PR #8 pendiente de aprobación, sin merge.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -173,7 +173,7 @@ producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
 
 ## Siguiente paso
-Trabajo detenido tras el merge de PR #7. Esperar autorización expresa para HITO 4. OPS-02 se implementará después de H6 y antes de H7.
+Revisión y aprobación del PR #8 (HITO 4). No hacer merge ni iniciar H5 sin autorización. OPS-02 se implementará después de H6 y antes de H7.
 
 ## HITO 3 — correcciones append-only
 ESTADO: PASS — HITO 3 aprobado por el usuario y PR #7 integrado en `main`.
@@ -228,4 +228,77 @@ Checks ejecutan de nuevo toda la suite sin cambiar el código probado.
 
 Límites: datos exclusivamente sintéticos y stack CI efímero. Sin UI/PWA, kiosco H4, informes H5,
 clasificaciones de horas, producción, datos reales ni configuración remota. Backup DB bloqueado.
-PR #7 integrado por autorización expresa del usuario. H4 no iniciado. Trabajo detenido.
+PR #7 integrado por autorización expresa del usuario. H4 autorizado posteriormente; ver sección siguiente.
+
+
+
+## HITO 4 — kiosco seguro
+ESTADO: PASS — implementación y pruebas completadas; pendiente de aprobación del usuario.
+Rama `astra/hito-4-kiosco`, base main `4d2a40d09be431fd1f8cafe1365c7b71b8b520bf`.
+[PR #8](https://github.com/marioleongayo23-spec/fichaje/pull/8), sin merge.
+
+Entregado: cuatro tablas privadas FORCE RLS, identidades Auth técnicas con exclusión
+bidireccional de memberships, provisioning/revocación OWNER/ADMIN y reset auditado.
+Gateway Deno server-only valida JWT con GoTrue; SQL por login dedicado con únicamente
+el rol gateway (EXECUTE de entrypoints, sin tablas ni service_role). Auth admin solo
+para crear/compensar cuentas técnicas; no acceso universal a datos laborales.
+PIN CSPRNG de ocho dígitos, Argon2id 19 MiB/t=2/p=1, salt individual de 16 bytes y
+pepper externo de >=32 bytes. Entrega cifrada RSA-OAEP-256 al gestor; ningún PIN en claro
+en respuestas, DB o logs. Reset conserva locks y revoca credencial/challenges anteriores.
+Rate limit persistente por empleado y dispositivo, 5/30 fallos en 15 minutos, sin bypass
+con PIN correcto y conservado tras reiniciar gateway. Errores externos genéricos y no-store.
+Challenge de 256 bits, solo hash, TTL 60 s, ligado a tenant/empleado/dispositivo/acción/
+versión/request_id. Consumo, evento, estado, audit KIOSK e idempotencia en una transacción.
+Recuperación exacta tras perder ACK, sin nuevo fichaje, incluso tras caducar el challenge
+consumido; siempre revalida dispositivo, empleado y versión de credencial.
+
+H2/H3 comparten una única función invoker `private.apply_time_event`: misma máquina,
+locks, política, reloj/high-water de originales, secuencia e inmutabilidad. Autorización
+humana original conservada; kiosk tiene capabilities y RLS separadas. Sin acceso a
+directorio, correcciones administrativas, memberships, roles o exports.
+
+Evidencia real del código `b3fa80ed3c68fb9eda6ba24efaaf5ad43d934da8`, 2026-09-23:
+- [Database H1 + H2 + H3 + H4, run 35839508363](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35839508363): PASS.
+  Ubuntu 24.04, Deno 2.9.6, Supabase CLI 2.117.0, PostgreSQL 17, GoTrue/PostgREST/Storage
+  reales. `supabase db reset --local --no-seed` reconstruye las seis migraciones desde vacío.
+  **246 tests SQL/pgTAP PASS** (217 previos + 29 H4).
+  **346 checks de integración PASS: 102 H1 + 70 H2 + 80 H3 + 94 H4**.
+  Gateway HTTP real, sin mocks de RLS/Auth. Concurrencia, revocación con JWT previo y
+  lock primero, 12 consumos simultáneos/un evento, payload distinto, ACK perdido por
+  proxy tras commit real, rollback audit, matriz H2 completa por kiosco e inmutabilidad.
+  Prueba KIO-07 escanea PIN sintéticos conocidos en memoria contra tablas serializadas,
+  logs de contenedores/gateway/suite, respuestas HTTP y artefactos temporales generados:
+  ninguna fuga en claro. Los buffers se imprimen solo después del gate.
+  Stack destruido con `supabase stop --no-backup` al terminar.
+- [CI general, run 35839508364](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35839508364): PASS.
+  npm ci, typecheck, lint, **21 tests**, build, shell y whitespace.
+- Entorno de edición: `npm run check`, Deno strict check, Python compile y diff check PASS.
+  No Docker/PostgreSQL local: la ejecución DB/Auth atribuida aquí es la de CI.
+- Fallos intermedios corregidos: sonda de arranque demasiado corta para suelo de 300 ms;
+  INHERIT de la membresía del login efímero PostgreSQL; doble serialización JSONB del
+  driver. Provisioning concurrente compensa la cuenta Auth que no ganó. Ningún test omitido.
+- El commit posterior solo registra esta evidencia. Sus Checks repiten automáticamente
+  la suite; no cambia el código probado.
+
+Límites: solo datos/secretos sintéticos efímeros. Gateway probado como módulo Deno por HTTP
+con stack Supabase real local de CI; no despliegue Edge remoto ni producción. Entrega de
+PIN es un contrato cifrado backend; interfaz y limpieza visual a 15 s corresponden a H6.
+No fichaje offline, ACK optimista, informes/retención H5, UI/PWA H6, OPS-02 ni datos reales.
+OPS-02 permanece después de H6 y antes de H7. Compensación de Auth en fallo de red es
+best effort; identidades no vinculadas no obtienen acceso tenant y deben reconciliarse
+antes del piloto. Backup DB sigue bloqueado. Trabajo detenido para revisión del PR #8.
+
+## Revisión SEC-H4-01 (H4 no aprobado)
+En la misma rama astra/hito-4-kiosco y PR #8. Defensa adicional por peer TCP
+normalizado y HMAC tenant con secreto backend independiente; bucket persistente
+60/15 min, sin cambios H1/H2/H3 ni límites empleado/dispositivo. Frontera de
+confianza y proxy documentadas. KIO-07 ampliado para IP y digests.
+Estado de esta revisión: **PASS técnico; HITO 4 NO aprobado, pendiente de revisión**.
+Evidencia del código `a820a417d03b543ebb8ff7470cffc0ee3e07c755`:
+- [Database run 35869927438](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35869927438): PASS, Supabase/PostgreSQL/Auth reales, reset desde vacío sin seed; **251 SQL/pgTAP**, **356 checks integración (102 H1 + 70 H2 + 80 H3 + 104 H4)**. Gateway strict typecheck y **2 tests Deno** PASS. Ninguna suite omitida.
+- [CI run 35869927465](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35869927465): PASS; npm ci, typecheck, lint, **21 tests**, build, shell y whitespace.
+- SEC-H4-01: 60 fallos reales desde un peer TCP sintético repartidos entre tres dispositivos, headers falsificados sin alterar el bucket, bloqueo persistente tras reinicio y frente a PIN correcto, separación por peer/tenant, expiración servidor, RLS y contadores previos conservados.
+- KIO-07: PIN/IP sintéticos ausentes de DB/logs/respuestas/artefactos; todos los digests de red ausentes de logs/respuestas/artefactos/audit laboral. Solo HMAC en tabla privada. Captura y escaneo en memoria antes de imprimir resultados.
+- Verificación local: npm run check, Deno check/test, Python compile, shell y whitespace PASS. DB/Auth se ejecutaron en CI, no se simularon localmente.
+Este commit documental registra la evidencia anterior y no cambia código probado.
+Sin merge, H5, OPS-02, producción ni datos reales. Próximo paso: revisión del PR #8 por el usuario.

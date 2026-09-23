@@ -145,3 +145,54 @@ La independencia también conserva el vínculo afectado capturado al solicitar y
 el autor de fichajes originales mediante el lector RLS. Desvincular/reasignar el empleado
 antes o después de solicitar no permite al autor de esos fichajes aprobarlos. El guard
 no gana lectura global de eventos; el helper lector solo ve el historial autorizado.
+
+### H4 — frontera concreta y pruebas
+`fichaje_gateway` solo USAGE + EXECUTE de cinco funciones privadas: preflight/apply gestor,
+auth begin/finish y record. No tablas, membresías ni herencia de otros roles. El login SQL
+servidor valida JWT primero y fija identidad transaccional; no se entrega a dispositivo.
+`fichaje_kiosk` NOLOGIN/NOINHERIT/NOBYPASSRLS es definer de estas funciones; las rutas
+kiosk_admin/device/clock de capability protegen tenant y empleado. RLS + grants por columna
+separan lectura/verificación de credenciales, provisioning y consumo. No permisos UPDATE,
+DELETE o TRUNCATE sobre originales. El guard lee solo identidad del dispositivo adicional,
+no hashes/challenges; mantiene las capacidades H1/H2/H3 independientes.
+La exclusión dispositivo/membership es bidireccional y serializada por identidad Auth.
+El reset cambia hash/version sin eliminar bloqueos activos; no permite recuperar el PIN.
+Entrega cifrada para clave pública del gestor evita PIN/password en respuestas en claro.
+El pepper nunca entra en parámetros SQL. Tiempo mínimo de respuesta 300 ms + trabajo
+Argon2 dummy en fallo de autenticación; no prometer tiempo constante bajo saturación.
+Detalles reproducibles, recuperación de recibo y prueba de fugas en `supabase/README.md`.
+
+### SEC-H4-01 — defensa adicional de red
+El gateway Deno usa exclusivamente `Deno.ServeHandlerInfo.remoteAddr` (peer TCP
+establecido por el runtime/SO). No lee `Forwarded`, `X-Forwarded-For`, `X-Real-IP`,
+`CF-Connecting-IP` ni otra cabecera de red; los campos JSON no admitidos se rechazan.
+Sin peer TCP válido, autenticación denegada: no fallback a datos del cliente.
+IPv4 se valida en decimal estricto; IPv6 se canonicaliza y las IPv4 mapeadas se
+unifican con IPv4. Inmediatamente se calcula HMAC-SHA256 sobre dominio
+`kiosk-network-v1`, UUID tenant en minúsculas y dirección normalizada, separados
+por salto de línea. Solo ese digest llega a PostgreSQL, en
+`private.kiosk_network_buckets`, FORCE RLS y contexto de tenant/dispositivo activo.
+`KIOSK_NETWORK_SECRET`: aleatorio, mínimo 32 bytes en base64, exclusivamente backend,
+independiente de `KIOSK_PEPPER` (igualdad rechazada), nunca VITE/GitHub/PostgreSQL.
+CI genera ambos de forma independiente y efímera. El HMAC impide un diccionario
+público de IP; no es anonimato frente a quien obtenga el secreto.
+
+Límite adicional: 60 fallos/peer/tenant/15 minutos, compartido entre dispositivos.
+Usa el mismo lock de organización, transacción y reloj servidor; reserva intento
+y lo descuenta solo tras PIN válido y ausencia de TODOS los bloqueos previos.
+El fallo número 60 bloquea 15 minutos desde ese fallo. El éxito no levanta un
+bloqueo vigente. Reiniciar gateway no reinicia contadores; al expirar ventana y
+bloqueo, el siguiente intento reinicia el bucket. Los límites 5/empleado y
+30/dispositivo conservan sus reglas. Nunca es prueba de identidad ni autorización.
+No se incluye IP/digest en respuestas, logs, audit laboral ni frontend.
+
+Frontera de despliegue: el listener TCP es la fuente confiable, no una cabecera
+que un proxy prometa añadir. Detrás de proxy/NAT se agrupa por su dirección real
+de conexión (posible bloqueo compartido conservador), no por la IP original
+declarada. Un cliente no elige el bucket enviando cabeceras. No usar un adaptador
+que fabrique remoteAddr desde headers. Si la plataforma Edge no proporciona
+metadata TCP confiable, esta ruta falla cerrada y requiere adaptar/verificar
+la infraestructura antes del piloto; H4 no despliega producción. Rotar el secreto
+cambia buckets de red; hacerlo de forma controlada, manteniendo los límites
+persistentes empleado/dispositivo. Estos hashes operativos no son historia laboral;
+su política de retención corresponde al H5 aún pendiente.
