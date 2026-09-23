@@ -68,7 +68,7 @@ create function private.purge_labour(p_org uuid,p_employee uuid,p_month date,
  p_cutoff timestamptz,p_authorization text) returns uuid
 language plpgsql security definer set search_path='' as $$
 declare v_ids uuid[]; v_requests uuid[]; v_decisions uuid[]; v_events uuid[];
- v_adjustments uuid[]; v_classifications uuid[]; v_audit bigint;
+ v_adjustments uuid[]; v_classifications uuid[]; v_audit bigint; v_audit_ids uuid[];
  v_counts jsonb; v_digest text; v_run uuid;
 begin
  if p_org is null or p_employee is null or p_month is null or extract(day from p_month)<>1
@@ -145,8 +145,8 @@ begin
   and a.employee_id=p_employee and a.server_at<=p_cutoff and (
    a.entity_id=any(v_ids) or a.entity_id=any(v_events) or a.entity_id=any(v_requests)
    or a.entity_id=any(v_decisions) or a.entity_id=any(v_adjustments)
-   or a.entity_id=any(v_classifications)) returning 1)
- select count(*) into v_audit from gone;
+   or a.entity_id=any(v_classifications)) returning id)
+ select count(*),array_agg(id order by id) into v_audit,v_audit_ids from gone;
  delete from public.event_adjustments where organization_id=p_org and id=any(v_adjustments);
  delete from public.correction_decisions where organization_id=p_org and id=any(v_decisions);
  delete from public.correction_requests where organization_id=p_org and id=any(v_requests);
@@ -161,6 +161,12 @@ begin
  v_digest:=encode(sha256(convert_to(jsonb_build_array(p_org,p_cutoff,p_authorization,v_counts)::text,'UTF8')),'hex');
  insert into private.retention_runs(organization_id,cutoff,authorization_ref,counts,digest)
  values(p_org,p_cutoff,p_authorization,v_counts,v_digest) returning id into v_run;
+ perform private.journal_prepare(p_org,'PURGE',jsonb_build_object('run_id',v_run,
+  'employee_id',p_employee,'local_month',p_month,'cutoff',p_cutoff,
+  'authorization_ref',p_authorization,'counts',v_counts,'digest',v_digest,
+  'ids',jsonb_build_object('work_sessions',v_ids,'time_events',v_events,
+   'correction_requests',v_requests,'correction_decisions',v_decisions,
+   'event_adjustments',v_adjustments,'hour_classifications',v_classifications,'audit_log',v_audit_ids)));
  delete from private.retention_delete_guard where backend_pid=pg_catalog.pg_backend_pid()
   and transaction_id=pg_catalog.pg_current_xact_id();
  return v_run;

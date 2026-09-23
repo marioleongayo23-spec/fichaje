@@ -34,11 +34,20 @@ jobs:
       - name: Network minimization tests
         run: deno test supabase/functions/kiosk/network_test.ts
       - name: Start isolated local Supabase
-        run: supabase start -x realtime,imgproxy,edge-runtime,logflare,vector,supavisor > /dev/null
+        run: |
+          for attempt in 1 2 3; do
+            if supabase start -x realtime,imgproxy,edge-runtime,logflare,vector,supavisor > /dev/null; then
+              exit 0
+            fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            sleep 5
+          done
       - name: Rebuild from empty database
         run: supabase db reset --local --no-seed
       - name: Real SQL and RLS tests
-        run: supabase test db
+        run: |
+          python3 tests/integration/journal_init.py
+          supabase test db
       - name: Render real H5 evidence package
         run: python3 tests/integration/h5_render.py
       - name: Real Auth, REST, Storage and concurrency tests
