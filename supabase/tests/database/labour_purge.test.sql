@@ -1,6 +1,7 @@
 begin;
 set local search_path=public,extensions;
 select no_plan();
+grant usage on schema extensions to fichaje_retention;
 insert into auth.users(id,email,email_confirmed_at) values
  ('a1000000-0000-0000-0000-000000000001','purge-a@example.invalid',now()),
  ('a1000000-0000-0000-0000-000000000002','purge-b@example.invalid',now());
