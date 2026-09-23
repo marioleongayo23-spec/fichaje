@@ -86,6 +86,7 @@ create trigger retention_immutable before update or delete or truncate on privat
 -- Only the guard can bind a tenant and an authorized subject. The reporter has
 -- no permission to forge a transaction capability or mutate H1-H4 records.
 grant select on public.employees,public.memberships to fichaje_guard;
+grant create on schema private to fichaje_guard;
 create function private.report_scope(p_org uuid,p_employee uuid) returns uuid
 language plpgsql security definer set search_path='' as $$
 declare v_role public.member_role; v_actor uuid; v_employee uuid;
