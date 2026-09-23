@@ -96,9 +96,7 @@ begin
  select id into v_actor from public.memberships where organization_id=p_org
   and auth_user_id=private.request_uid() and active;
  if p_employee is null then
-  if v_role not in ('OWNER','ADMIN') then
-   select id into v_employee from public.employees where organization_id=p_org and membership_id=v_actor;
-  end if;
+  select id into v_employee from public.employees where organization_id=p_org and membership_id=v_actor;
  else
   select id into v_employee from public.employees where organization_id=p_org and id=p_employee
    and (v_role in ('OWNER','ADMIN') or membership_id=v_actor);
@@ -195,7 +193,9 @@ begin
   schema_version,expires_at,snapshot,request_id,created_at)
  values(p_organization_id,p_employee_id,actor,jsonb_build_array(p_employee_id,p_start,p_end,p_timezone),
   now_at,'PENDING',1,now_at+interval '24 hours',
-  private.evidence_snapshot(p_organization_id,private.scoped_subject('report'),p_start,p_end,p_timezone,now_at),
+  private.evidence_snapshot(p_organization_id,
+   case when p_employee_id is null and private.current_role(p_organization_id) in ('OWNER','ADMIN')
+   then null else private.scoped_subject('report') end,p_start,p_end,p_timezone,now_at),
   p_request_id,now_at) returning * into j;
  insert into public.audit_log(organization_id,actor_kind,actor_id,employee_id,action,entity_type,entity_id,
   request_id,server_at,safe_details) values(p_organization_id,'USER',private.request_uid(),p_employee_id,
@@ -300,3 +300,46 @@ revoke all on function public.classify_hours(uuid,uuid,uuid,date,uuid,bigint,big
 grant execute on function public.classify_hours(uuid,uuid,uuid,date,uuid,bigint,bigint,bigint,bigint,text)
  to authenticated;
 revoke create on schema public from fichaje_report;
+
+-- Offline export worker. Its object key is derived from the job UUID, never
+-- from employee names. READY is published only after verified private upload.
+create role fichaje_export_worker nologin noinherit nobypassrls;
+grant fichaje_export_worker to postgres;
+grant usage on schema private to fichaje_export_worker;
+grant select on private.export_jobs to fichaje_export_worker;
+grant update(status,checksum,object_path) on private.export_jobs to fichaje_export_worker;
+create policy export_worker_read on private.export_jobs for select to fichaje_export_worker
+ using(status='PENDING' and expires_at>clock_timestamp());
+create policy export_worker_update on private.export_jobs for update to fichaje_export_worker
+ using(status='PENDING' and expires_at>clock_timestamp())
+ with check(status='READY' and checksum ~ '^[0-9a-f]{64}$'
+  and object_path=organization_id::text||'/'||id::text||'.zip'
+  and expires_at>clock_timestamp());
+-- The worker has no INSERT, DELETE or arbitrary UPDATE grant on any labour table.
+
+create function public.authorize_export_link(p_organization_id uuid,p_job_id uuid) returns text
+language plpgsql security definer set search_path='' as $$
+declare actor uuid; j private.export_jobs; role public.member_role;
+begin
+ -- First validate tenant membership, then inspect the job. A foreign UUID and
+ -- a nonexistent UUID produce the same denial.
+ role:=private.current_role(p_organization_id);
+ if role is null then raise exception using errcode='42501',message='FORBIDDEN'; end if;
+ select id into actor from public.memberships where organization_id=p_organization_id
+  and auth_user_id=private.request_uid() and active;
+ perform private.report_scope(p_organization_id,null);
+ select * into j from private.export_jobs where organization_id=p_organization_id and id=p_job_id;
+ if not FOUND or j.status<>'READY' or j.expires_at<=clock_timestamp()
+  or (j.requested_by<>actor and role='EMPLOYEE')
+  or (role='EMPLOYEE' and j.employee_id is distinct from private.scoped_subject('report')) then
+  raise exception using errcode='42501',message='FORBIDDEN'; end if;
+ return j.object_path;
+end $$;
+alter function public.authorize_export_link(uuid,uuid) owner to fichaje_report;
+revoke all on function public.authorize_export_link(uuid,uuid) from public,anon,service_role;
+grant execute on function public.authorize_export_link(uuid,uuid) to authenticated;
+
+insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
+values('fichaje-evidence','fichaje-evidence',false,10485760,array['application/zip']);
+-- No SELECT policy on storage.objects: neither anonymous nor authenticated
+-- clients can list or download objects, regardless of guessed UUID paths.
