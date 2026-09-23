@@ -6,7 +6,9 @@ HITO 1 aprobado por el usuario e integrado en `main` mediante PR #4 el 2026-09-2
 Rama de origen: `astra/hito-1-identidad-rls`. Merge: `ffd12c689824886abd8ba6f1e836057fc43ee9a8`.
 HITO 2 aprobado por el usuario e integrado en `main` mediante PR #5 el 2026-09-22.
 Rama de origen: `astra/hito-2-motor-horario`. Merge: `e4edd0d451627d6cd6e25aafc31819a77ee76116`.
-HITO 3 implementado y validado: PASS técnico; pendiente de revisión/aprobación, no integrado.
+HITO 3 aprobado por el usuario e integrado en `main` mediante PR #7 el 2026-09-23.
+Rama de origen: `astra/hito-3-correcciones`. Merge: `a848c1c5adef50ada215d7362089db5da3ebf3f8`.
+HITO 4 no autorizado ni iniciado.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -171,11 +173,11 @@ producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
 
 ## Siguiente paso
-Revisión del PR #7 por el usuario. No hacer merge ni iniciar H4. OPS-02 se implementará después de H6 y antes de H7.
+Trabajo detenido tras el merge de PR #7. Esperar autorización expresa para HITO 4. OPS-02 se implementará después de H6 y antes de H7.
 
 ## HITO 3 — correcciones append-only
-ESTADO: PASS técnico — implementado y validado; pendiente de aprobación del usuario, no integrado.
-Rama `astra/hito-3-correcciones`; [PR #7](https://github.com/marioleongayo23-spec/fichaje/pull/7) contra `main`.
+ESTADO: PASS — HITO 3 aprobado por el usuario y PR #7 integrado en `main`.
+Rama `astra/hito-3-correcciones`; [PR #7](https://github.com/marioleongayo23-spec/fichaje/pull/7) integrado en `main`.
 Base H2 y actualización documental OPS-02 conservada.
 
 Entregado: correction_requests, correction_decisions y event_adjustments append-only;
@@ -226,4 +228,4 @@ Checks ejecutan de nuevo toda la suite sin cambiar el código probado.
 
 Límites: datos exclusivamente sintéticos y stack CI efímero. Sin UI/PWA, kiosco H4, informes H5,
 clasificaciones de horas, producción, datos reales ni configuración remota. Backup DB bloqueado.
-PR abierto sin merge. H4 no iniciado. Detenido a la espera de revisión.
+PR #7 integrado por autorización expresa del usuario. H4 no iniciado. Trabajo detenido.
