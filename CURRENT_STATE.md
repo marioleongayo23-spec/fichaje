@@ -309,5 +309,12 @@ ESTADO: FAIL / INCOMPLETO. PR #9 es borrador y no se debe integrar.
 Implementados parcialmente: snapshot materializado, clasificación append-only, paquete real CSV/JSON/PDF,
 worker y firmador privados, holds append-only y purga operativa acotada.
 Pendiente: purga legal de historia laboral, tombstones y restore PostgreSQL con replay, entrega a terceros
-con recibo, pruebas completas EXP-01..05/RET-01..04, concurrencia de snapshot y regresión integral.
+con recibo, pruebas completas EXP-01..05/RET-01..04 y concurrencia de snapshot.
+Evidencia parcial del commit `13b27bad2e7e7e33710cd32512126851f8014f7f`:
+- [Database run 35879913197](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35879913197):
+  PASS en Supabase local efímero reconstruido desde vacío: 275 aserciones SQL/pgTAP,
+  4 tests de generación CSV/JSON/PDF y DST, y 356 checks H1-H4 de Auth/REST/Storage/concurrencia.
+  Las pruebas nuevas H5 cubren solo una parte de EXP/RET; este PASS de CI no aprueba el hito.
+- [CI run 35879913192](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35879913192):
+  PASS, 21 tests frontend, typecheck, lint y build.
 No hay producción, datos reales, secretos reales ni backup DB. OPS-02 permanece después de H6 y antes de H7.
