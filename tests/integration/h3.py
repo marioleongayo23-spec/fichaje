@@ -273,7 +273,8 @@ for table in ['correction_requests','correction_decisions','event_adjustments']:
     code,_=api('/rest/v1/'+table,None); check(code in (401,403),'anonymous read denied '+table)
     for method in ['POST','PATCH','DELETE']:
         payload={'created_at':'2000-01-01T00:00:00Z'} if method=='PATCH' else {'id':uid()} if method=='POST' else None
-        code,err=api('/rest/v1/'+table,admin['token'],payload,method)
+        path='/rest/v1/'+table+('?organization_id=eq.'+org if method!='POST' else '')
+        code,err=api(path,admin['token'],payload,method)
         check(code==403,f'direct {method} denied {table}: {code}, {err}')
 check(timeline(token=other['token'])==[],'effective timeline RPC cannot leak foreign tenant')
 check(timeline(u=owner,token=user['token'])==[],'effective timeline RPC cannot leak another employee')
