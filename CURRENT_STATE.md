@@ -293,4 +293,12 @@ En la misma rama astra/hito-4-kiosco y PR #8. Defensa adicional por peer TCP
 normalizado y HMAC tenant con secreto backend independiente; bucket persistente
 60/15 min, sin cambios H1/H2/H3 ni límites empleado/dispositivo. Frontera de
 confianza y proxy documentadas. KIO-07 ampliado para IP y digests.
-Estado de esta revisión: validación completa desde cero pendiente; no PASS todavía.
+Estado de esta revisión: **PASS técnico; HITO 4 NO aprobado, pendiente de revisión**.
+Evidencia del código `a820a417d03b543ebb8ff7470cffc0ee3e07c755`:
+- [Database run 35869927438](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35869927438): PASS, Supabase/PostgreSQL/Auth reales, reset desde vacío sin seed; **251 SQL/pgTAP**, **356 checks integración (102 H1 + 70 H2 + 80 H3 + 104 H4)**. Gateway strict typecheck y **2 tests Deno** PASS. Ninguna suite omitida.
+- [CI run 35869927465](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35869927465): PASS; npm ci, typecheck, lint, **21 tests**, build, shell y whitespace.
+- SEC-H4-01: 60 fallos reales desde un peer TCP sintético repartidos entre tres dispositivos, headers falsificados sin alterar el bucket, bloqueo persistente tras reinicio y frente a PIN correcto, separación por peer/tenant, expiración servidor, RLS y contadores previos conservados.
+- KIO-07: PIN/IP sintéticos ausentes de DB/logs/respuestas/artefactos; todos los digests de red ausentes de logs/respuestas/artefactos/audit laboral. Solo HMAC en tabla privada. Captura y escaneo en memoria antes de imprimir resultados.
+- Verificación local: npm run check, Deno check/test, Python compile, shell y whitespace PASS. DB/Auth se ejecutaron en CI, no se simularon localmente.
+Este commit documental registra la evidencia anterior y no cambia código probado.
+Sin merge, H5, OPS-02, producción ni datos reales. Próximo paso: revisión del PR #8 por el usuario.
