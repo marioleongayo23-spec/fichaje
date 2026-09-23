@@ -171,3 +171,81 @@ last_sequence=0. Este es el único ajuste de constraint de la proyección H2. Su
 añade únicamente la comparación del reloj contra el máximo server_at original, para que
 corregir/VOID no reduzca la protección CLOCK_REGRESSION; permisos y gates no cambian. Evidencia original/ajustes/solicitud/decisión es append-only. Rollback incluye
 sesiones creadas, auditoría e idempotencia. No clasificaciones de horas en este contrato.
+
+## H4 — gateway kiosco (server-only)
+Implementación en `supabase/functions/kiosk/index.ts`, Deno; el mismo handler se ejecuta
+por HTTP en CI contra GoTrue/PostgreSQL reales. Sin despliegue remoto ni interfaz.
+`deno check --config supabase/functions/kiosk/deno.json supabase/functions/kiosk/index.ts`.
+CI: `supabase db reset --local --no-seed`, `supabase test db`, `python3 tests/integration/h4.py`.
+El último comando ejecuta también H1/H2/H3. Requiere Deno y cryptography (solo test).
+
+Variables exclusivamente servidor: `KIOSK_AUTH_URL`, `KIOSK_ANON_KEY`,
+`KIOSK_AUTH_PROVISION_KEY` (Auth admin exclusivamente alta/compensación de identidades),
+`KIOSK_DATABASE_URL` (login dedicado que solo hereda `fichaje_gateway`), `KIOSK_PEPPER`
+(base64 aleatorio >=32 bytes, secret store externo a PostgreSQL/GitHub), `KIOSK_PORT`,
+`KIOSK_LISTEN_HOST`. No VITE, service_role para consultas/RPC ni credenciales SQL de postgres.
+Los roles de migración son NOLOGIN; CI crea un login efímero con contraseña aleatoria,
+sin BYPASSRLS ni roles humanos. Producción exige TLS, secret store y configuración explícita
+posterior en H7; no se crea aquí. El entorno Edge recibe también estas variables de servidor.
+No llamar al endpoint desde Internet sin TLS y política de origen en el despliegue futuro.
+
+POST JSON con Authorization Bearer validado por `/auth/v1/user` (no decode sin verificar).
+Campos comunes: `organization_id`, `request_id` UUID. Campos desconocidos rechazados,
+cuerpo máximo 8 KiB y respuestas `Cache-Control: no-store`, sin CORS abierto.
+
+| Ruta | Campos adicionales | Resultado |
+|---|---|---|
+| `/provision` | device_id UUID, name, expires_at ISO, delivery_key JWK RSA-OAEP-256 pública >=2048 bits | device_id y delivery cifrado de {email,password} de cuenta Auth técnica nueva |
+| `/revoke` | device_id | active:false; idempotente y auditado |
+| `/reset` | employee_id, delivery_key | credential_version y delivery cifrado del PIN nuevo de ocho dígitos |
+| `/authenticate` | device_id, code, pin, action, expected_version | challenge de 32 bytes (64 hex), employee_id, request_id, expires_in:60 |
+| `/record` | device_id, employee_id, challenge, action, expected_version | recibo H2, solo después de COMMIT |
+
+`delivery` es ciphertext RSA-OAEP-SHA256, no PIN/password recuperable por PostgreSQL.
+El gestor conserva localmente la clave privada y descifra para entregar presencialmente
+la credencial; el gateway no recibe dicha clave. El PIN nunca se devuelve en claro.
+Es un contrato de transporte backend, no una UI implementada. Los replays de provisioning
+/reset devuelven el mismo sobre cifrado y no generan otra credencial efectiva. Reset conserva
+locks de fuerza bruta e invalida por versión todos los challenges anteriores.
+La cuenta Auth técnica recibe email aleatorio del dominio reservado `.invalid`; no corresponde
+al empleado ni se envía correo. Trigger excluye membresías humanas incluso en otro tenant.
+Revocación DB consulta estado actual en cada operación: JWT/refresh previos no recuperan acceso.
+Auth admin se utiliza solo tras preflight de gestor; DB revalida después de crear la identidad.
+
+PIN Argon2id v19, m=19456 KiB, t=2, p=1, salt CSPRNG 16 bytes por reset, hash 32 bytes,
+pepper Argon2 secret fuera de DB. PIN CSPRNG por rejection sampling sin sesgo. Se ejecuta
+Argon2 también con hash dummy para códigos inexistentes y bloqueos; respuestas fallidas
+uniformes 403 {error:AUTH_FAILED}, con suelo de 300 ms (no garantía de tiempo constante bajo carga).
+El hash nunca cruza el gateway hacia el cliente. No logger de cuerpos/errores SQL.
+
+Fallo de PIN confirma contadores en una transacción separada de fichaje: 5 fallos por empleado
+compartidos entre dispositivos y 30 por dispositivo, ventana 15 min. Alcanzar límite bloquea
+15 min desde ese fallo; un éxito no salta el bloqueo. Cada intento reserva un fallo bajo lock,
+y solo la verificación correcta revierte su propia reserva; errores de red/rollback no emiten
+challenge. Verificación Argon2 local bajo el lock no hace I/O externo.
+`auth_attempt_buckets` mantiene una fila agregada por device/subject_hash (el subject constante
+`device` se hashea); `window_start` mutable rota ventana solo al vencer también locked_until.
+Esto acota almacenamiento: no crea filas por códigos desconocidos.
+
+`private.kiosk_record_event` solo ejecutable por gateway dedicado. El challenge se almacena
+como SHA-256, ligado a tuple completa, versión de credencial y TTL 60 s servidor. Consume y
+crea evento/estado/audit/recibo atómicamente. Un challenge usado no autoriza otro evento;
+la misma tuple/request_id recupera exclusivamente su recibo persistente tras revalidar
+identidad de dispositivo, empleado activo y versión de credencial (aunque el TTL ya pasó).
+Una autenticación nueva con igual request_id y payload distinto devuelve IDEMPOTENCY_CONFLICT.
+Timeout significa desconocido; conservar tuple/request_id y reintentar, jamás nueva clave ni
+ACK optimista. En la futura UI se borran PIN/recibo a los 15 s; aquí no hay cliente ni caché.
+
+Web y kiosco llaman a la misma `private.apply_time_event` SECURITY INVOKER. Web mantiene su
+wrapper/gate H2; kiosco tiene capability propia. Se conservan reloj y high-water original H3,
+política de sesión, secuencia, versión, proyección e inmutabilidad. Audit usa actor_kind KIOSK
+con actor_id Auth técnico (FK existente); time_events.kiosk_device_id identifica dispositivo.
+Orden conservador por tenant: bind único antes de lock organización → revalidación →
+challenge → estado (no contención cruzada por estar serializado por organización).
+No grants de escritura de identidad, memberships, correcciones ni exports al rol kiosco.
+
+Prueba de fugas: PIN generado conocido exclusivamente en memoria del test, escaneo de todas
+las tablas public/private/auth serializadas, logs de contenedores, gateway, stdout/stderr de
+suite, respuestas HTTP y artefactos temporales/build. La suite no imprime sus buffers hasta
+superar el gate; en fallo muestra solo tipo de excepción y ubicaciones de código. Sin dump
+ni artefacto de datos persistido, únicamente checks seguros. Destruye stack al finalizar.

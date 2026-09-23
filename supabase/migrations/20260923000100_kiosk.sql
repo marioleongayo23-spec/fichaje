@@ -354,3 +354,45 @@ do $$ declare f regprocedure; begin
  end loop;
 end $$;
 revoke create on schema private from fichaje_kiosk,fichaje_guard;
+
+-- Column grants and per-route policies narrow the internal writer further:
+-- clocking cannot provision/revoke/reset a credential even inside its tenant.
+revoke update on private.kiosk_devices,private.kiosk_credentials,private.kiosk_challenges,private.auth_attempt_buckets from fichaje_kiosk;
+grant update(active) on private.kiosk_devices to fichaje_kiosk;
+grant update(pin_hash,credential_version,failed_attempts,window_start,locked_until,changed_at) on private.kiosk_credentials to fichaje_kiosk;
+grant update(used_at) on private.kiosk_challenges to fichaje_kiosk;
+grant update(window_start,failures,locked_until) on private.auth_attempt_buckets to fichaje_kiosk;
+drop policy kiosk_access on private.kiosk_devices;
+create policy kiosk_device_read on private.kiosk_devices for select to fichaje_kiosk using(
+ organization_id=private.scoped_tenant('kiosk_admin') or
+ (organization_id=coalesce(private.scoped_tenant('kiosk_device'),private.scoped_tenant('kiosk_clock')) and auth_user_id=private.request_uid()));
+create policy kiosk_device_insert on private.kiosk_devices for insert to fichaje_kiosk with check(organization_id=private.scoped_tenant('kiosk_admin'));
+create policy kiosk_device_update on private.kiosk_devices for update to fichaje_kiosk using(organization_id=private.scoped_tenant('kiosk_admin')) with check(organization_id=private.scoped_tenant('kiosk_admin'));
+drop policy kiosk_access on private.kiosk_credentials;
+create policy kiosk_credential_read on private.kiosk_credentials for select to fichaje_kiosk using(
+ organization_id=coalesce(private.scoped_tenant('kiosk_admin'),private.scoped_tenant('kiosk_device')) or
+ (organization_id=private.scoped_tenant('kiosk_clock') and employee_id=private.scoped_subject('kiosk_clock')));
+create policy kiosk_credential_insert on private.kiosk_credentials for insert to fichaje_kiosk with check(organization_id=private.scoped_tenant('kiosk_admin'));
+create policy kiosk_credential_update on private.kiosk_credentials for update to fichaje_kiosk using(
+ organization_id=coalesce(private.scoped_tenant('kiosk_admin'),private.scoped_tenant('kiosk_device')))
+ with check(organization_id=coalesce(private.scoped_tenant('kiosk_admin'),private.scoped_tenant('kiosk_device')));
+drop policy kiosk_access on private.kiosk_challenges;
+create policy kiosk_challenge_read on private.kiosk_challenges for select to fichaje_kiosk using(
+ organization_id=private.scoped_tenant('kiosk_clock') and employee_id=private.scoped_subject('kiosk_clock') and
+ device_id in (select id from private.kiosk_devices where auth_user_id=private.request_uid()));
+create policy kiosk_challenge_insert on private.kiosk_challenges for insert to fichaje_kiosk with check(
+ organization_id=private.scoped_tenant('kiosk_device') and device_id=private.scoped_subject('kiosk_device'));
+create policy kiosk_challenge_update on private.kiosk_challenges for update to fichaje_kiosk using(
+ organization_id=private.scoped_tenant('kiosk_clock') and employee_id=private.scoped_subject('kiosk_clock') and
+ device_id in (select id from private.kiosk_devices where auth_user_id=private.request_uid()))
+ with check(organization_id=private.scoped_tenant('kiosk_clock') and employee_id=private.scoped_subject('kiosk_clock'));
+drop policy kiosk_access on private.auth_attempt_buckets;
+create policy kiosk_attempt on private.auth_attempt_buckets to fichaje_kiosk using(
+ organization_id=private.scoped_tenant('kiosk_device') and device_id=private.scoped_subject('kiosk_device'))
+ with check(organization_id=private.scoped_tenant('kiosk_device') and device_id=private.scoped_subject('kiosk_device'));
+drop policy kiosk_clock on public.time_events;
+create policy kiosk_clock on public.time_events to fichaje_kiosk using(
+ organization_id=private.scoped_tenant('kiosk_clock') and employee_id=private.scoped_subject('kiosk_clock'))
+ with check(organization_id=private.scoped_tenant('kiosk_clock') and employee_id=private.scoped_subject('kiosk_clock')
+ and source='KIOSK' and actor_membership_id is null and kiosk_device_id in
+ (select id from private.kiosk_devices where auth_user_id=private.request_uid()));

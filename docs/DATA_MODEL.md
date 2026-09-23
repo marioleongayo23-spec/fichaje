@@ -104,3 +104,14 @@ hour_classifications no es necesario para correcciones y no se implementa en H3.
 `correction_requests.affected_membership_id` conserva el vínculo al presentar la solicitud
 (FK tenant, nullable sin Auth). La independencia considera vínculo actual, vínculo
 capturado, solicitante y autor de originales; una reasignación no borra esta evidencia.
+
+## H4 — implementación
+Migración `20260923000100_kiosk.sql`; tablas privadas FORCE RLS y gateway dedicado.
+`kiosk_credentials` incorpora window_start; challenge conserva credential_version y
+created_at para invalidar también al reset y fijar TTL exacto. Buckets agregados tienen
+PK(org,device,subject_hash), con window_start mutable para acotar filas ante códigos
+inexistentes; mismo límite contractual de 15 minutos. No historial de PIN ni pepper DB.
+`time_events` permite actor_membership_id NULL exclusivamente con source KIOSK y
+kiosk_device_id FK compuesta. Audit mantiene FK Auth: actor_kind KIOSK, actor_id identidad
+técnica. Idempotencia de fichaje usa principal_kind KIOSK y principal_id dispositivo.
+Recibos de provisioning/reset guardan únicamente entrega cifrada RSA-OAEP-256; nunca PIN.

@@ -145,3 +145,19 @@ La independencia también conserva el vínculo afectado capturado al solicitar y
 el autor de fichajes originales mediante el lector RLS. Desvincular/reasignar el empleado
 antes o después de solicitar no permite al autor de esos fichajes aprobarlos. El guard
 no gana lectura global de eventos; el helper lector solo ve el historial autorizado.
+
+### H4 — frontera concreta y pruebas
+`fichaje_gateway` solo USAGE + EXECUTE de cinco funciones privadas: preflight/apply gestor,
+auth begin/finish y record. No tablas, membresías ni herencia de otros roles. El login SQL
+servidor valida JWT primero y fija identidad transaccional; no se entrega a dispositivo.
+`fichaje_kiosk` NOLOGIN/NOINHERIT/NOBYPASSRLS es definer de estas funciones; las rutas
+kiosk_admin/device/clock de capability protegen tenant y empleado. RLS + grants por columna
+separan lectura/verificación de credenciales, provisioning y consumo. No permisos UPDATE,
+DELETE o TRUNCATE sobre originales. El guard lee solo identidad del dispositivo adicional,
+no hashes/challenges; mantiene las capacidades H1/H2/H3 independientes.
+La exclusión dispositivo/membership es bidireccional y serializada por identidad Auth.
+El reset cambia hash/version sin eliminar bloqueos activos; no permite recuperar el PIN.
+Entrega cifrada para clave pública del gestor evita PIN/password en respuestas en claro.
+El pepper nunca entra en parámetros SQL. Tiempo mínimo de respuesta 300 ms + trabajo
+Argon2 dummy en fallo de autenticación; no prometer tiempo constante bajo saturación.
+Detalles reproducibles, recuperación de recibo y prueba de fugas en `supabase/README.md`.

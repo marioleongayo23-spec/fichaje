@@ -55,3 +55,14 @@ Referencias: [Claves públicas Supabase](https://supabase.com/docs/guides/gettin
 [RLS Supabase](https://supabase.com/docs/guides/database/postgres/row-level-security),
 [funciones DB](https://supabase.com/docs/guides/database/functions),
 [bloqueos PostgreSQL](https://www.postgresql.org/docs/current/explicit-locking.html).
+
+## H4 — frontera de kiosco implementada
+Gateway Deno server-only en `supabase/functions/kiosk`; contrato y variables en
+`supabase/README.md`. Validación de JWT vía Auth, Argon2id local y rol SQL dedicado
+sin tablas/grants administrativos. Supabase Auth admin limitado a provisioning y
+compensación de cuentas técnicas; nunca acceso universal a datos laborales.
+No I/O externo bajo lock PostgreSQL: Auth/preflight/provisioning fuera de la transacción
+final, que revalida permisos. Pepper en secret store servidor; CI solo valores aleatorios
+efímeros. PIN de entrega cifrado para clave pública del gestor, no respuesta en claro.
+Motor H2/H3 compartido por función invoker, autorizaciones separadas para Web y KIOSK.
+No se despliega ni diseña UI, PWA, H5 u OPS-02 en este hito.

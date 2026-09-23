@@ -49,7 +49,7 @@ def main():
         if process.poll() is not None:
             raise AssertionError('gateway startup failed')
         try:
-            urllib.request.urlopen('http://127.0.0.1:8765',timeout=.2)
+            urllib.request.urlopen('http://127.0.0.1:8765',timeout=1)
         except urllib.error.HTTPError:
             break
         except OSError:
@@ -174,7 +174,7 @@ def main():
         c,r=record(challenge(action=action));check(c==200 and r['state']==state,'shared H2 engine '+action)
 
     expired=challenge()
-    sql(f"update private.kiosk_challenges set created_at=clock_timestamp()-interval '62 seconds',expires_at=clock_timestamp()-interval '2 seconds' where request_id='{expired['request_id']}';")
+    sql(f"update private.kiosk_challenges set created_at=statement_timestamp()-interval '62 seconds',expires_at=statement_timestamp()-interval '2 seconds' where request_id='{expired['request_id']}';")
     check(record(expired)[0]==403,'expired challenge rejected')
     before=snap(); c,r=record(challenge(action='BREAK_START'));check(c==400 and r['error']=='INVALID_TRANSITION','H2 invalid transition enforced')
     # Audit insertion failure must roll back everything including challenge consumption.
@@ -203,6 +203,38 @@ def main():
     proxy.shutdown();proxy.server_close()
     check(lost and committed and committed[0][0]==200 and record(timeout_body)==committed[0],'timeout after real commit recovers same receipt')
     record(challenge(action='CLOCK_OUT'))
+
+    # Full H2 state matrix through the actual PIN/challenge gateway.
+    transitions={('OUT','CLOCK_IN'):'WORKING',('WORKING','BREAK_START'):'PAUSED',
+                 ('WORKING','CLOCK_OUT'):'OUT',('PAUSED','BREAK_END'):'WORKING',('PAUSED','CLOCK_OUT'):'OUT'}
+    for initial_state in ['OUT','WORKING','PAUSED']:
+        for action in ['CLOCK_IN','BREAK_START','BREAK_END','CLOCK_OUT']:
+            matrix=employee()
+            if initial_state!='OUT':assert record(challenge(matrix))[0]==200
+            if initial_state=='PAUSED':assert record(challenge(matrix,action='BREAK_START'))[0]==200
+            body=challenge(matrix,action=action);before=snap(matrix)
+            c,r=record(body)
+            if (initial_state,action) in transitions:
+                check(c==200 and r['state']==transitions[(initial_state,action)],'kiosk state matrix '+initial_state+'/'+action)
+            else:
+                check(c==400 and r['error']=='INVALID_TRANSITION' and snap(matrix)==before,'kiosk illegal transition atomic '+initial_state+'/'+action)
+    no_policy=employee(policy=False)
+    check(record(challenge(no_policy))==(400,{'error':'POLICY_REQUIRED'}),'kiosk uses H2 policy gate')
+    stale=challenge(expected=version()+1)
+    check(record(stale)==(409,{'error':'VERSION_CONFLICT'}),'kiosk uses H2 expected_version gate')
+    clock_worker=employee()
+    first=record(challenge(clock_worker))[1]
+    regression=challenge(clock_worker,action='CLOCK_OUT')
+    sql(f"update private.employee_state set last_event_at=clock_timestamp()+interval '1 day' where employee_id='{clock_worker['id']}';")
+    before=snap(clock_worker)
+    check(record(regression)==(400,{'error':'CLOCK_REGRESSION'}) and snap(clock_worker)==before,'kiosk rejects clock regression atomically')
+    sql(f"update private.employee_state set last_event_at='{first['server_at']}' where employee_id='{clock_worker['id']}';")
+    check(record(regression)[0]==200,'same request valid after clock recovers')
+    forged=dict(challenge(clock_worker),server_at='2000-01-01T00:00:00Z')
+    check(record(forged)[0]==403,'gateway rejects client-provided timestamp')
+    disabled=employee(); disabled_challenge=challenge(disabled)
+    sql(f"update public.employees set active=false where id='{disabled['id']}';")
+    check(authenticate(disabled)[0]==403 and record(disabled_challenge)[0]==403,'inactive employee cannot authenticate or record')
 
     # Employee limit is shared across devices and persists across gateway requests.
     limited=employee()
