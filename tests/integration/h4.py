@@ -99,6 +99,11 @@ def main():
     d=provision(); d2=provision(manager=admin); foreign_d=provision(foreign,other)
     check(sql(f"select count(*) from public.memberships where auth_user_id='{d['auth_id']}';")=='0','KIO-01 technical identity has no human membership')
     check(gw('provision',owner['token'],d['body'])==(200,d['receipt']),'device provisioning replay returns one encrypted delivery')
+    concurrent_body=dict(d['body'],request_id=uid(),device_id=uid())
+    with concurrent.futures.ThreadPoolExecutor(2) as pool:
+        provision_results=list(pool.map(lambda _:gw('provision',owner['token'],concurrent_body),range(2)))
+    check(provision_results[0]==provision_results[1] and provision_results[0][0]==200,'concurrent provisioning returns one persistent encrypted receipt')
+    check(sql("select count(*) from auth.users u where u.raw_app_meta_data->>'identity_kind'='KIOSK' and not exists(select 1 from private.kiosk_devices d where d.auth_user_id=u.id);")=='0','concurrent provisioning compensates unused Auth identity')
     denied_body=dict(d['body'],request_id=uid(),device_id=uid())
     check(gw('provision',worker['token'],denied_body)[0]==403,'EMPLOYEE cannot provision')
     check(gw('provision',other['token'],denied_body)[0]==403,'foreign manager cannot provision')
@@ -276,6 +281,13 @@ def main():
     c1,r1,_=authenticate(o=foreign); c2,r2,_=authenticate(o=uid())
     check((c1,r1)==(c2,r2)==(403,{'error':'AUTH_FAILED'}),'foreign and nonexistent tenant indistinguishable')
     check(record(dict(pending,employee_id=fe['id']),d2)==record(dict(pending,employee_id=uid()),d2),'foreign and nonexistent employee UUID indistinguishable')
+
+    check(rpc('record_time_event',d['token'],dict(p_organization_id=org,p_request_id=uid(),p_employee_id=e['id'],p_action='CLOCK_IN',p_expected_version=version()))[0]==403,'kiosk JWT cannot use human clock RPC without PIN')
+    check(gw('revoke',d['token'],dict(organization_id=org,request_id=uid(),device_id=d2['id']))[0]==403,'kiosk cannot revoke devices')
+    original=sql(f"select to_jsonb(t) from public.time_events t where id='{first['event_id']}';")
+    for method,payload in [('PATCH',{'server_at':'2000-01-01T00:00:00Z'}),('DELETE',None)]:
+        check(h.api('/rest/v1/time_events?id=eq.'+first['event_id'],d['token'],payload,method)[0]==403,'kiosk REST '+method+' original denied')
+    check(sql(f"select to_jsonb(t) from public.time_events t where id='{first['event_id']}';")==original,'original event byte representation unchanged after attempts')
 
     # Revocation after device login denies authentication, pending event and receipt replay.
     rev=provision(); pending=challenge(e2,rev)

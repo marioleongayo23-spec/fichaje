@@ -32,10 +32,10 @@ const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-
 type Tx = postgres.TransactionSql;
 async function identity(tx: Tx, id: string) { await tx.unsafe("select set_config('request.jwt.claim.sub',$1,true)",[id]); }
 async function preflight(id: string, org: string, req: string, op: string, payload: postgres.JSONValue) {
-  return await db.begin(async tx => { await identity(tx,id); const [r] = await tx.unsafe('select private.kiosk_admin_prepare($1::uuid,$2::uuid,$3,$4) as r',[org,req,op,JSON.stringify(payload)]); return r.r; });
+  return await db.begin(async tx => { await identity(tx,id); const [r] = await tx.unsafe('select private.kiosk_admin_prepare($1::uuid,$2::uuid,$3,$4::jsonb) as r',[org,req,op,tx.json(payload)]); return r.r; });
 }
 async function apply(id: string, org: string, req: string, op: string, payload: postgres.JSONValue, data: postgres.JSONValue) {
-  return await db.begin(async tx => { await identity(tx,id); const [r] = await tx.unsafe('select private.kiosk_admin_apply($1::uuid,$2::uuid,$3,$4,$5) as r',[org,req,op,JSON.stringify(payload),JSON.stringify(data)]); return r.r; });
+  return await db.begin(async tx => { await identity(tx,id); const [r] = await tx.unsafe('select private.kiosk_admin_apply($1::uuid,$2::uuid,$3,$4::jsonb,$5::jsonb) as r',[org,req,op,tx.json(payload),tx.json(data)]); return r.r; });
 }
 
 export async function handler(req: Request): Promise<Response> {
@@ -91,12 +91,19 @@ export async function handler(req: Request): Promise<Response> {
       if (!created.ok) return fail();
       const user = await created.json();
       stage = 'device_commit';
-      try { return response(200,await apply(id,org,request,op,payload,{ auth_user_id: user.id, delivery })); }
+      const discardUnbound = () => fetch(authURL + '/auth/v1/admin/users/' + user.id, { method: 'DELETE', headers: { apikey: provisionKey, Authorization: 'Bearer ' + provisionKey }, signal: AbortSignal.timeout(5000) }).catch(() => {});
+      try {
+        const receipt = await apply(id,org,request,op,payload,{ auth_user_id: user.id, delivery });
+        // A concurrent request may have won after our preflight. Its persistent
+        // encrypted receipt identifies the winner without exposing any secret.
+        if (receipt.delivery !== delivery) await discardUnbound();
+        return response(200,receipt);
+      }
       catch (err) {
         // Best effort compensation for an unbound Auth identity; never delete a bound device.
         const bound = await preflight(id,org,request,op,payload).catch(() => null);
-        if (bound) return response(200,bound);
-        await fetch(authURL + '/auth/v1/admin/users/' + user.id, { method: 'DELETE', headers: { apikey: provisionKey, Authorization: 'Bearer ' + provisionKey }, signal: AbortSignal.timeout(5000) }).catch(() => {});
+        if (bound) { if (bound.delivery !== delivery) await discardUnbound(); return response(200,bound); }
+        await discardUnbound();
         throw err;
       }
     }
