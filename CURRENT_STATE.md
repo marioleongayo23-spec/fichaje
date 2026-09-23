@@ -8,7 +8,8 @@ HITO 2 aprobado por el usuario e integrado en `main` mediante PR #5 el 2026-09-2
 Rama de origen: `astra/hito-2-motor-horario`. Merge: `e4edd0d451627d6cd6e25aafc31819a77ee76116`.
 HITO 3 aprobado por el usuario e integrado en `main` mediante PR #7 el 2026-09-23.
 Rama de origen: `astra/hito-3-correcciones`. Merge: `a848c1c5adef50ada215d7362089db5da3ebf3f8`.
-HITO 4 implementado y validado en `astra/hito-4-kiosco`; PR #8 pendiente de aprobación, sin merge.
+HITO 4 aprobado por el usuario, incluida SEC-H4-01, e integrado en `main` mediante PR #8 el 2026-09-23.
+Rama de origen: `astra/hito-4-kiosco`. Merge: `76922f352a64f3bbf0d1d7ece2c7ae155f58d1a0`.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -173,7 +174,7 @@ producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
 
 ## Siguiente paso
-Revisión y aprobación del PR #8 (HITO 4). No hacer merge ni iniciar H5 sin autorización. OPS-02 se implementará después de H6 y antes de H7.
+HITO 4 cerrado. Esperar autorización expresa antes de iniciar H5. OPS-02 se implementará después de H6 y antes de H7.
 
 ## HITO 3 — correcciones append-only
 ESTADO: PASS — HITO 3 aprobado por el usuario y PR #7 integrado en `main`.
@@ -233,9 +234,9 @@ PR #7 integrado por autorización expresa del usuario. H4 autorizado posteriorme
 
 
 ## HITO 4 — kiosco seguro
-ESTADO: PASS — implementación y pruebas completadas; pendiente de aprobación del usuario.
+ESTADO: PASS — HITO 4 aprobado por el usuario, incluida SEC-H4-01, y PR #8 integrado en `main`.
 Rama `astra/hito-4-kiosco`, base main `4d2a40d09be431fd1f8cafe1365c7b71b8b520bf`.
-[PR #8](https://github.com/marioleongayo23-spec/fichaje/pull/8), sin merge.
+[PR #8](https://github.com/marioleongayo23-spec/fichaje/pull/8), integrado en `main`.
 
 Entregado: cuatro tablas privadas FORCE RLS, identidades Auth técnicas con exclusión
 bidireccional de memberships, provisioning/revocación OWNER/ADMIN y reset auditado.
@@ -286,14 +287,14 @@ PIN es un contrato cifrado backend; interfaz y limpieza visual a 15 s correspond
 No fichaje offline, ACK optimista, informes/retención H5, UI/PWA H6, OPS-02 ni datos reales.
 OPS-02 permanece después de H6 y antes de H7. Compensación de Auth en fallo de red es
 best effort; identidades no vinculadas no obtienen acceso tenant y deben reconciliarse
-antes del piloto. Backup DB sigue bloqueado. Trabajo detenido para revisión del PR #8.
+antes del piloto. Backup DB sigue bloqueado. HITO 4 cerrado; H5 no iniciado.
 
-## Revisión SEC-H4-01 (H4 no aprobado)
+## Revisión SEC-H4-01 (aprobada e integrada)
 En la misma rama astra/hito-4-kiosco y PR #8. Defensa adicional por peer TCP
 normalizado y HMAC tenant con secreto backend independiente; bucket persistente
 60/15 min, sin cambios H1/H2/H3 ni límites empleado/dispositivo. Frontera de
 confianza y proxy documentadas. KIO-07 ampliado para IP y digests.
-Estado de esta revisión: **PASS técnico; HITO 4 NO aprobado, pendiente de revisión**.
+Estado de esta revisión: **PASS; HITO 4 y SEC-H4-01 aprobados e integrados en main**.
 Evidencia del código `a820a417d03b543ebb8ff7470cffc0ee3e07c755`:
 - [Database run 35869927438](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35869927438): PASS, Supabase/PostgreSQL/Auth reales, reset desde vacío sin seed; **251 SQL/pgTAP**, **356 checks integración (102 H1 + 70 H2 + 80 H3 + 104 H4)**. Gateway strict typecheck y **2 tests Deno** PASS. Ninguna suite omitida.
 - [CI run 35869927465](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35869927465): PASS; npm ci, typecheck, lint, **21 tests**, build, shell y whitespace.
@@ -301,4 +302,4 @@ Evidencia del código `a820a417d03b543ebb8ff7470cffc0ee3e07c755`:
 - KIO-07: PIN/IP sintéticos ausentes de DB/logs/respuestas/artefactos; todos los digests de red ausentes de logs/respuestas/artefactos/audit laboral. Solo HMAC en tabla privada. Captura y escaneo en memoria antes de imprimir resultados.
 - Verificación local: npm run check, Deno check/test, Python compile, shell y whitespace PASS. DB/Auth se ejecutaron en CI, no se simularon localmente.
 Este commit documental registra la evidencia anterior y no cambia código probado.
-Sin merge, H5, OPS-02, producción ni datos reales. Próximo paso: revisión del PR #8 por el usuario.
+PR #8 integrado por autorización expresa del usuario. Sin iniciar H5 ni OPS-02; sin producción, secretos reales ni datos reales. OPS-02 permanece después de H6 y antes de H7. Trabajo detenido.
