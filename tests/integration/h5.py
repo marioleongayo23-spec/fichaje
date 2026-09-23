@@ -69,7 +69,7 @@ def dbone(query, params=()):
 
 def offline(query, params=()):
     with psycopg.connect(APP) as c:
-        c.execute('set local role fichaje_retention')
+        c.execute('set local role fichaje_retention_operator')
         return c.execute(query, params).fetchone()[0]
 
 

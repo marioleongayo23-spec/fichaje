@@ -30,6 +30,8 @@ language plpgsql security definer set search_path='' as $$
 declare t text; ids uuid[]; n bigint; c jsonb:='{}'; digest text; hold_employee uuid;
 begin
  if p_id is null or p_org is null or p_payload is null then raise exception 'INVALID_INPUT'; end if;
+ if not private.verify_journal_entry(p_id,p_org,p_kind,p_payload) then
+  raise exception using errcode='42501',message='UNVERIFIED_RECOVERY_ENTRY'; end if;
  insert into private.retention_delete_guard values(pg_catalog.pg_backend_pid(),
   pg_catalog.pg_current_xact_id(),p_org,'RECOVERY:'||p_id::text);
  if exists(select 1 from private.recovery_applied where id=p_id and organization_id=p_org)

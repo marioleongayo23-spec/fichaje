@@ -43,7 +43,7 @@ def replay(app_url: str, archive_url: str) -> int:
     with psycopg.connect(app_url) as app:
         source = app.execute('select id from private.journal_source').fetchone()[0]
         entries = committed_entries(archive_url, source)
-        app.execute('set local role fichaje_retention')
+        app.execute('set local role fichaje_retention_operator')
         count = 0
         for event_id, org, kind, payload in entries:
             result = app.execute('select private.replay_recovery(%s,%s,%s,%s)',

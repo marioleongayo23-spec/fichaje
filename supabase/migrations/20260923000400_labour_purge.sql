@@ -80,10 +80,10 @@ begin
   raise exception using errcode='22023',message='INVALID_INPUT'; end if;
  insert into private.retention_delete_guard values(pg_catalog.pg_backend_pid(),
   pg_catalog.pg_current_xact_id(),p_org,p_authorization);
+ perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_org::text,39));
  perform 1 from public.organizations where id=p_org for update;
  if not found or not exists(select 1 from public.employees where organization_id=p_org and id=p_employee)
  then raise exception using errcode='42501',message='FORBIDDEN'; end if;
- perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_org::text,39));
  if private.active_legal_hold(p_org,p_employee) then
   raise exception using errcode='42501',message='LEGAL_HOLD'; end if;
  select array_agg(s.id order by s.id) into v_ids from public.work_sessions s

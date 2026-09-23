@@ -59,6 +59,20 @@ alter function private.journal_prepare(uuid,text,jsonb) owner to fichaje_journal
 revoke all on function private.journal_prepare(uuid,text,jsonb) from public,anon,authenticated,service_role;
 grant execute on function private.journal_prepare(uuid,text,jsonb) to fichaje_retention;
 
+create function private.verify_journal_entry(p_id uuid,p_org uuid,p_kind text,p_payload jsonb) returns boolean
+language plpgsql security definer set search_path='' as $$
+declare v_source uuid; verified boolean;
+begin
+ select id into strict v_source from private.journal_source;
+ select ok into strict verified from extensions.dblink('fichaje_recovery',format(
+  'select journal.verify(%L::uuid,%L::uuid,%L::uuid,%L,%L::jsonb)',
+  p_id,v_source,p_org,p_kind,p_payload::text)) as result(ok boolean);
+ return verified is true;
+end $$;
+alter function private.verify_journal_entry(uuid,uuid,text,jsonb) owner to fichaje_journal;
+revoke all on function private.verify_journal_entry(uuid,uuid,text,jsonb) from public,anon,authenticated,service_role;
+grant execute on function private.verify_journal_entry(uuid,uuid,text,jsonb) to fichaje_retention;
+
 create function private.capture_recovery_state() returns trigger
 language plpgsql security definer set search_path='' as $$
 begin

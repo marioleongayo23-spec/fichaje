@@ -27,7 +27,7 @@ def run(db_url: str, storage_url: str, key: str, organization_id: str,
     with psycopg.connect(db_url) as connection:
         with connection.transaction():
             with connection.cursor() as cursor:
-                cursor.execute("set local role fichaje_retention")
+                cursor.execute("set local role fichaje_retention_operator")
                 cursor.execute("select pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(%s,39))",
                                (organization_id,))
                 cursor.execute("""select exists(select 1 from private.legal_holds h

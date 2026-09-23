@@ -198,6 +198,12 @@ language plpgsql security definer set search_path='' as $$
 declare actor uuid; j private.export_jobs; now_at timestamptz; existing private.export_jobs;
 begin
  actor:=private.report_scope(p_organization_id,p_employee_id);
+ perform 1 from public.organizations where id=p_organization_id and status='ACTIVE' for update;
+ if not found or private.current_role(p_organization_id) is null or
+  (private.current_role(p_organization_id)='EMPLOYEE' and not exists(
+   select 1 from public.employees where organization_id=p_organization_id
+    and id=private.scoped_subject('report') and active)) then
+  raise exception using errcode='42501',message='FORBIDDEN'; end if;
  select * into existing from private.export_jobs where organization_id=p_organization_id
   and requested_by=actor and request_id=p_request_id;
  if FOUND then

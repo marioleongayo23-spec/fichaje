@@ -27,7 +27,7 @@ grant create on schema public to fichaje_report;
 create function public.record_evidence_delivery(p_org uuid,p_job uuid,p_recipient_kind text,
  p_receipt_ref text,p_purpose text) returns uuid
 language plpgsql security definer set search_path='' as $$
-declare actor uuid; j private.export_jobs; d uuid; t timestamptz;
+declare actor uuid; j private.export_jobs; prior private.evidence_deliveries; d uuid; t timestamptz;
 begin
  actor:=private.report_scope(p_org,null);
  if private.current_role(p_org) not in ('OWNER','ADMIN') then
@@ -40,9 +40,14 @@ begin
   and requested_by=actor and status='READY' and expires_at>clock_timestamp();
  if not found or j.checksum is null or j.object_path is null then
   raise exception using errcode='42501',message='FORBIDDEN'; end if;
- select id into d from private.evidence_deliveries where organization_id=p_org
+ perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_org::text||p_job::text||p_receipt_ref,17));
+ select * into prior from private.evidence_deliveries where organization_id=p_org
   and export_job_id=p_job and receipt_ref=p_receipt_ref;
- if found then return d; end if;
+ if found then
+  if prior.recipient_kind is distinct from p_recipient_kind or prior.purpose is distinct from p_purpose then
+   raise exception using errcode='22023',message='IDEMPOTENCY_CONFLICT'; end if;
+  return prior.id;
+ end if;
  t:=clock_timestamp();
  insert into private.evidence_deliveries(organization_id,employee_id,export_job_id,
   actor_membership_id,recipient_kind,receipt_ref,purpose,local_start,local_end,timezone,
