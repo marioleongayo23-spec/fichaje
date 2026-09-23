@@ -41,6 +41,7 @@ async function apply(id: string, org: string, req: string, op: string, payload: 
 export async function handler(req: Request): Promise<Response> {
   const started = performance.now();
   let body: Record<string, unknown> = {};
+  let stage = 'input';
   try {
     if (req.method !== 'POST' || !req.headers.get('content-type')?.startsWith('application/json')) return fail();
     // Bounded streaming read even when Content-Length is absent or false.
@@ -60,6 +61,7 @@ export async function handler(req: Request): Promise<Response> {
     if (!route || !permitted[route] || Object.keys(body).some(k => !permitted[route].includes(k))) return fail();
     const org = body.organization_id as string, request = body.request_id as string, device = body.device_id as string;
     if (!uuid(org) || !uuid(request)) return fail();
+    stage = 'jwt';
     const auth = await fetch(authURL + '/auth/v1/user', { headers: { apikey: apiKey, Authorization: req.headers.get('authorization') || '' }, signal: AbortSignal.timeout(5000) });
     if (!auth.ok) return fail();
     const { id } = await auth.json(); if (!uuid(id)) return fail();
@@ -69,6 +71,7 @@ export async function handler(req: Request): Promise<Response> {
       const op = 'kiosk_' + route;
       const payload: postgres.JSONValue = { target, ...(route === 'provision' ? { name: body.name as string, expires_at: body.expires_at as string } : {}),
         ...(route !== 'revoke' ? { delivery_key: body.delivery_key as postgres.JSONValue } : {}) };
+      stage = 'preflight';
       const prior = await preflight(id,org,request,op,payload); if (prior) return response(200,prior);
       if (route === 'reset') {
         let pin = newPin();
@@ -79,12 +82,15 @@ export async function handler(req: Request): Promise<Response> {
       if (route === 'revoke') return response(200,await apply(id,org,request,op,payload,{}));
       // Fresh technical Auth identity; never reuse a human account. DB checks membership exclusion.
       const email = crypto.randomUUID() + '@kiosk.invalid'; let password = b64(random(32));
+      stage = 'device_seal';
       const delivery = await seal(JSON.stringify({ email, password }),body.delivery_key as JsonWebKey);
+      stage = 'auth_create';
       const created = await fetch(authURL + '/auth/v1/admin/users', { method: 'POST', headers: { apikey: provisionKey, Authorization: 'Bearer ' + provisionKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, email_confirm: true, app_metadata: { identity_kind: 'KIOSK' } }), signal: AbortSignal.timeout(5000) });
       password = '';
       if (!created.ok) return fail();
       const user = await created.json();
+      stage = 'device_commit';
       try { return response(200,await apply(id,org,request,op,payload,{ auth_user_id: user.id, delivery })); }
       catch (err) {
         // Best effort compensation for an unbound Auth identity; never delete a bound device.
@@ -121,6 +127,9 @@ export async function handler(req: Request): Promise<Response> {
     });
     return response(200,result); // sql.begin resolves only after COMMIT.
   } catch (err) {
+    // Only fixed stage and SQLSTATE are logged; never driver messages or values.
+    const sqlstate = typeof err === 'object' && err && 'code' in err && /^[0-9A-Z]{5}$/.test(String(err.code)) ? String(err.code) : 'INTERNAL';
+    console.error('KIOSK_FAILURE', stage, sqlstate);
     // Never serialize driver errors: they contain query/parameters, hashes and tokens.
     const safe = new Set(['INVALID_TRANSITION','VERSION_CONFLICT','IDEMPOTENCY_CONFLICT','CLOCK_REGRESSION','POLICY_REQUIRED']);
     const message = err instanceof Error ? err.message : '';

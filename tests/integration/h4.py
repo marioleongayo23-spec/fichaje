@@ -318,6 +318,10 @@ if __name__=='__main__':
         # Safe trace gives source lines and exception type but never values/SQL/HTTP bodies.
         import sys,traceback
         kind,_,tb=sys.exc_info()
+        import re
+        if (root/'gateway.log').exists():
+            for stage,code in re.findall(r'KIOSK_FAILURE ([a-z_]+) ([A-Z0-9]+)',(root/'gateway.log').read_text()):
+                print('Gateway failure stage/code:',stage,code)
         print('H4 suite failed:',kind.__name__)
         for frame in traceback.extract_tb(tb):print(f'{frame.filename}:{frame.lineno} in {frame.name}')
         raise SystemExit(1)
