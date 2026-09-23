@@ -39,6 +39,7 @@ select ok((public.request_export('82000000-0000-0000-0000-000000000001',gen_rand
 select throws_ok($$select public.authorize_export_link('82000000-0000-0000-0000-000000000001',gen_random_uuid())$$,
  '42501','FORBIDDEN','unknown export UUID denied');
 reset role;
+select set_config('request.jwt.claims','{"sub":"81000000-0000-0000-0000-000000000003","role":"authenticated"}',true);
 set local role fichaje_report;
 select is((select count(*)::int from public.employees),0,'reporter without transaction scope sees nothing');
 select throws_ok($$select private.bind_context('82000000-0000-0000-0000-000000000002','report')$$,

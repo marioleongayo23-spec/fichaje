@@ -35,17 +35,20 @@ export async function handler(request: Request): Promise<Response> {
       signal: AbortSignal.timeout(5000),
     });
     if (!result.ok) return denied();
-    const path = await result.json();
-    if (path !== `${fields.organization_id}/${fields.job_id}.zip`) return denied();
+    const permit = await result.json();
+    const path = permit?.path;
+    const seconds = permit?.expires_in;
+    if (path !== `${fields.organization_id}/${fields.job_id}.zip` ||
+      !Number.isInteger(seconds) || seconds < 1 || seconds > 300) return denied();
     const signed = await fetch(endpoint + '/storage/v1/object/sign/fichaje-evidence/' + path, {
       method: 'POST', headers: { apikey: storageKey, Authorization: 'Bearer ' + storageKey,
-        'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 300 }),
+        'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: seconds }),
       signal: AbortSignal.timeout(5000),
     });
     if (!signed.ok) return denied();
     const receipt = await signed.json();
     if (typeof receipt.signedURL !== 'string' || !receipt.signedURL.startsWith('/object/sign/')) return denied();
-    return new Response(JSON.stringify({ url: endpoint + '/storage/v1' + receipt.signedURL, expires_in: 300 }), {
+    return new Response(JSON.stringify({ url: endpoint + '/storage/v1' + receipt.signedURL, expires_in: seconds }), {
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store',
         'Pragma': 'no-cache', 'Referrer-Policy': 'no-referrer' },
     });

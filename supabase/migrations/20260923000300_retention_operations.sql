@@ -34,14 +34,14 @@ grant execute on function private.active_legal_hold(uuid,uuid) to fichaje_retent
 create function private.record_legal_hold(p_org uuid,p_employee uuid,p_reason text,p_authorization text,
  p_release_of uuid default null) returns uuid
 language plpgsql security definer set search_path='' as $$
-declare prior private.legal_holds; id uuid; t timestamptz;
+declare prior private.legal_holds; v_hold_id uuid; t timestamptz;
 begin
  if p_org is null or length(btrim(coalesce(p_reason,''))) not between 1 and 1000
   or length(btrim(coalesce(p_authorization,''))) not between 1 and 200 then
   raise exception using errcode='22023',message='INVALID_INPUT'; end if;
  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_org::text,39));
  if p_release_of is not null then
-  select * into prior from private.legal_holds where organization_id=p_org and id=p_release_of
+  select * into prior from private.legal_holds h where h.organization_id=p_org and h.id=p_release_of
    and release_of is null;
   if not FOUND or prior.employee_id is distinct from p_employee or exists(
    select 1 from private.legal_holds where organization_id=p_org and release_of=p_release_of) then
@@ -50,12 +50,12 @@ begin
  t:=clock_timestamp();
  insert into private.legal_holds(organization_id,employee_id,scope,reason,authorized_by,created_at,release_of)
  values(p_org,p_employee,case when p_employee is null then 'ORGANIZATION' else 'EMPLOYEE' end,
-  p_reason,p_authorization,t,p_release_of) returning private.legal_holds.id into id;
+  p_reason,p_authorization,t,p_release_of) returning private.legal_holds.id into v_hold_id;
  insert into public.audit_log(organization_id,actor_kind,actor_id,employee_id,action,entity_type,
   entity_id,request_id,server_at,safe_details) values(p_org,'SYSTEM',null,p_employee,
-  case when p_release_of is null then 'legal_hold' else 'release_hold' end,'legal_holds',id,
+  case when p_release_of is null then 'legal_hold' else 'release_hold' end,'legal_holds',v_hold_id,
   gen_random_uuid(),t,jsonb_build_object('release_of',p_release_of,'authorization_ref',p_authorization));
- return id;
+ return v_hold_id;
 end $$;
 alter function private.record_legal_hold(uuid,uuid,text,text,uuid) owner to fichaje_retention;
 revoke all on function private.record_legal_hold(uuid,uuid,text,text,uuid) from public,anon,authenticated,service_role;

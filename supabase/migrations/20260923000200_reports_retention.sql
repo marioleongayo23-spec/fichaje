@@ -341,7 +341,7 @@ create policy export_worker_update on private.export_jobs for update to fichaje_
 -- The worker has no INSERT, DELETE or arbitrary UPDATE grant on any labour table.
 
 grant create on schema public to fichaje_report;
-create function public.authorize_export_link(p_organization_id uuid,p_job_id uuid) returns text
+create function public.authorize_export_link(p_organization_id uuid,p_job_id uuid) returns jsonb
 language plpgsql security definer set search_path='' as $$
 declare actor uuid; j private.export_jobs; role public.member_role;
 begin
@@ -357,7 +357,8 @@ begin
   or (j.requested_by<>actor and role='EMPLOYEE')
   or (role='EMPLOYEE' and j.employee_id is distinct from private.scoped_subject('report')) then
   raise exception using errcode='42501',message='FORBIDDEN'; end if;
- return j.object_path;
+ return jsonb_build_object('path',j.object_path,'expires_in',
+  least(300,greatest(0,floor(extract(epoch from j.expires_at-clock_timestamp()))::integer)));
 end $$;
 alter function public.authorize_export_link(uuid,uuid) owner to fichaje_report;
 revoke all on function public.authorize_export_link(uuid,uuid) from public,anon,service_role;
