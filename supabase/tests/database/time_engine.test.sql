@@ -56,12 +56,16 @@ select throws_ok($$insert into public.work_sessions(organization_id,employee_id,
 reset role;
 -- Even an accidentally over-granted ordinary role cannot bypass immutable triggers.
 grant update,delete,truncate on public.time_events to fichaje_writer;
+-- H3 adds an inbound FK. Include adjustments to reach the immutable trigger,
+-- with a harness-only grant rolled back/revoked below. No production grant.
+grant truncate on public.event_adjustments to fichaje_writer;
 set local role fichaje_writer;
 select throws_ok($$update public.time_events set server_at=clock_timestamp()$$,'42501','IMMUTABLE','IMM trigger blocks technical UPDATE even with accidental grant');
 select throws_ok($$delete from public.time_events$$,'42501','IMMUTABLE','IMM trigger blocks technical DELETE even with accidental grant');
-select throws_ok($$truncate public.time_events$$,'42501','IMMUTABLE','IMM trigger blocks technical TRUNCATE even with accidental grant');
+select throws_ok($$truncate public.time_events,public.event_adjustments$$,'42501','IMMUTABLE','IMM trigger blocks technical TRUNCATE even with accidental grant');
 reset role;
 revoke update,delete,truncate on public.time_events from fichaje_writer;
+revoke truncate on public.event_adjustments from fichaje_writer;
 -- Empty capability cannot expose H2 data, even with forged GUC. Harness-only
 -- context deletion is postgres and rolled back, never a production entry point.
 delete from private.mutation_context where route='member';

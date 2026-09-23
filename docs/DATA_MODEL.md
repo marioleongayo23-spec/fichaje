@@ -88,3 +88,19 @@ sin consentimiento administrativo; provisioning de kiosco separado. H0 no invita
 Errores estables: UNAUTHENTICATED, FORBIDDEN (sin revelar existencia ajena), INVALID_INPUT,
 INVALID_TRANSITION, VERSION_CONFLICT, IDEMPOTENCY_CONFLICT, CLOCK_REGRESSION, RETRYABLE_TIMEOUT.
 Errores validación no consumen clave; éxito persiste respuesta. No devolver SQL, PIN ni JWT.
+
+## H3 implementado — detalles del contrato de transporte
+Ver `supabase/README.md` para JSON y errores estables. `correction_decisions` incluye
+employee_id y FK compuesta a solicitud; ajustes enlazan decisión, evento, sesión y ajuste
+previo mediante `(organization_id,employee_id,id)`. Un único sucesor por ajuste y una sola
+primera revisión por original impiden bifurcaciones. La cadena de ADD tiene target NULL;
+la de original conserva target. Cada hoja no VOID participa en el timeline efectivo.
+Ordinal positivo explícito en ADD/REPLACE; originales usan sequence. Corte histórico por
+server_at original/created_at del ajuste. Se conserva la evidencia de autor y fuente.
+La proyección separa last_sequence original de last_event_at efectivo, permitiendo historia
+completamente anulada o formada solo por ADD. Se preserva el contrato de independencia;
+hour_classifications no es necesario para correcciones y no se implementa en H3.
+
+`correction_requests.affected_membership_id` conserva el vínculo al presentar la solicitud
+(FK tenant, nullable sin Auth). La independencia considera vínculo actual, vínculo
+capturado, solicitante y autor de originales; una reasignación no borra esta evidencia.
