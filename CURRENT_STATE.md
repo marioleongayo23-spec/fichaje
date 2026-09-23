@@ -1,4 +1,4 @@
-# CURRENT_STATE — 2026-09-22
+# CURRENT_STATE — 2026-09-23
 ## Hito autorizado
 HITO 0 Bootstrap aprobado por el usuario e integrado en `main` mediante PR #1 el 2026-09-21.
 Rama de origen: `astra/hito-0-bootstrap`. Merge: `f9a02bb150b424d9cf0a47b741496c997b7bc085`.
@@ -6,7 +6,7 @@ HITO 1 aprobado por el usuario e integrado en `main` mediante PR #4 el 2026-09-2
 Rama de origen: `astra/hito-1-identidad-rls`. Merge: `ffd12c689824886abd8ba6f1e836057fc43ee9a8`.
 HITO 2 aprobado por el usuario e integrado en `main` mediante PR #5 el 2026-09-22.
 Rama de origen: `astra/hito-2-motor-horario`. Merge: `e4edd0d451627d6cd6e25aafc31819a77ee76116`.
-HITO 3 autorizado, en implementación y validación; no aprobado ni integrado.
+HITO 3 implementado y validado: PASS técnico; pendiente de revisión/aprobación, no integrado.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -115,7 +115,7 @@ validación automática sobre ese último commit. H1 aprobado e integrado poster
 ## HITO 2 — motor horario
 ESTADO: PASS — HITO 2 aprobado por el usuario y PR #5 integrado en `main`.
 Rama `astra/hito-2-motor-horario`, base `4ce37bda1e02124def77e0c6e89e2d069e65df21`.
-PR [#5](https://github.com/marioleongayo23-spec/fichaje/pull/5) integrado en `main`. H3 no iniciado.
+PR [#5](https://github.com/marioleongayo23-spec/fichaje/pull/5) integrado en `main`. H3 no estaba iniciado al cierre de H2.
 
 Entregado: work_policies/asignaciones append-only, employee_state con alta/backfill atómicos,
 work_sessions/time_events inmutables, record_time_event y consulta operativa de estado.
@@ -171,11 +171,59 @@ producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
 
 ## Siguiente paso
-Completar únicamente HITO 3 y su validación real. No hacer merge ni iniciar H4. OPS-02 se implementará después de H6 y antes de H7.
+Revisión del PR #7 por el usuario. No hacer merge ni iniciar H4. OPS-02 se implementará después de H6 y antes de H7.
 
 ## HITO 3 — correcciones append-only
-ESTADO: en validación; no PASS hasta completar CI H1 + H2 + H3.
-Rama `astra/hito-3-correcciones`; PR #7. Base H2 y actualización documental OPS-02 conservada.
-Migración aditiva, solicitudes/decisiones/ajustes inmutables, capacidades aisladas,
-reconstrucción completa y pruebas reales COR-01..06. Sin UI, kiosco, informes,
-clasificaciones de horas, producción ni datos reales. No merge.
+ESTADO: PASS técnico — implementado y validado; pendiente de aprobación del usuario, no integrado.
+Rama `astra/hito-3-correcciones`; [PR #7](https://github.com/marioleongayo23-spec/fichaje/pull/7) contra `main`.
+Base H2 y actualización documental OPS-02 conservada.
+
+Entregado: correction_requests, correction_decisions y event_adjustments append-only;
+RPC submit_correction/decide_correction y lectura del timeline efectivo. ADD/REPLACE/VOID,
+cadenas por referencia/supersedes, motivo acotado, base_version y decisión única.
+Originales inmutables; effective_at separado de server_at, ordinal explícito y corte histórico.
+Replay completo valida transiciones, sesiones, orden, intervalos, solapamientos y tiempos futuros.
+Aprobación reconstruye proyección e incrementa versión; rechazo no modifica timeline.
+Auditoría, idempotencia persistente y cambios se confirman o revierten juntos.
+
+Independencia: otro OWNER/ADMIN autorizado; solicitante y gestor afectado no pueden decidir.
+Se comprueban vínculo actual, vínculo al solicitar y autor original para impedir bypass por
+desvinculación. Sin excepción para empresas de un único gestor. Capacidad H3 aislada por
+tenant/empleado/principal/transacción; RLS/FORCE, referencias compuestas y grants mínimos.
+Locks compartidos con H1/H2 y permisos revalidados tras el lock. H1/H2 no reciben nuevas
+capabilities; adaptación mínima del guard del reloj H2 conserva el máximo server_at original
+aunque el timeline corregido retroceda o quede vacío. Se separa la secuencia original de la
+proyección efectiva; el test TRUNCATE H2 incluye la nueva tabla referenciante, sin relajar el trigger.
+
+Evidencia real del código `cbd207263fa61b4d26e1cfe745630d01a8287540`, 2026-09-23:
+- [Database H1 + H2 + H3, run 35814742001](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35814742001): PASS.
+  Supabase local efímero en CI, PostgreSQL real; `supabase db reset --local --no-seed`
+  reconstruye desde vacío. **217 pruebas SQL/pgTAP PASS** (180 anteriores + 37 H3).
+  **102 checks H1 + 70 H2 + 80 H3 PASS** con GoTrue/JWT/PostgREST/Storage reales.
+  Contenedores destruidos con `supabase stop --no-backup`.
+- [CI general, run 35814741994](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35814741994): PASS.
+  Instalación, typecheck, lint, **21 tests**, build, sintaxis shell y whitespace.
+- `npm run check`, `python3 -m py_compile tests/integration/h3.py`,
+  `bash -n scripts/*.sh` y `git diff --check`: PASS en el entorno de edición.
+  Sin Docker/PostgreSQL en este entorno; no se atribuye aquí la ejecución DB de CI.
+
+| Criterio | Evidencia real |
+|---|---|
+| COR-01 | ADD/REPLACE/VOID válidos, cadenas sucesivas, rechazo sin ajustes, una decisión y replay idempotente |
+| COR-02 | Solicitante/afectado/EMPLOYEE/gestor cruzado denegados; independencia tras desvincular; OWNER revisado por ADMIN independiente |
+| COR-03 | Base obsoleta rechazada en aprobación/rechazo; 20 propuestas de una base dejan un ganador; carrera H2/H3 comparte versión |
+| COR-04 | Replay imposible, intervalo negativo, solapamiento, futuro y empate sin ordinal válido rechazados sin efectos |
+| COR-05 | Timeline/proyección/versión atómicos; fallo audit revierte decisión, ajustes, sesión, proyección y recibo; reintento válido |
+| COR-06 | Originales idénticos antes/después; fuente/autor y server_at preservados; effective_at separado y lectura histórica |
+
+Cobertura adicional: referencias a evento/sesión/ajuste de otro tenant denegadas, lectura
+propia/gestor/anon y DML directo, grants técnicos negativos, 20 solicitudes y 20 decisiones
+idénticas sin duplicados, revocación concurrente y bloqueo de replay con JWT revocado.
+Fallos intermedios corregidos y revalidados: sintaxis SQL, fixture TRUNCATE con nueva FK,
+mapeo HTTP de conflictos H3 y fixture PATCH con payload/filtro explícitos. Ningún test omitido
+ni simulación de lógica SQL. El commit documental posterior registra esta evidencia; sus
+Checks ejecutan de nuevo toda la suite sin cambiar el código probado.
+
+Límites: datos exclusivamente sintéticos y stack CI efímero. Sin UI/PWA, kiosco H4, informes H5,
+clasificaciones de horas, producción, datos reales ni configuración remota. Backup DB bloqueado.
+PR abierto sin merge. H4 no iniciado. Detenido a la espera de revisión.
