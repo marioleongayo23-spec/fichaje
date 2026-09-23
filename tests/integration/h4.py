@@ -33,12 +33,12 @@ def main():
     sql, rpc, uid, check = h.sql, h.rpc, h.uid, h.check
     initial = h.checks
     password = secrets.token_hex(32)
-    # The production role stays NOLOGIN; an ephemeral non-inheriting login can SET
-    # only this gateway role. No service_role, postgres, writer or guard membership.
-    sql(f"create role kiosk_ci login noinherit password '{password}'; grant fichaje_gateway to kiosk_ci;")
-    # postgres.js startup role is unavailable: explicitly use INHERIT for this LOGIN,
-    # which inherits ONLY entrypoint EXECUTE/USAGE (no data grants or bypass).
-    sql('alter role kiosk_ci inherit;')
+    # NOLOGIN gateway holds only entrypoint EXECUTE/USAGE. The ephemeral login
+    # inherits that single role, with no table privileges or bypass. PG17 captures
+    # INHERIT on the membership when GRANT runs; set it before the grant.
+    sql(f"create role kiosk_ci login inherit password '{password}'; grant fichaje_gateway to kiosk_ci;")
+    check(sql("select has_function_privilege('kiosk_ci','private.kiosk_admin_prepare(uuid,uuid,text,jsonb)','EXECUTE') and has_schema_privilege('kiosk_ci','private','USAGE');")=='t','ephemeral login inherits gateway entrypoints')
+    check(sql("select has_table_privilege('kiosk_ci','public.employees','SELECT') or has_table_privilege('kiosk_ci','private.kiosk_credentials','SELECT');")=='f','ephemeral login inherits no data access')
     env = dict(os.environ, KIOSK_AUTH_URL=h.URL, KIOSK_ANON_KEY=h.ANON,
                KIOSK_AUTH_PROVISION_KEY=h.SERVICE, KIOSK_PEPPER=base64.b64encode(secrets.token_bytes(32)).decode(),
                KIOSK_DATABASE_URL=f'postgres://kiosk_ci:{password}@127.0.0.1:54322/postgres', KIOSK_PORT='8765')
@@ -154,6 +154,8 @@ def main():
     check(sql(f"select source='KIOSK' and actor_membership_id is null and kiosk_device_id='{d['id']}' from public.time_events where id='{r['event_id']}';")=='t','KIOSK original actor and device provenance')
     check(sql(f"select actor_kind='KIOSK' and actor_id='{d['auth_id']}' from public.audit_log where entity_id='{r['event_id']}' and action='kiosk_record_event';")=='t','atomic KIOSK audit actor')
     check(record(b)==(200,r),'same request retry returns exact committed receipt')
+    sql(f"update private.kiosk_challenges set created_at=statement_timestamp()-interval '62 seconds',expires_at=statement_timestamp()-interval '2 seconds' where request_id='{b['request_id']}';")
+    check(record(b)==(200,r),'consumed expired challenge only recovers same committed receipt')
     check(record(dict(b,request_id=uid()))[0]==403,'consumed challenge cannot authorize new request')
     # Distinct payload requires fresh valid challenge yet conflicts with persistent request.
     changed=challenge(action='BREAK_START',request=b['request_id'])
@@ -248,6 +250,13 @@ def main():
     blocked_d=provision()
     for _ in range(30): assert authenticate(e,blocked_d,code=uid(),pin=wrong)[0]==403
     check(sql(f"select failures from private.auth_attempt_buckets where device_id='{blocked_d['id']}';")=='30','30 unknown codes persistently lock device')
+    # Restart gateway: a process restart cannot clear the database lock.
+    process.terminate();process.wait(timeout=10)
+    process=subprocess.Popen(['deno','run','--allow-env','--allow-net','--config','supabase/functions/kiosk/deno.json','supabase/functions/kiosk/index.ts'],env=env,stdout=gateway_log,stderr=gateway_log)
+    for _ in range(50):
+        try:urllib.request.urlopen('http://127.0.0.1:8765',timeout=1)
+        except urllib.error.HTTPError:break
+        except OSError:time.sleep(.1)
     check(authenticate(e,blocked_d)[0]==403,'correct PIN cannot bypass active device lock')
 
     pending=challenge(e2,d2); previous=e2['pin']; rb,rr=reset(e2)
