@@ -3,11 +3,23 @@ Requires an explicit authorization reference. Never invoked by the product API.
 """
 import argparse
 import os
+import json
 from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 import psycopg
+from export_worker import storage
+
+
+def is_missing(error: HTTPError) -> bool:
+    if error.code == 404:
+        return True
+    try:
+        body = json.loads(error.read())
+    except (ValueError, UnicodeError):
+        return False
+    return error.code == 400 and str(body.get('statusCode')) == '404'
 
 
 def run(db_url: str, storage_url: str, key: str, organization_id: str,
@@ -25,23 +37,22 @@ def run(db_url: str, storage_url: str, key: str, organization_id: str,
                     (organization_id,))
                 if cursor.fetchone()[0]:
                     raise RuntimeError("LEGAL_HOLD")
-                cursor.execute("""select object_path from private.export_jobs
-                    where organization_id=%s and expires_at<=%s and object_path is not null""",
+                cursor.execute("""select coalesce(object_path,organization_id::text||'/'||id::text||'.zip') from private.export_jobs
+                    where organization_id=%s and expires_at<=%s""",
                     (organization_id, cutoff))
                 for (path,) in cursor.fetchall():
                     url = storage_url.rstrip("/") + "/storage/v1/object/fichaje-evidence/" + quote(path)
                     headers = {"apikey": key, "Authorization": "Bearer " + key, "Cache-Control": "no-store"}
                     try:
-                        with urlopen(Request(url, headers=headers, method="DELETE"), timeout=15):
-                            pass
+                        storage('DELETE',url,key)
                     except HTTPError as error:
-                        if error.code != 404:
+                        if not is_missing(error):
                             raise
                     try:
                         with urlopen(Request(url, headers=headers), timeout=15):
                             raise RuntimeError("OBJECT_STILL_PRESENT")
                     except HTTPError as error:
-                        if error.code != 404:
+                        if not is_missing(error):
                             raise
                 cursor.execute("select private.purge_operational(%s,%s,%s)",
                                (organization_id, cutoff, authorization))

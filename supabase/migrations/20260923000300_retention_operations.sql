@@ -87,8 +87,9 @@ begin
   and greatest(window_start,coalesce(locked_until,window_start))+interval '24 hours'<=p_cutoff returning 1)
  select count(*) into n_network from removed;
  with removed as (delete from private.export_jobs j where j.organization_id=p_org
-  and j.expires_at<=p_cutoff and (j.object_path is null or not exists(
-   select 1 from storage.objects o where o.bucket_id='fichaje-evidence' and o.name=j.object_path)) returning 1)
+  and j.expires_at<=p_cutoff and not exists(
+   select 1 from storage.objects o where o.bucket_id='fichaje-evidence'
+    and o.name=coalesce(j.object_path,j.organization_id::text||'/'||j.id::text||'.zip')) returning 1)
  select count(*) into n_exports from removed;
  c:=jsonb_build_object('challenges',n_challenges,'attempt_buckets',n_attempts,
   'network_buckets',n_network,'export_jobs',n_exports);

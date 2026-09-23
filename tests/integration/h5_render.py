@@ -9,7 +9,8 @@ import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
-from export_package import canonical, package, rows, safe_text  # noqa: E402
+from export_package import canonical, package, rows, safe_text, csv_detail, HEADINGS  # noqa: E402
+from pypdf import PdfReader
 
 
 def sample(zone, start, end, code="=SUM(1,1)"):
@@ -46,6 +47,9 @@ class Render(unittest.TestCase):
             pdf = archive.read("summary.pdf")
             self.assertTrue(pdf.startswith(b"%PDF-"))
             self.assertIn(b"Registro horario", pdf)
+            text = '\n'.join(p.extract_text() for p in PdfReader(io.BytesIO(pdf)).pages)
+            self.assertIn('computable 3600 s', text)
+            self.assertIn('No es firma electronica cualificada', text)
             manifest = json.loads(archive.read("manifest.json"))
             for name, expected in manifest["files_sha256"].items():
                 self.assertEqual(hashlib.sha256(archive.read(name)).hexdigest(), expected)
@@ -53,6 +57,9 @@ class Render(unittest.TestCase):
     def test_all_formula_prefixes(self):
         for prefix in ("=", "+", "-", "@", "\t", "\r"):
             self.assertEqual(safe_text(prefix + "cmd"), "'" + prefix + "cmd")
+            value = prefix+'formula,"quoted"\r\nnext line'
+            decoded = next(csv.DictReader(io.StringIO(csv_detail([dict.fromkeys(HEADINGS,value)]).decode())))
+            self.assertTrue(all(decoded[key]=="'"+value for key in HEADINGS))
         self.assertEqual(safe_text("ordinary"), "ordinary")
 
     def test_dst_and_night(self):
@@ -60,10 +67,12 @@ class Render(unittest.TestCase):
             ("Europe/Madrid", ("2026-03-28T23:00:00Z", "2026-03-29T22:00:00Z"),
              ("2026-10-24T22:00:00Z", "2026-10-25T23:00:00Z")),
             ("Atlantic/Canary", ("2026-03-29T00:00:00Z", "2026-03-29T23:00:00Z"),
-             ("2026-10-25T00:00:00Z", "2026-10-26T01:00:00Z")),
+             ("2026-10-24T23:00:00Z", "2026-10-26T00:00:00Z")),
         ):
             self.assertEqual(sum(r["gross_seconds"] for r in rows(sample(zone, *spring))), 23 * 3600)
             self.assertEqual(sum(r["gross_seconds"] for r in rows(sample(zone, *autumn))), 25 * 3600)
+            self.assertEqual({r['natural_day'] for r in rows(sample(zone,*spring))},{'2026-03-29'})
+            self.assertEqual({r['natural_day'] for r in rows(sample(zone,*autumn))},{'2026-10-25'})
         night = rows(sample("Europe/Madrid", "2026-04-01T20:00:00Z", "2026-04-02T05:00:00Z"))
         self.assertEqual([r["natural_day"] for r in night], ["2026-04-01", "2026-04-02"])
         self.assertEqual({r["local_entry_day"] for r in night}, {"2026-04-01"})

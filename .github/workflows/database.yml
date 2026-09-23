@@ -28,7 +28,7 @@ jobs:
           python-version: '3.12'
       - name: Gateway dependencies and strict typecheck
         run: |
-          python -m pip install cryptography==46.0.3 reportlab==4.4.9 'psycopg[binary]==3.2.10'
+          python -m pip install cryptography==46.0.3 reportlab==4.4.9 pypdf==6.1.0 'psycopg[binary]==3.2.10'
           deno check --config supabase/functions/kiosk/deno.json supabase/functions/kiosk/index.ts
           deno check supabase/functions/export-link/index.ts
       - name: Network minimization tests

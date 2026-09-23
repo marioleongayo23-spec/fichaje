@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
 import export_worker
 from export_package import package
 from recovery_journal import reconcile, replay, committed_entries
+import purge_operational
 
 check, uid, rpc, sql = h.check, h.uid, h.rpc, h.sql
 initial = h.checks
@@ -149,6 +150,12 @@ for manager in (owner,admin):
     check(request_export(manager,foreign)[0]==403, 'EXP-01 manager cannot export foreign tenant')
     check(request_export(manager,subject=employee['employee'])[0]==200, 'EXP-01 authorized manager exports own tenant')
 check({e['id'] for e in before['employees']}=={employee['employee']}, 'EXP-01 employee export contains exclusively own evidence')
+kiosk=h.account('h5-kiosk')
+device=uid()
+with psycopg.connect(APP) as c:
+    c.execute("insert into private.kiosk_devices(id,organization_id,auth_user_id,name,expires_at) values(%s,%s,%s,'Synthetic kiosk',clock_timestamp()+interval '1 day')",
+              (device,org,kiosk['id']))
+check(request_export(kiosk)[0]==403,'EXP-01 real kiosk identity cannot request exports')
 
 # Force a real Storage authorization failure. No mock storage implementation.
 try:
@@ -176,6 +183,9 @@ check(rpc('record_evidence_delivery',other['token'],delivery_args)[0]==403,
       'EXP third-party delivery cannot cross tenant')
 check(dbone('select count(*) from public.audit_log where entity_id=%s and action=%s',(receipt,'record_delivery'))==1,
       'EXP controlled delivery audit is transactional')
+code,admin_job=request_export(admin,subject=employee['employee'])
+assert code==200
+export_worker.run(APP,h.URL,h.SERVICE)
 
 # Real signer, real Auth check, real Storage signed URL and expiry rejection.
 with tempfile.TemporaryDirectory(prefix='h5-signer-') as temp:
@@ -219,12 +229,30 @@ with tempfile.TemporaryDirectory(prefix='h5-signer-') as temp:
                 'p_request_id':uid(),'p_expected_version':1,'p_active':False})
             assert code==200
             check(sign(employee,after_job['job_id'])[0]==403,'EXP-05 deactivated employee cannot get a fresh URL')
+            code,_=rpc('manage_membership',owner['token'],dict(p_organization_id=org,p_request_id=uid(),
+                p_membership_id=admin['membership'],p_expected_version=1,p_role='ADMIN',p_active=False))
+            assert code==200
+            check(sign(admin,admin_job['job_id'])[0]==403,'EXP-05 revoked manager cannot obtain a new link')
+            check(rpc('record_evidence_delivery',admin['token'],{**delivery_args,'p_job':admin_job['job_id']})[0]==403,
+                  'EXP delivery revalidates manager revocation')
         finally:
             proc.terminate()
             proc.wait(timeout=10)
 code, listing=h.api('/storage/v1/object/list/fichaje-evidence',data={'prefix':org})
 check(code>=400 or listing==[],'EXP-05 anonymous object listing cannot reveal evidence')
 check(h.api('/storage/v1/object/public/fichaje-evidence/'+path)[0]>=400,'EXP-05 public object URL impossible')
+with psycopg.connect(APP) as c:
+    c.execute("""insert into private.kiosk_challenges(organization_id,device_id,employee_id,action,
+      expected_version,request_id,token_hash,credential_version,created_at,expires_at)
+      values(%s,%s,%s,'CLOCK_IN',0,%s,%s,1,clock_timestamp()-interval '25 hours',
+      clock_timestamp()-interval '25 hours'+interval '60 seconds')""",(org,device,employee['employee'],uid(),'a'*64))
+    c.execute("insert into private.auth_attempt_buckets(organization_id,device_id,subject_hash,window_start) values(%s,%s,%s,clock_timestamp()-interval '25 hours')",(org,device,'b'*64))
+    c.execute("insert into private.kiosk_network_buckets(organization_id,subject_hash,window_start) values(%s,%s,clock_timestamp()-interval '25 hours')",(org,'c'*64))
+purge_operational.run(APP,h.URL,h.SERVICE,org,sql('select clock_timestamp();'),'SYN-OP-EXPIRY')
+for table in ('kiosk_challenges','auth_attempt_buckets','kiosk_network_buckets'):
+    check(dbone(f'select count(*) from private.{table} where organization_id=%s',(org,))==0,'RET 24-hour expiry of '+table)
+check(dbone('select count(*) from private.export_jobs where id=%s',(before_job['job_id'],))==0,
+      'RET expired export removed only after private object deletion')
 
 # Synthetic historical fixture with real constraints and an actual closed timeline.
 historical=uid()
@@ -243,6 +271,34 @@ with psycopg.connect(APP) as c:
 purge='select private.purge_labour(%s,%s,%s,%s,%s)'
 purge_args=(org,historical,'2020-01-01','2024-01-31 23:00+00','SYNTHETIC-PURGE')
 
+# Classifications use real computable totals, preserve both revisions and never
+# alter original events. A separate month remains outside the purge target.
+classified_session=uid()
+with psycopg.connect(APP) as c:
+    c.execute("insert into public.work_sessions(id,organization_id,employee_id,policy_id,timezone,created_at) values(%s,%s,%s,%s,'Europe/Madrid','2020-04-10 08:00+00')",
+              (classified_session,org,historical,employee['policy']))
+    for seq,action,at in ((3,'CLOCK_IN','2020-04-10 08:00+00'),(4,'CLOCK_OUT','2020-04-10 16:00+00')):
+        c.execute("""insert into public.time_events(organization_id,employee_id,session_id,sequence,event_type,
+          server_at,actor_membership_id,source,request_id) values(%s,%s,%s,%s,%s,%s,%s,'WEB',%s)""",
+          (org,historical,classified_session,seq,action,at,owner['membership'],uid()))
+classification=dict(p_organization_id=org,p_request_id=uid(),p_employee_id=historical,
+    p_local_month='2020-04-01',p_previous_id=None,p_basis_version=0,p_regular_seconds=28800,
+    p_complementary_seconds=0,p_overtime_seconds=0,p_reason='Synthetic motivated classification')
+code,first_class=rpc('classify_hours',owner['token'],classification)
+check(code==200,'EXP classification validates real computable month')
+code,_=rpc('classify_hours',owner['token'],{**classification,'p_request_id':uid(),'p_previous_id':first_class['id'],'p_regular_seconds':1})
+check(code==400,'EXP classification rejects mismatched sum')
+code,second_class=rpc('classify_hours',owner['token'],{**classification,'p_request_id':uid(),'p_previous_id':first_class['id'],
+    'p_regular_seconds':25200,'p_overtime_seconds':3600,'p_reason':'Synthetic authorized revision'})
+check(code==200 and second_class['id']!=first_class['id'],'EXP classification appends a motivated successor')
+code,class_job=request_export(owner,subject=historical,start='2020-04-01',end='2020-04-30')
+assert code==200
+classification_snapshot=dbone('select snapshot from private.export_jobs where id=%s',(class_job['job_id'],))
+check(len(classification_snapshot['employees'][0]['classifications'])==2,'EXP both classification revisions visible in evidence')
+check(dbone('select count(*) from public.time_events where session_id=%s',(classified_session,))==2,
+      'EXP classification never rewrites original events')
+expect_db_error(purge,(org,historical,'2020-04-01','2026-09-01','SYN-CLASS-RETENTION'),'NOT_EXPIRED')
+
 # Inject manifest and audit failures inside real PostgreSQL transactions.
 for table in ('private.retention_runs','public.audit_log'):
     with psycopg.connect(APP) as c:
@@ -258,6 +314,71 @@ for table in ('private.retention_runs','public.audit_log'):
         with psycopg.connect(APP) as c:
             c.execute(f'drop trigger h5_fail on {table}')
             c.execute('drop function private.h5_fail()')
+
+# An open/incomplete period is never silently converted to zero or purged.
+open_session=uid()
+with psycopg.connect(APP) as c:
+    c.execute("insert into public.work_sessions(id,organization_id,employee_id,policy_id,timezone,created_at) values(%s,%s,%s,%s,'Europe/Madrid','2020-05-10 08:00+00')",
+              (open_session,org,historical,employee['policy']))
+    c.execute("""insert into public.time_events(organization_id,employee_id,session_id,sequence,event_type,
+      server_at,actor_membership_id,source,request_id) values(%s,%s,%s,5,'CLOCK_IN','2020-05-10 08:00+00',%s,'WEB',%s)""",
+              (org,historical,open_session,owner['membership'],uid()))
+expect_db_error(purge,(org,historical,'2020-05-01','2026-09-01','SYN-INCOMPLETE'),'INCOMPLETE_PERIOD')
+
+# Later correction retains the entire original/adjustment/decision/request chain.
+corrected_args=h.employee_args(org)
+assert rpc('manage_employee',owner['token'],corrected_args)[0]==200
+corrected=corrected_args['p_employee_id']
+cs,ce,cr,cd,ca=[uid() for _ in range(5)]
+with psycopg.connect(APP) as c:
+    c.execute("insert into public.work_sessions(id,organization_id,employee_id,policy_id,timezone,created_at) values(%s,%s,%s,%s,'Europe/Madrid','2020-03-10 08:00+00')",
+              (cs,org,corrected,employee['policy']))
+    for event_id,seq,action,at in ((uid(),1,'CLOCK_IN','2020-03-10 08:00+00'),(ce,2,'CLOCK_OUT','2020-03-10 16:00+00')):
+        c.execute("""insert into public.time_events(id,organization_id,employee_id,session_id,sequence,event_type,
+          server_at,actor_membership_id,source,request_id) values(%s,%s,%s,%s,%s,%s,%s,%s,'WEB',%s)""",
+          (event_id,org,corrected,cs,seq,action,at,owner['membership'],uid()))
+    c.execute("""insert into public.correction_requests(id,organization_id,employee_id,submitted_by_membership_id,
+      base_version,reason,proposal,created_at) values(%s,%s,%s,%s,2,'Synthetic historical request',%s,'2022-03-15 00:00+00')""",
+      (cr,org,corrected,owner['membership'],Jsonb([dict(operation='REPLACE',session_id=cs,target_event_id=ce,
+        event_type='CLOCK_OUT',effective_at='2020-03-10T17:00:00Z',ordinal=2,timezone='Europe/Madrid')])) )
+    c.execute("""insert into public.correction_decisions(id,organization_id,employee_id,request_id,decision,
+      actor_membership_id,reason,created_at) values(%s,%s,%s,%s,'APPROVE',%s,'Synthetic decision','2022-03-15 00:00+00')""",
+      (cd,org,corrected,cr,owner['membership']))
+    c.execute("""insert into public.event_adjustments(id,organization_id,employee_id,decision_id,target_event_id,
+      operation,effective_at,event_type,session_id,ordinal,created_at)
+      values(%s,%s,%s,%s,%s,'REPLACE','2020-03-10 17:00+00','CLOCK_OUT',%s,2,'2022-03-15 00:00+00')""",
+      (ca,org,corrected,cd,ce,cs))
+expect_db_error(purge,(org,corrected,'2020-03-01','2026-03-14','SYN-CORR-EARLY'),'NOT_EXPIRED')
+offline(purge,(org,corrected,'2020-03-01','2026-03-15 00:00+00','SYN-CORR-EXACT'))
+for table in ('work_sessions','time_events','correction_requests','correction_decisions','event_adjustments'):
+    check(dbone(f'select count(*) from public.{table} where employee_id=%s',(corrected,))==0,
+          'RET correction expiry removes dependency '+table)
+
+# Uncommitted external intents block reopening; a rolled-back DB transaction
+# can be reconciled to ABORTED without deleting its append-only archive entry.
+reconcile(APP,ARCHIVE)
+source=dbone('select id from private.journal_source')
+with psycopg.connect(APP) as c:
+    c.execute('update public.employees set active=false,version=version+1 where id=%s',(historical,))
+    try:
+        committed_entries(ARCHIVE,source)
+    except RuntimeError as error:
+        check(str(error)=='RECOVERY_BLOCKED_UNRESOLVED_JOURNAL','RET unresolved write-ahead intent blocks recovery')
+    else:
+        raise AssertionError('unresolved journal accepted')
+    c.rollback()
+reconcile(APP,ARCHIVE)
+check(dbone('select active from public.employees where id=%s',(historical,)),
+      'ATOMIC rolled-back deactivation leaves original identity active')
+with psycopg.connect(ARCHIVE) as c:
+    c.execute('revoke execute on function journal.prepare(uuid,uuid,text,uuid,text,jsonb) from fichaje_archive_connection')
+try:
+    code,_=rpc('manage_employee',owner['token'],{**args,'p_request_id':uid(),'p_expected_version':1,'p_active':False})
+    check(code>=400 and dbone('select active from public.employees where id=%s',(historical,)),
+          'ATOMIC external journal failure rolls back real deactivation RPC')
+finally:
+    with psycopg.connect(ARCHIVE) as c:
+        c.execute('grant execute on function journal.prepare(uuid,uuid,text,uuid,text,jsonb) to fichaje_archive_connection')
 
 # Actual pg_dump/pg_restore of only the synthetic application schemas. The
 # separate journal database is neither dumped nor restored with these schemas.
@@ -275,7 +396,7 @@ offline(purge,purge_args)
 active_hold=offline('select private.record_legal_hold(%s,%s,%s,%s)',(org,historical,'Later active hold','SYN-LATER-HOLD'))
 check(dbone('select count(*) from public.work_sessions where id=%s',(session,))==0,'RET authorized purge removed exact historical session')
 reconcile(APP,ARCHIVE)
-subprocess.run(['docker','exec','-i',h.CONTAINER,'pg_restore','-U','postgres','-d','postgres',
+subprocess.run(['docker','exec','-i',h.CONTAINER,'pg_restore','-U','supabase_admin','-d','postgres',
     '--clean','--if-exists','--exit-on-error'],input=dump,check=True,stdout=subprocess.DEVNULL)
 check(dbone('select count(*) from public.work_sessions where id=%s',(session,))==1,
       'RET-04 real pg_restore actually restores the older synthetic evidence')
@@ -289,6 +410,16 @@ check(not offline('select private.active_legal_hold(%s,%s)',(org,None)), 'RET-04
 check(dbone('select to_jsonb(e) from public.employees e where id=%s',(other['employee'],))==foreign_before,
       'RET-04 other tenant identity unaffected by replay')
 check(replay(APP,ARCHIVE)==0,'RET-04 replay idempotent')
+with psycopg.connect(ARCHIVE) as c:
+    payloads=c.execute('select payload from journal.entries where source_id=%s',(source,)).fetchall()
+    forbidden={'display_name','code','reason','proposal','effective_at','server_at','pin_hash'}
+    def keys(value):
+        if isinstance(value,dict):
+            return set(value).union(*(keys(v) for v in value.values()))
+        if isinstance(value,list):
+            return set().union(*(keys(v) for v in value))
+        return set()
+    check(all(not (keys(p[0]) & forbidden) for p in payloads),'RET journal holds only identifiers and recovery metadata')
 check(dbone("select bool_and(relrowsecurity and relforcerowsecurity) from pg_class where oid in ('public.time_events'::regclass,'public.employees'::regclass,'private.legal_holds'::regclass)"),
       'RET-04 FORCE RLS survives real restore')
 with psycopg.connect(APP) as c:

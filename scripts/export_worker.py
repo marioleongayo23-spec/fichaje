@@ -6,8 +6,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 from urllib.request import Request, urlopen
 
 import psycopg
@@ -20,6 +21,13 @@ def storage(method: str, url: str, key: str, body: bytes | None = None) -> bytes
                "Cache-Control": "no-store", "Content-Type": "application/zip"}
     if method == "POST":
         headers["x-upsert"] = "true"
+    if method == "DELETE":
+        base, separator, path = url.partition('/object/fichaje-evidence/')
+        if not separator:
+            raise ValueError('INVALID_EXPORT_OBJECT_PATH')
+        url = base+'/object/fichaje-evidence'
+        body = json.dumps({'prefixes':[unquote(path)]}).encode()
+        headers['Content-Type'] = 'application/json'
     with urlopen(Request(url, data=body, headers=headers, method=method), timeout=15) as response:
         return response.read()
 

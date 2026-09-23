@@ -11,7 +11,9 @@ Rama de origen: `astra/hito-3-correcciones`. Merge: `a848c1c5adef50ada215d736208
 HITO 4 aprobado por el usuario, incluida SEC-H4-01, e integrado en `main` mediante PR #8 el 2026-09-23.
 Rama de origen: `astra/hito-4-kiosco`. Merge: `76922f352a64f3bbf0d1d7ece2c7ae155f58d1a0`.
 
-HITO 5 autorizado el 2026-09-23; trabajo en `astra/hito-5-informes-retencion`, PR #9 en borrador. No aprobado ni integrado.\n\n## Entregado en H0
+HITO 5 autorizado el 2026-09-23; trabajo en `astra/hito-5-informes-retencion`, PR #9 en borrador. No aprobado ni integrado.
+
+## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
   estados, tiempo servidor, inmutabilidad/correcciones, audit, concurrencia/idempotencia y kiosco.
 - Contratos de exportación, retención, aceptación, recuperación y roadmap con puertas por hito.
@@ -308,8 +310,13 @@ PR #8 integrado por autorización expresa del usuario. Sin iniciar H5 ni OPS-02;
 ESTADO: FAIL / INCOMPLETO. PR #9 es borrador y no se debe integrar.
 Implementados parcialmente: snapshot materializado, clasificación append-only, paquete real CSV/JSON/PDF,
 worker y firmador privados, holds append-only y purga operativa acotada.
-Pendiente: purga legal de historia laboral, tombstones y restore PostgreSQL con replay, entrega a terceros
-con recibo, pruebas completas EXP-01..05/RET-01..04 y concurrencia de snapshot.
+Continuación: añadidas purga laboral offline por periodo con RLS acotada y manifiesto transaccional,
+entrega controlada con recibo, journal síncrono en base PostgreSQL separada y replay offline.
+La suite H5 ahora incluye concurrencia real de worker/corrección, Storage/Auth/firmador reales,
+fallos forzados de manifest/audit/Storage/journal y pg_dump/pg_restore sintético con replay.
+Estas ampliaciones siguen pendientes de ejecución completa: código y tests escritos no equivalen a PASS.
+Último bloqueo observado de CI: aprovisionamiento efímero del foreign server del journal sin USAGE
+sobre dblink_fdw; corregido en el inicializador sintético, pendiente de revalidación.
 Evidencia parcial del commit `13b27bad2e7e7e33710cd32512126851f8014f7f`:
 - [Database run 35879913197](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35879913197):
   PASS en Supabase local efímero reconstruido desde vacío: 275 aserciones SQL/pgTAP,

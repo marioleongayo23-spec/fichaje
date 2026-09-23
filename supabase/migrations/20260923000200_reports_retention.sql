@@ -174,6 +174,13 @@ returns jsonb language sql stable set search_path='' as $$
    'decision',to_jsonb(d)) order by r.created_at,r.id) from public.correction_requests r
    left join public.correction_decisions d on d.organization_id=r.organization_id and d.request_id=r.id
    where r.organization_id=p_org and r.employee_id=e.id and r.created_at<=p_cutoff
+    and exists(select 1 from jsonb_array_elements(r.proposal) op
+     join public.work_sessions rs on rs.organization_id=p_org and rs.employee_id=e.id
+      and rs.id::text=op->>'session_id'
+     left join lateral (select min(tx.effective_at) as entered
+      from private.effective_timeline(p_org,e.id,p_cutoff) tx
+      where tx.session_id=rs.id and tx.event_type='CLOCK_IN') re on true
+     where (coalesce(re.entered,rs.created_at) at time zone p_zone)::date between p_start and p_end)
     and (d.created_at is null or d.created_at<=p_cutoff)),'[]'::jsonb),
   'classifications',coalesce((select jsonb_agg(to_jsonb(c) order by c.local_month,c.created_at,c.id)
    from public.hour_classifications c where c.organization_id=p_org and c.employee_id=e.id

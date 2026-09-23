@@ -2,6 +2,7 @@
 No credential or journal entry is printed or saved as an Actions artifact.
 """
 import secrets
+import subprocess
 import psycopg
 from psycopg import sql
 
@@ -10,6 +11,9 @@ ARCHIVE = 'postgresql://postgres:postgres@127.0.0.1:54322/fichaje_recovery'
 
 
 def initialize():
+    subprocess.run(['docker','exec','-i','supabase_db_fichaje-h1','psql','-U','supabase_admin',
+        '-d','postgres','-v','ON_ERROR_STOP=1','-c',
+        'grant usage on foreign data wrapper dblink_fdw to postgres'],check=True,stdout=subprocess.DEVNULL)
     password = secrets.token_urlsafe(40)
     with psycopg.connect(APP, autocommit=True) as c:
         c.execute('create database fichaje_recovery')
