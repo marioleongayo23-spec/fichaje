@@ -115,3 +115,9 @@ inexistentes; mismo límite contractual de 15 minutos. No historial de PIN ni pe
 kiosk_device_id FK compuesta. Audit mantiene FK Auth: actor_kind KIOSK, actor_id identidad
 técnica. Idempotencia de fichaje usa principal_kind KIOSK y principal_id dispositivo.
 Recibos de provisioning/reset guardan únicamente entrega cifrada RSA-OAEP-256; nunca PIN.
+
+H4 SEC-H4-01: `private.kiosk_network_buckets` contiene organization_id, subject_hash
+(HMAC-SHA256 server-side por tenant/peer), window_start, failures y locked_until.
+PK (organization_id, subject_hash), FORCE RLS limitada a contexto kiosk_device
+del tenant; sin grants a clientes/gateway sobre tablas, sin IP en claro, sin vínculo
+con audit laboral. Límite adicional 60 fallos/15 min bajo lock de organización.

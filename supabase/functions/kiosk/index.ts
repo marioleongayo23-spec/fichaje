@@ -1,5 +1,6 @@
 // Server-only gateway; also served unchanged by Deno in the real integration suite.
 import postgres from 'postgres';
+import { networkIdentifier } from './network.ts';
 import { argon2id, argon2Verify } from 'hash-wasm';
 
 const env = (key: string) => { const value = Deno.env.get(key); if (!value) throw new Error('CONFIG_REQUIRED'); return value; };
@@ -7,6 +8,8 @@ const authURL = env('KIOSK_AUTH_URL');
 const apiKey = env('KIOSK_ANON_KEY');
 const provisionKey = env('KIOSK_AUTH_PROVISION_KEY'); // Auth admin provisioning only, NEVER database access.
 const pepper = Uint8Array.from(atob(env('KIOSK_PEPPER')), c => c.charCodeAt(0));
+const networkSecret = Uint8Array.from(atob(env('KIOSK_NETWORK_SECRET')), c => c.charCodeAt(0));
+if (networkSecret.length < 32 || btoa(String.fromCharCode(...networkSecret)) === btoa(String.fromCharCode(...pepper))) throw new Error('CONFIG_REQUIRED');
 if (pepper.length < 32) throw new Error('CONFIG_REQUIRED');
 const db = postgres(env('KIOSK_DATABASE_URL'), { max: 8, prepare: false, onnotice: () => {}, debug: false,
   connection: { application_name: 'kiosk-gateway', statement_timeout: 10000, lock_timeout: 5000, idle_in_transaction_session_timeout: 10000 } });
@@ -38,7 +41,7 @@ async function apply(id: string, org: string, req: string, op: string, payload: 
   return await db.begin(async tx => { await identity(tx,id); const [r] = await tx.unsafe('select private.kiosk_admin_apply($1::uuid,$2::uuid,$3,$4::jsonb,$5::jsonb) as r',[org,req,op,tx.json(payload),tx.json(data)]); return r.r; });
 }
 
-export async function handler(req: Request): Promise<Response> {
+export async function handler(req: Request, info: Deno.ServeHandlerInfo): Promise<Response> {
   const started = performance.now();
   let body: Record<string, unknown> = {};
   let stage = 'input';
@@ -111,16 +114,17 @@ export async function handler(req: Request): Promise<Response> {
     if (!uuid(device) || !['CLOCK_IN','BREAK_START','BREAK_END','CLOCK_OUT'].includes(action) || !Number.isSafeInteger(expected) || expected < 0) return fail();
     if (route === 'authenticate') {
       if (typeof body.code !== 'string' || body.code.length > 64 || typeof body.pin !== 'string' || !/^\d{8,32}$/.test(body.pin)) return fail();
+      const network = await networkIdentifier(info.remoteAddr,org,networkSecret);
       const result = await db.begin(async tx => {
         await identity(tx,id);
-        const [r] = await tx.unsafe('select private.kiosk_auth_begin($1::uuid,$2::uuid,$3) as r',[org,device,body.code as string]);
+        const [r] = await tx.unsafe('select private.kiosk_auth_begin($1::uuid,$2::uuid,$3,$4) as r',[org,device,body.code as string,network]);
         const a = r.r;
         // Same Argon2 work for unknown, wrong and blocked credentials.
         const valid = await argon2Verify({ password: body.pin as string, secret: pepper, hash: a.pin_hash || dummy });
         body.pin = '';
         if (!valid || a.blocked || !a.employee_id || !a.pin_hash) return null; // COMMIT failure buckets.
         const challenge = hex(random(32)), tokenHash = await digest(challenge);
-        await tx.unsafe('select private.kiosk_auth_finish($1::uuid,$2::uuid,$3::uuid,$4::bigint,$5::public.time_action,$6::bigint,$7::uuid,$8)',[org,device,a.employee_id,a.credential_version,action,expected,request,tokenHash]);
+        await tx.unsafe('select private.kiosk_auth_finish($1::uuid,$2::uuid,$3::uuid,$4::bigint,$5::public.time_action,$6::bigint,$7::uuid,$8,$9)',[org,device,a.employee_id,a.credential_version,action,expected,request,tokenHash,network]);
         return { challenge, employee_id: a.employee_id, request_id: request, expires_in: 60 };
       });
       return result ? response(200,result) : fail();

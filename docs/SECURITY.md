@@ -161,3 +161,38 @@ Entrega cifrada para clave pública del gestor evita PIN/password en respuestas 
 El pepper nunca entra en parámetros SQL. Tiempo mínimo de respuesta 300 ms + trabajo
 Argon2 dummy en fallo de autenticación; no prometer tiempo constante bajo saturación.
 Detalles reproducibles, recuperación de recibo y prueba de fugas en `supabase/README.md`.
+
+### SEC-H4-01 — defensa adicional de red
+El gateway Deno usa exclusivamente `Deno.ServeHandlerInfo.remoteAddr` (peer TCP
+establecido por el runtime/SO). No lee `Forwarded`, `X-Forwarded-For`, `X-Real-IP`,
+`CF-Connecting-IP` ni otra cabecera de red; los campos JSON no admitidos se rechazan.
+Sin peer TCP válido, autenticación denegada: no fallback a datos del cliente.
+IPv4 se valida en decimal estricto; IPv6 se canonicaliza y las IPv4 mapeadas se
+unifican con IPv4. Inmediatamente se calcula HMAC-SHA256 sobre dominio
+`kiosk-network-v1`, UUID tenant en minúsculas y dirección normalizada, separados
+por salto de línea. Solo ese digest llega a PostgreSQL, en
+`private.kiosk_network_buckets`, FORCE RLS y contexto de tenant/dispositivo activo.
+`KIOSK_NETWORK_SECRET`: aleatorio, mínimo 32 bytes en base64, exclusivamente backend,
+independiente de `KIOSK_PEPPER` (igualdad rechazada), nunca VITE/GitHub/PostgreSQL.
+CI genera ambos de forma independiente y efímera. El HMAC impide un diccionario
+público de IP; no es anonimato frente a quien obtenga el secreto.
+
+Límite adicional: 60 fallos/peer/tenant/15 minutos, compartido entre dispositivos.
+Usa el mismo lock de organización, transacción y reloj servidor; reserva intento
+y lo descuenta solo tras PIN válido y ausencia de TODOS los bloqueos previos.
+El fallo número 60 bloquea 15 minutos desde ese fallo. El éxito no levanta un
+bloqueo vigente. Reiniciar gateway no reinicia contadores; al expirar ventana y
+bloqueo, el siguiente intento reinicia el bucket. Los límites 5/empleado y
+30/dispositivo conservan sus reglas. Nunca es prueba de identidad ni autorización.
+No se incluye IP/digest en respuestas, logs, audit laboral ni frontend.
+
+Frontera de despliegue: el listener TCP es la fuente confiable, no una cabecera
+que un proxy prometa añadir. Detrás de proxy/NAT se agrupa por su dirección real
+de conexión (posible bloqueo compartido conservador), no por la IP original
+declarada. Un cliente no elige el bucket enviando cabeceras. No usar un adaptador
+que fabrique remoteAddr desde headers. Si la plataforma Edge no proporciona
+metadata TCP confiable, esta ruta falla cerrada y requiere adaptar/verificar
+la infraestructura antes del piloto; H4 no despliega producción. Rotar el secreto
+cambia buckets de red; hacerlo de forma controlada, manteniendo los límites
+persistentes empleado/dispositivo. Estos hashes operativos no son historia laboral;
+su política de retención corresponde al H5 aún pendiente.

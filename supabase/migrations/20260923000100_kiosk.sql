@@ -41,6 +41,13 @@ create table private.auth_attempt_buckets (
  primary key(organization_id,device_id,subject_hash),
  foreign key(organization_id,device_id) references private.kiosk_devices(organization_id,id) on delete restrict
 );
+-- Additional tenant-scoped network defense; only keyed digests reach PostgreSQL.
+create table private.kiosk_network_buckets (
+ organization_id uuid not null references public.organizations(id),
+ subject_hash text not null check(subject_hash ~ '^[0-9a-f]{64}$'),
+ window_start timestamptz not null, failures integer not null default 0 check(failures>=0), locked_until timestamptz,
+ primary key(organization_id,subject_hash)
+);
 alter table public.time_events alter column actor_membership_id drop not null;
 alter table public.time_events drop constraint time_events_source_check;
 alter table public.time_events add column kiosk_device_id uuid;
@@ -50,7 +57,7 @@ alter table public.time_events add constraint time_events_source_check check(
  (source='KIOSK' and actor_membership_id is null and kiosk_device_id is not null));
 
 do $$ declare t text; begin
- foreach t in array array['kiosk_devices','kiosk_credentials','kiosk_challenges','auth_attempt_buckets'] loop
+ foreach t in array array['kiosk_devices','kiosk_credentials','kiosk_challenges','auth_attempt_buckets','kiosk_network_buckets'] loop
  execute format('alter table private.%I enable row level security',t);
  execute format('alter table private.%I force row level security',t);
  execute format('revoke all on private.%I from public,anon,authenticated,service_role,fichaje_gateway',t);
@@ -272,15 +279,23 @@ end $$;
 
 -- Reservations count as failure until verified. Failed responses COMMIT the attempt.
 -- Verification is local Argon2id within this transaction; no network I/O under locks.
-create function private.kiosk_auth_begin(p_org uuid,p_device uuid,p_code text) returns jsonb
+create function private.kiosk_auth_begin(p_org uuid,p_device uuid,p_code text,p_network text) returns jsonb
 language plpgsql security definer set search_path='' as $$
-declare e uuid; c private.kiosk_credentials; b private.auth_attempt_buckets;
+declare e uuid; c private.kiosk_credentials; b private.auth_attempt_buckets; n private.kiosk_network_buckets;
  t timestamptz; subject text:=encode(sha256(convert_to('device','UTF8')),'hex'); blocked boolean;
 begin
  perform private.kiosk_scope(p_org,p_device,null,false);
  perform 1 from public.organizations where id=p_org and status='ACTIVE' for update;
  perform private.kiosk_access(p_org,p_device,null,false);
  t:=clock_timestamp();
+ if p_network is null or p_network !~ '^[0-9a-f]{64}$' then raise exception using errcode='42501',message='FORBIDDEN'; end if;
+ insert into private.kiosk_network_buckets(organization_id,subject_hash,window_start)
+ values(p_org,p_network,t) on conflict do nothing;
+ select * into n from private.kiosk_network_buckets where organization_id=p_org and subject_hash=p_network for update;
+ if n.window_start<=t-interval '15 minutes' and coalesce(n.locked_until,t)<=t then
+  update private.kiosk_network_buckets set failures=0,window_start=t,locked_until=null where organization_id=p_org and subject_hash=p_network;
+  n.locked_until:=null;
+ end if;
  insert into private.auth_attempt_buckets(organization_id,device_id,subject_hash,window_start)
  values(p_org,p_device,subject,t) on conflict do nothing;
  select * into b from private.auth_attempt_buckets where organization_id=p_org and device_id=p_device and subject_hash=subject for update;
@@ -295,8 +310,10 @@ begin
   update private.kiosk_credentials set failed_attempts=0,window_start=t,locked_until=null where organization_id=p_org and employee_id=e;
   c.failed_attempts:=0; c.locked_until:=null;
  end if;
- blocked:=coalesce(b.locked_until>t,false) or coalesce(c.locked_until>t,false);
+ blocked:=coalesce(n.locked_until>t,false) or coalesce(b.locked_until>t,false) or coalesce(c.locked_until>t,false);
  if not blocked then
+  update private.kiosk_network_buckets set failures=failures+1,locked_until=case when failures+1>=60 then t+interval '15 minutes' else null end
+   where organization_id=p_org and subject_hash=p_network;
   update private.auth_attempt_buckets set failures=failures+1,locked_until=case when failures+1>=30 then t+interval '15 minutes' else null end
    where organization_id=p_org and device_id=p_device and subject_hash=subject;
   update private.kiosk_credentials set failed_attempts=failed_attempts+1,locked_until=case when failed_attempts+1>=5 then t+interval '15 minutes' else null end
@@ -305,7 +322,7 @@ begin
  return jsonb_build_object('employee_id',e,'pin_hash',c.pin_hash,'credential_version',c.credential_version,'blocked',blocked);
 end $$;
 
-create function private.kiosk_auth_finish(p_org uuid,p_device uuid,p_employee uuid,p_version bigint,p_action public.time_action,p_expected bigint,p_request uuid,p_hash text) returns void
+create function private.kiosk_auth_finish(p_org uuid,p_device uuid,p_employee uuid,p_version bigint,p_action public.time_action,p_expected bigint,p_request uuid,p_hash text,p_network text) returns void
 language plpgsql security definer set search_path='' as $$
 declare t timestamptz:=clock_timestamp();
 begin
@@ -316,6 +333,7 @@ begin
  where organization_id=p_org and employee_id=p_employee and credential_version=p_version;
  if not FOUND then raise exception using errcode='42501',message='FORBIDDEN'; end if;
  update private.auth_attempt_buckets set failures=greatest(0,failures-1),locked_until=null where organization_id=p_org and device_id=p_device;
+ update private.kiosk_network_buckets set failures=greatest(0,failures-1),locked_until=null where organization_id=p_org and subject_hash=p_network;
  insert into private.kiosk_challenges(organization_id,device_id,employee_id,action,expected_version,request_id,token_hash,credential_version,created_at,expires_at)
  values(p_org,p_device,p_employee,p_action,p_expected,p_request,p_hash,p_version,t,t+interval '60 seconds');
 end $$;
@@ -396,3 +414,10 @@ create policy kiosk_clock on public.time_events to fichaje_kiosk using(
  with check(organization_id=private.scoped_tenant('kiosk_clock') and employee_id=private.scoped_subject('kiosk_clock')
  and source='KIOSK' and actor_membership_id is null and kiosk_device_id in
  (select id from private.kiosk_devices where auth_user_id=private.request_uid()));
+
+revoke update on private.kiosk_network_buckets from fichaje_kiosk;
+grant update(window_start,failures,locked_until) on private.kiosk_network_buckets to fichaje_kiosk;
+drop policy kiosk_access on private.kiosk_network_buckets;
+create policy kiosk_network on private.kiosk_network_buckets to fichaje_kiosk
+ using(organization_id=private.scoped_tenant('kiosk_device'))
+ with check(organization_id=private.scoped_tenant('kiosk_device'));

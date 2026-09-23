@@ -3,6 +3,8 @@ import base64
 import concurrent.futures
 import contextlib
 import hashlib
+import hmac
+import http.client
 import io
 import json
 import os
@@ -40,6 +42,7 @@ def main():
     check(sql("select has_function_privilege('kiosk_ci','private.kiosk_admin_prepare(uuid,uuid,text,jsonb)','EXECUTE') and has_schema_privilege('kiosk_ci','private','USAGE');")=='t','ephemeral login inherits gateway entrypoints')
     check(sql("select has_table_privilege('kiosk_ci','public.employees','SELECT') or has_table_privilege('kiosk_ci','private.kiosk_credentials','SELECT');")=='f','ephemeral login inherits no data access')
     env = dict(os.environ, KIOSK_AUTH_URL=h.URL, KIOSK_ANON_KEY=h.ANON,
+               KIOSK_NETWORK_SECRET=base64.b64encode(secrets.token_bytes(32)).decode(),
                KIOSK_AUTH_PROVISION_KEY=h.SERVICE, KIOSK_PEPPER=base64.b64encode(secrets.token_bytes(32)).decode(),
                KIOSK_DATABASE_URL=f'postgres://kiosk_ci:{password}@127.0.0.1:54322/postgres', KIOSK_PORT='8765')
     gateway_log = open(root/'gateway.log','wb')
@@ -57,7 +60,13 @@ def main():
     else:
         raise AssertionError('gateway unavailable')
 
-    def gw(route, token, body):
+    def gw(route, token, body, source=None, extra_headers=None):
+        if source:
+            conn=http.client.HTTPConnection('127.0.0.1',8765,timeout=25,source_address=(source,0))
+            conn.request('POST','/'+route,json.dumps(body),headers={'Content-Type':'application/json','Authorization':'Bearer '+token,**(extra_headers or {})})
+            res=conn.getresponse(); data=res.read(); http_outputs.append(data)
+            assert res.getheader('Cache-Control')=='no-store, max-age=0'
+            status=res.status; conn.close(); return status,json.loads(data)
         req=urllib.request.Request('http://127.0.0.1:8765/'+route, data=json.dumps(body).encode(),
             headers={'Content-Type':'application/json','Authorization':'Bearer '+token})
         try:
@@ -313,6 +322,35 @@ def main():
     check(sql("select count(*) from pg_roles where rolname in ('fichaje_kiosk','fichaje_gateway') and (rolsuper or rolbypassrls or rolcanlogin or rolinherit);")=='0','technical roles have no login/inheritance/bypass')
     check(sql("select has_table_privilege('fichaje_gateway','public.time_events','INSERT') or has_table_privilege('fichaje_gateway','private.kiosk_credentials','SELECT');")=='f','gateway SQL login has no direct table access')
 
+    # SEC-H4-01: real TCP source, never forwarded/JSON client assertions.
+    net_ip='127.81.82.83'; second_ip='127.81.82.84'
+    net_employee=employee(); net_devices=[provision() for _ in range(3)]
+    net_body=dict(organization_id=org,device_id=net_devices[0]['id'],request_id=uid(),action='CLOCK_IN',expected_version=0,code='missing-network-code',pin='0'*8)
+    network_hash=hmac.new(base64.b64decode(env['KIOSK_NETWORK_SECRET']),f'kiosk-network-v1\n{org}\n{net_ip}'.encode(),hashlib.sha256).hexdigest()
+    for i in range(60):
+        dev=net_devices[i//20]
+        status,result=gw('authenticate',dev['token'],dict(net_body,device_id=dev['id'],request_id=uid()),source=net_ip,
+            extra_headers={'X-Forwarded-For':f'198.51.100.{i+1}','X-Real-IP':second_ip,'CF-Connecting-IP':second_ip,'Forwarded':f'for={second_ip}'})
+        assert (status,result)==(403,{'error':'AUTH_FAILED'}),'network failures stay generic'
+    check(sql(f"select failures=60 and locked_until>clock_timestamp() from private.kiosk_network_buckets where organization_id='{org}' and subject_hash='{network_hash}';")=='t','network bucket persists across devices despite arbitrary forwarded headers')
+    check(sql(f"select count(*) from private.kiosk_network_buckets where organization_id='{org}' and subject_hash='{network_hash}';")=='1','normalized peer stored only as tenant HMAC')
+    process.terminate();process.wait(timeout=10)
+    process=subprocess.Popen(['deno','run','--allow-env','--allow-net','--config','supabase/functions/kiosk/deno.json','supabase/functions/kiosk/index.ts'],env=env,stdout=gateway_log,stderr=gateway_log)
+    for _ in range(50):
+        try:urllib.request.urlopen('http://127.0.0.1:8765',timeout=1)
+        except urllib.error.HTTPError:break
+        except OSError:time.sleep(.1)
+    valid_body=dict(net_body,code=net_employee['code'],pin=net_employee['pin'])
+    check(gw('authenticate',net_devices[0]['token'],valid_body,source=net_ip)==(403,{'error':'AUTH_FAILED'}),'correct PIN does not clear active network lock')
+    check(gw('authenticate',net_devices[0]['token'],valid_body,source=second_ip)[0]==200,'separate actual connection peer has independent additional bucket')
+    check(gw('authenticate',foreign_d['token'],dict(valid_body,organization_id=foreign,device_id=foreign_d['id'],code=fe['code'],pin=fe['pin']),source=net_ip)[0]==200,'network lock isolated from another tenant at same peer')
+    check(gw('authenticate',net_devices[0]['token'],dict(valid_body,ip=second_ip),source=net_ip)[0]==403,'JSON cannot choose trusted network signal')
+    check(sql(f"select bool_and(failures=20) from private.auth_attempt_buckets where device_id in ({','.join(chr(39)+dev['id']+chr(39) for dev in net_devices)});")=='t','additional limiter preserves per-device failure counters')
+    check(sql("select has_table_privilege('fichaje_gateway','private.kiosk_network_buckets','SELECT') or has_table_privilege('authenticated','private.kiosk_network_buckets','SELECT');")=='f','network hashes inaccessible to clients and gateway login')
+    # Expiry uses server time; no success can unlock early.
+    sql(f"update private.kiosk_network_buckets set window_start=clock_timestamp()-interval '31 minutes',locked_until=clock_timestamp()-interval '1 second' where organization_id='{org}' and subject_hash='{network_hash}';")
+    check(gw('authenticate',net_devices[0]['token'],valid_body,source=net_ip)[0]==200,'expired network lock resets using server clock')
+
     # Entire database serialization plus ALL actual Docker logs, gateway output,
     # captured HTTP responses and generated build/test artifacts are scanned in memory.
     database=sql("select string_agg(row_to_json(t)::text,E'\\n') from (select 'placeholder' as value) t;")
@@ -328,6 +366,12 @@ def main():
         if base.exists():buffers.extend(p.read_bytes() for p in base.rglob('*') if p.is_file())
     for pin in known_pins:
         assert all(pin.encode() not in blob for blob in buffers),'PIN_LEAK_DETECTED'
+    for address in [net_ip,second_ip]:
+        assert all(address.encode() not in blob for blob in buffers),'NETWORK_PLAINTEXT_LEAK_DETECTED'
+    audit=sql("select coalesce(string_agg(row_to_json(t)::text,chr(10)),'') from public.audit_log t;")
+    for digest in sql("select subject_hash from private.kiosk_network_buckets;").splitlines():
+        assert all(digest.encode() not in blob for blob in buffers[1:]) and digest not in audit,'NETWORK_DIGEST_LEAK_DETECTED'
+    check(True,'KIO-07 network plaintext absent from DB/logs/responses/artifacts; hashes absent outside private buckets')
     check(len(known_pins)>0,'KIO-07 known synthetic PIN absent from DB/logs/responses/cacheable responses/generated artifacts')
     print(f'H4 real gateway checks: {h.checks-initial}; full H1+H2+H3 retained.')
 

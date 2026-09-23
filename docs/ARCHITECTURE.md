@@ -66,3 +66,9 @@ final, que revalida permisos. Pepper en secret store servidor; CI solo valores a
 efímeros. PIN de entrega cifrado para clave pública del gestor, no respuesta en claro.
 Motor H2/H3 compartido por función invoker, autorizaciones separadas para Web y KIOSK.
 No se despliega ni diseña UI, PWA, H5 u OPS-02 en este hito.
+
+SEC-H4-01: la defensa de red recibe solo el peer TCP del runtime Deno, normalizado
+y HMAC-SHA256 por tenant con `KIOSK_NETWORK_SECRET` independiente del pepper.
+Cabeceras de red no se usan. Tras un proxy el peer es el proxy, sin inferir IP
+original; metadata no confiable/no disponible deniega autenticación. Contrato,
+limitaciones de despliegue y umbral adicional 60/15 min en SECURITY.md.

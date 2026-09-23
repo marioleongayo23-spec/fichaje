@@ -287,3 +287,10 @@ No fichaje offline, ACK optimista, informes/retención H5, UI/PWA H6, OPS-02 ni 
 OPS-02 permanece después de H6 y antes de H7. Compensación de Auth en fallo de red es
 best effort; identidades no vinculadas no obtienen acceso tenant y deben reconciliarse
 antes del piloto. Backup DB sigue bloqueado. Trabajo detenido para revisión del PR #8.
+
+## Revisión SEC-H4-01 (H4 no aprobado)
+En la misma rama astra/hito-4-kiosco y PR #8. Defensa adicional por peer TCP
+normalizado y HMAC tenant con secreto backend independiente; bucket persistente
+60/15 min, sin cambios H1/H2/H3 ni límites empleado/dispositivo. Frontera de
+confianza y proxy documentadas. KIO-07 ampliado para IP y digests.
+Estado de esta revisión: validación completa desde cero pendiente; no PASS todavía.

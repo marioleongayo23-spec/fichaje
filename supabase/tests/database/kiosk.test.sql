@@ -14,7 +14,7 @@ insert into public.employees(id,organization_id,code,display_name) values
 insert into private.kiosk_devices(id,organization_id,auth_user_id,name,expires_at) values
  ('75000000-0000-0000-0000-000000000001','72000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000002','Device',clock_timestamp()+interval '1 day');
 set constraints all immediate;
-select ok(not exists(select 1 from pg_class where relnamespace='private'::regnamespace and relname in ('kiosk_devices','kiosk_credentials','kiosk_challenges','auth_attempt_buckets') and (not relrowsecurity or not relforcerowsecurity)),'all kiosk data FORCE RLS');
+select ok(not exists(select 1 from pg_class where relnamespace='private'::regnamespace and relname in ('kiosk_devices','kiosk_credentials','kiosk_challenges','auth_attempt_buckets','kiosk_network_buckets') and (not relrowsecurity or not relforcerowsecurity)),'all kiosk data FORCE RLS');
 select ok(not exists(select 1 from pg_roles where rolname in ('fichaje_kiosk','fichaje_gateway') and (rolcanlogin or rolsuper or rolbypassrls or rolinherit or rolcreatedb or rolcreaterole)),'dedicated roles minimum privileges');
 select throws_ok($$insert into public.memberships(organization_id,auth_user_id,role) values('72000000-0000-0000-0000-000000000002','71000000-0000-0000-0000-000000000002','EMPLOYEE')$$,'42501','FORBIDDEN','technical Auth cannot gain even foreign human membership');
 select throws_ok($$insert into private.kiosk_devices(id,organization_id,auth_user_id,name,expires_at) values(gen_random_uuid(),'72000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000001','Bad',clock_timestamp()+interval '1 day')$$,'42501','FORBIDDEN','human Auth cannot become a device');
@@ -51,6 +51,16 @@ select throws_ok($$truncate public.time_events$$,'42501',null,'kiosk cannot TRUN
 select throws_ok($$update public.memberships set active=false$$,'42501',null,'kiosk writer cannot modify memberships');
 select throws_ok($$select private.kiosk_scope('72000000-0000-0000-0000-000000000002','75000000-0000-0000-0000-000000000001',null,false)$$,'42501','FORBIDDEN','technical scope cannot cross tenant');
 select throws_ok($$select private.kiosk_scope('72000000-0000-0000-0000-000000000001','75000000-0000-0000-0000-000000000001','74000000-0000-0000-0000-000000000002',false)$$,'42501','FORBIDDEN','technical scope rejects foreign employee');
+select private.kiosk_scope('72000000-0000-0000-0000-000000000001','75000000-0000-0000-0000-000000000001',null,false);
+insert into private.kiosk_network_buckets(organization_id,subject_hash,window_start) values('72000000-0000-0000-0000-000000000001',repeat('a',64),clock_timestamp());
+select is((select count(*)::int from private.kiosk_network_buckets),1,'network scope permits own tenant');
+select throws_ok($$insert into private.kiosk_network_buckets(organization_id,subject_hash,window_start) values('72000000-0000-0000-0000-000000000002',repeat('b',64),clock_timestamp())$$,'42501',null,'network RLS denies foreign tenant INSERT');
+with changed as (update private.kiosk_network_buckets set failures=99 where organization_id='72000000-0000-0000-0000-000000000002' returning *) select is((select count(*)::int from changed),0,'network RLS denies foreign tenant UPDATE');
+select throws_ok($$update private.kiosk_network_buckets set subject_hash=repeat('c',64)$$,'42501',null,'network writer cannot change bucket identity');
+reset role;
+insert into private.kiosk_network_buckets(organization_id,subject_hash,window_start) values('72000000-0000-0000-0000-000000000002',repeat('b',64),clock_timestamp());
+set local role fichaje_kiosk;
+select is((select count(*)::int from private.kiosk_network_buckets),1,'network RLS hides existing foreign bucket');
 reset role;
 select * from finish();
 rollback;

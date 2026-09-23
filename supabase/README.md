@@ -249,3 +249,10 @@ las tablas public/private/auth serializadas, logs de contenedores, gateway, stdo
 suite, respuestas HTTP y artefactos temporales/build. La suite no imprime sus buffers hasta
 superar el gate; en fallo muestra solo tipo de excepción y ubicaciones de código. Sin dump
 ni artefacto de datos persistido, únicamente checks seguros. Destruye stack al finalizar.
+
+SEC-H4-01 añade `KIOSK_NETWORK_SECRET` (base64, >=32 bytes aleatorios, distinto del
+pepper, solo backend). Fuente de red: peer TCP Deno, nunca headers o JSON; tras
+proxy se limita el proxy por tenant. Sin metadata TCP confiable falla cerrado.
+Ver SECURITY.md antes de cualquier adaptación de ingress. CI usa secretos efímeros
+y conexiones loopback sintéticas; `deno test supabase/functions/kiosk/network_test.ts`
+verifica canonicalización/HMAC y la integración H4 prueba el limiter y fugas reales.

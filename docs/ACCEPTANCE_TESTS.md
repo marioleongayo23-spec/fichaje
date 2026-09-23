@@ -48,3 +48,12 @@ Evidencia de cada hito: comando, entorno, resultado y limitación en CURRENT_STA
 `h4.py` importa y ejecuta primero todas las suites H1/H2/H3. CI reconstruye desde vacío.
 Las pruebas SQL de privilegios son pgTAP real; gateway corre el mismo módulo Deno servidor.
 No PASS mientras alguna comprobación obligatoria falte o falle.
+
+Ampliación KIO-07 / SEC-H4-01: gateway real con peers TCP sintéticos conocidos,
+HMAC esperado únicamente en tabla privada, normalización IPv4/IPv6/mapped,
+separación por tenant/secreto/peer, headers falsificados y JSON incapaces de elegir
+bucket, límite 60/15 min entre dispositivos persistente tras reinicio, PIN correcto
+no desbloquea, expiración por reloj servidor y límites anteriores intactos.
+Escanear IP sintética en DB completa, logs, respuestas y artefactos; escanear todos
+los digests contra logs/respuestas/artefactos/audit laboral. RLS real: SELECT/INSERT/
+UPDATE cross-tenant y modificación de identidad denegados. Sin mocks de RLS.
