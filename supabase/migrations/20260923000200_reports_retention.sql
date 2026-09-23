@@ -5,7 +5,8 @@ grant fichaje_report to postgres;
 grant usage,create on schema public,private to fichaje_report;
 alter table private.mutation_context drop constraint mutation_context_route_check;
 alter table private.mutation_context add constraint mutation_context_route_check
- check(route in ('member','bootstrap','invitation','clock','correction_submit','correction_decide','report'));
+ check(route in ('member','bootstrap','invitation','clock','correction_submit','correction_decide',
+ 'kiosk_admin','kiosk_device','kiosk_clock','report'));
 
 create table public.hour_classifications (
  id uuid primary key default gen_random_uuid(), organization_id uuid not null,
@@ -162,6 +163,11 @@ returns jsonb language sql stable set search_path='' as $$
    where s.organization_id=p_org and s.employee_id=e.id and s.created_at<=p_cutoff
     and ((coalesce(entry.server_at,s.created_at) at time zone p_zone)::date between p_start and p_end)
   ),'[]'::jsonb),
+  'correction_requests',coalesce((select jsonb_agg(jsonb_build_object('request',to_jsonb(r),
+   'decision',to_jsonb(d)) order by r.created_at,r.id) from public.correction_requests r
+   left join public.correction_decisions d on d.organization_id=r.organization_id and d.request_id=r.id
+   where r.organization_id=p_org and r.employee_id=e.id and r.created_at<=p_cutoff
+    and (d.created_at is null or d.created_at<=p_cutoff)),'[]'::jsonb),
   'classifications',coalesce((select jsonb_agg(to_jsonb(c) order by c.local_month,c.created_at,c.id)
    from public.hour_classifications c where c.organization_id=p_org and c.employee_id=e.id
     and c.local_month between date_trunc('month',p_start::timestamp)::date and p_end and c.created_at<=p_cutoff),'[]'::jsonb)
@@ -317,6 +323,7 @@ create policy export_worker_update on private.export_jobs for update to fichaje_
   and expires_at>clock_timestamp());
 -- The worker has no INSERT, DELETE or arbitrary UPDATE grant on any labour table.
 
+grant create on schema public to fichaje_report;
 create function public.authorize_export_link(p_organization_id uuid,p_job_id uuid) returns text
 language plpgsql security definer set search_path='' as $$
 declare actor uuid; j private.export_jobs; role public.member_role;
@@ -338,6 +345,7 @@ end $$;
 alter function public.authorize_export_link(uuid,uuid) owner to fichaje_report;
 revoke all on function public.authorize_export_link(uuid,uuid) from public,anon,service_role;
 grant execute on function public.authorize_export_link(uuid,uuid) to authenticated;
+revoke create on schema public from fichaje_report;
 
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
 values('fichaje-evidence','fichaje-evidence',false,10485760,array['application/zip']);
