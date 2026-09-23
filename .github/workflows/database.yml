@@ -40,6 +40,12 @@ jobs:
               exit 0
             fi
             if [ "$attempt" = 3 ]; then exit 1; fi
+            if [ "$attempt" = 1 ]; then
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=public.ecr.aws
+            else
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io
+            fi
+            printf 'SUPABASE_INTERNAL_IMAGE_REGISTRY=%s\n' "$SUPABASE_INTERNAL_IMAGE_REGISTRY" >> "$GITHUB_ENV"
             sleep 5
           done
       - name: Rebuild from empty database
@@ -51,7 +57,7 @@ jobs:
       - name: Render real H5 evidence package
         run: python3 tests/integration/h5_render.py
       - name: Real Auth, REST, Storage and concurrency tests
-        run: python3 tests/integration/h4.py
+        run: python3 tests/integration/h5.py
       - name: Stop local containers
         if: always()
         run: supabase stop --no-backup

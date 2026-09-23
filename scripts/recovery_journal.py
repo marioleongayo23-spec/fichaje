@@ -21,10 +21,10 @@ def reconcile(app_url: str, archive_url: str) -> int:
                 raise RuntimeError('UNRESOLVED_JOURNAL_TRANSACTION')
             exists = app.execute('select exists(select 1 from private.recovery_outbox where id=%s)',
                                  (event_id,)).fetchone()[0]
-            if exists != (status == 'committed'):
+            if exists and status != 'committed':
                 raise RuntimeError('JOURNAL_SOURCE_MISMATCH')
             archive.execute('insert into journal.finalizations(id,outcome) values(%s,%s) on conflict do nothing',
-                            (event_id, status.upper()))
+                            (event_id, 'COMMITTED' if exists else 'ABORTED'))
             count += 1
     return count
 

@@ -63,6 +63,9 @@ end $$;
 -- incomplete sessions and newer revisions prevent removal of the whole scope.
 -- Dependencies are removed leaf-first, in the same transaction as the manifest.
 grant execute on function private.effective_timeline(uuid,uuid,timestamptz) to fichaje_retention;
+create policy labour_purge_audit on public.audit_log for insert to fichaje_retention
+ with check(organization_id=private.retention_scope() and actor_kind='SYSTEM'
+  and actor_id is null and action='purge_labour');
 grant create on schema private to fichaje_retention;
 create function private.purge_labour(p_org uuid,p_employee uuid,p_month date,
  p_cutoff timestamptz,p_authorization text) returns uuid
@@ -161,6 +164,9 @@ begin
  v_digest:=encode(sha256(convert_to(jsonb_build_array(p_org,p_cutoff,p_authorization,v_counts)::text,'UTF8')),'hex');
  insert into private.retention_runs(organization_id,cutoff,authorization_ref,counts,digest)
  values(p_org,p_cutoff,p_authorization,v_counts,v_digest) returning id into v_run;
+ insert into public.audit_log(organization_id,actor_kind,actor_id,action,entity_type,entity_id,request_id,safe_details)
+ values(p_org,'SYSTEM',null,'purge_labour','retention_runs',v_run,v_run,
+  jsonb_build_object('counts',v_counts,'digest',v_digest));
  perform private.journal_prepare(p_org,'PURGE',jsonb_build_object('run_id',v_run,
   'employee_id',p_employee,'local_month',p_month,'cutoff',p_cutoff,
   'authorization_ref',p_authorization,'counts',v_counts,'digest',v_digest,

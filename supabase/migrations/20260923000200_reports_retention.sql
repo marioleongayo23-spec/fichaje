@@ -99,10 +99,11 @@ begin
  select id into v_actor from public.memberships where organization_id=p_org
   and auth_user_id=private.request_uid() and active;
  if p_employee is null then
-  select id into v_employee from public.employees where organization_id=p_org and membership_id=v_actor;
+  select id into v_employee from public.employees where organization_id=p_org and membership_id=v_actor
+   and (v_role<>'EMPLOYEE' or active);
  else
   select id into v_employee from public.employees where organization_id=p_org and id=p_employee
-   and (v_role in ('OWNER','ADMIN') or membership_id=v_actor);
+   and (v_role in ('OWNER','ADMIN') or (membership_id=v_actor and active));
  end if;
  if (p_employee is not null and v_employee is null) or
     (p_employee is null and v_role='EMPLOYEE' and v_employee is null) then
@@ -203,7 +204,8 @@ begin
  now_at:=clock_timestamp();
  insert into private.export_jobs(organization_id,employee_id,requested_by,filters,cutoff_at,status,
   schema_version,expires_at,snapshot,request_id,created_at)
- values(p_organization_id,p_employee_id,actor,jsonb_build_array(p_employee_id,p_start,p_end,p_timezone),
+ values(p_organization_id,case when private.current_role(p_organization_id)='EMPLOYEE'
+  then private.scoped_subject('report') else p_employee_id end,actor,jsonb_build_array(p_employee_id,p_start,p_end,p_timezone),
   now_at,'PENDING',1,now_at+interval '24 hours',
   private.evidence_snapshot(p_organization_id,
    case when p_employee_id is null and private.current_role(p_organization_id) in ('OWNER','ADMIN')

@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from reportlab.lib.utils import simpleSplit
 
 
 HEADINGS = (
@@ -139,11 +140,14 @@ def pdf_summary(snapshot: dict[str, Any], entries: list[dict[str, Any]]) -> byte
         lines.append("Sin jornadas en el periodo.")
     lines.append("SHA-256 del paquete: ver manifest.json. No es firma electronica cualificada.")
     for line in lines:
-        if y < 45:
-            page.showPage()
-            y = 790
-        page.drawString(35, y, line[:115])
-        y -= 16
+        for paragraph in line.splitlines():
+            for fragment in simpleSplit(paragraph, 'Helvetica', 9, 525):
+                if y < 45:
+                    page.showPage()
+                    y = 790
+                page.setFont('Helvetica', 9)
+                page.drawString(35, y, fragment)
+                y -= 13
     page.save()
     return stream.getvalue()
 
