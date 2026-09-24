@@ -16,6 +16,12 @@ create function private.retention_scope() returns uuid language sql stable set s
 $$;
 revoke all on function private.retention_scope() from public,anon,authenticated,service_role;
 grant execute on function private.retention_scope() to fichaje_retention;
+create function private.retention_expiry(p_at timestamptz,p_zone text) returns timestamptz
+language sql immutable set search_path='' as $$
+ select (date_trunc('month',p_at at time zone p_zone)+interval '1 month'+interval '4 years') at time zone p_zone
+$$;
+revoke all on function private.retention_expiry(timestamptz,text) from public,anon,authenticated,service_role;
+grant execute on function private.retention_expiry(timestamptz,text) to fichaje_retention;
 
 -- No trigger is disabled. UPDATE and TRUNCATE remain forbidden, as does every
 -- DELETE outside an explicitly authorized offline purge transaction.
@@ -87,9 +93,12 @@ begin
  if private.active_legal_hold(p_org,p_employee) then
   raise exception using errcode='42501',message='LEGAL_HOLD'; end if;
  select array_agg(s.id order by s.id) into v_ids from public.work_sessions s
+ left join lateral (select min(e.effective_at) as entered
+  from private.effective_timeline(p_org,p_employee,clock_timestamp()) e
+  where e.session_id=s.id and e.event_type='CLOCK_IN') entry on true
  where s.organization_id=p_org and s.employee_id=p_employee
-  and (s.created_at at time zone s.timezone)::date>=p_month
-  and (s.created_at at time zone s.timezone)::date<(p_month+interval '1 month')::date;
+  and (coalesce(entry.entered,s.created_at) at time zone s.timezone)::date>=p_month
+  and (coalesce(entry.entered,s.created_at) at time zone s.timezone)::date<(p_month+interval '1 month')::date;
  if v_ids is null then raise exception using errcode='22023',message='EMPTY_PERIOD'; end if;
  -- Month closure, last correction and last classification each start their own
  -- four-year clock. At the exact expiry instant the period becomes eligible.
@@ -100,11 +109,11 @@ begin
    where s.id=any(v_ids) and
    ((date_trunc('month',x.effective_at at time zone s.timezone)+interval '1 month'+interval '4 years')
     at time zone s.timezone)>p_cutoff)
-  or exists(select 1 from public.event_adjustments a where a.organization_id=p_org
-   and a.session_id=any(v_ids) and a.created_at+interval '4 years'>p_cutoff)
-  or exists(select 1 from public.hour_classifications c where c.organization_id=p_org
+  or exists(select 1 from public.event_adjustments a join public.work_sessions s on s.id=a.session_id and s.organization_id=a.organization_id
+   where a.organization_id=p_org and a.session_id=any(v_ids) and private.retention_expiry(a.created_at,s.timezone)>p_cutoff)
+  or exists(select 1 from public.hour_classifications c cross join public.work_sessions s where c.organization_id=p_org
    and c.employee_id=p_employee and c.local_month=p_month
-   and c.created_at+interval '4 years'>p_cutoff) then
+   and s.id=any(v_ids) and private.retention_expiry(c.created_at,s.timezone)>p_cutoff) then
   raise exception using errcode='22023',message='NOT_EXPIRED'; end if;
  if exists(select 1 from public.work_sessions s where s.id=any(v_ids) and (
   not exists(select 1 from private.effective_timeline(p_org,p_employee,clock_timestamp()) t
@@ -122,15 +131,15 @@ begin
   select 1 from jsonb_array_elements(r.proposal) op
   where (op->>'session_id')::uuid=any(v_ids));
  if exists(select 1 from public.correction_requests r where r.id=any(v_requests) and (
-  r.created_at+interval '4 years'>p_cutoff
+  exists(select 1 from public.work_sessions s where s.id=any(v_ids) and private.retention_expiry(r.created_at,s.timezone)>p_cutoff)
   or not exists(select 1 from public.correction_decisions d where d.organization_id=p_org and d.request_id=r.id)
   or exists(select 1 from jsonb_array_elements(r.proposal) op
    where (op->>'session_id')::uuid<>all(v_ids)))) then
   raise exception using errcode='22023',message='DEPENDENT_EVIDENCE'; end if;
  select array_agg(id order by id) into v_decisions from public.correction_decisions
  where organization_id=p_org and request_id=any(v_requests);
- if exists(select 1 from public.correction_decisions where organization_id=p_org
-  and id=any(v_decisions) and created_at+interval '4 years'>p_cutoff) then
+ if exists(select 1 from public.correction_decisions d cross join public.work_sessions s where d.organization_id=p_org
+  and d.id=any(v_decisions) and s.id=any(v_ids) and private.retention_expiry(d.created_at,s.timezone)>p_cutoff) then
   raise exception using errcode='22023',message='NOT_EXPIRED'; end if;
  if exists(select 1 from public.event_adjustments a where a.organization_id=p_org
   and (a.session_id=any(v_ids) or a.decision_id=any(v_decisions))

@@ -25,7 +25,7 @@ import h1 as h
 from journal_init import APP, ARCHIVE
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
 import export_worker
-from export_package import package
+from export_package import package, rows
 from recovery_journal import reconcile, replay, committed_entries
 import purge_operational
 
@@ -133,6 +133,10 @@ check(not before_session['adjustments'] and all(e['source']=='WEB' for e in befo
       'EXP-02 old materialized snapshot wholly precedes concurrent correction')
 check(len(after_session['adjustments'])==1 and after_session['effective'][-1]['source']=='CORRECTION',
       'EXP-02 subsequent snapshot wholly includes committed adjustment and effective result')
+check(after_session['policy']['id']==employee['policy'] and
+      after_session['effective'][-1]['actor_membership_id']==admin['membership'] and
+      after_session['originals'][1]['id']==events[1]['event_id'],
+      'EXP-04 applied policy, original event and correction author preserved')
 path = f"{org}/{before_job['job_id']}.zip"
 archive = export_worker.storage('GET',h.URL+'/storage/v1/object/fichaje-evidence/'+path,h.SERVICE)
 check(archive == package(before)[0], 'EXP-02 all delivered files come from exactly the same pre-correction snapshot')
@@ -246,8 +250,8 @@ check(h.api('/storage/v1/object/public/fichaje-evidence/'+path)[0]>=400,'EXP-05 
 with psycopg.connect(APP) as c:
     c.execute("""insert into private.kiosk_challenges(organization_id,device_id,employee_id,action,
       expected_version,request_id,token_hash,credential_version,created_at,expires_at)
-      values(%s,%s,%s,'CLOCK_IN',0,%s,%s,1,clock_timestamp()-interval '25 hours',
-      clock_timestamp()-interval '25 hours'+interval '60 seconds')""",(org,device,employee['employee'],uid(),'a'*64))
+      values(%s,%s,%s,'CLOCK_IN',0,%s,%s,1,statement_timestamp()-interval '25 hours',
+      statement_timestamp()-interval '25 hours'+interval '60 seconds')""",(org,device,employee['employee'],uid(),'a'*64))
     c.execute("insert into private.auth_attempt_buckets(organization_id,device_id,subject_hash,window_start) values(%s,%s,%s,clock_timestamp()-interval '25 hours')",(org,device,'b'*64))
     c.execute("insert into private.kiosk_network_buckets(organization_id,subject_hash,window_start) values(%s,%s,clock_timestamp()-interval '25 hours')",(org,'c'*64))
 purge_operational.run(APP,h.URL,h.SERVICE,org,sql('select clock_timestamp();'),'SYN-OP-EXPIRY')
@@ -326,6 +330,18 @@ with psycopg.connect(APP) as c:
       server_at,actor_membership_id,source,request_id) values(%s,%s,%s,5,'CLOCK_IN','2020-05-10 08:00+00',%s,'WEB',%s)""",
               (org,historical,open_session,owner['membership'],uid()))
 expect_db_error(purge,(org,historical,'2020-05-01','2026-09-01','SYN-INCOMPLETE'),'INCOMPLETE_PERIOD')
+code,open_job=request_export(owner,subject=historical,start='2020-05-01',end='2020-05-31')
+assert code==200
+open_snapshot=dbone('select snapshot from private.export_jobs where id=%s',(open_job['job_id'],))
+open_rows=rows(open_snapshot)
+check(len(open_rows)==1 and open_rows[0]['status']=='OPEN_SESSION' and
+      all(open_rows[0][k] is None for k in ('gross_seconds','break_seconds','net_seconds','computable_seconds')),
+      'EXP-04 actual PostgreSQL open session exports as incident with unknown totals')
+replay_key=uid()
+with psycopg.connect(APP) as c:
+    c.execute("""insert into private.idempotency_records(organization_id,principal_kind,principal_id,
+      operation,key,payload_sha256,response,created_at) values(%s,'USER',%s,'record_time_event',%s,%s,%s,'2020-01-10')""",
+      (org,owner['id'],replay_key,'d'*64,Jsonb({'session_id':session,'version':2})))
 
 # Later correction retains the entire original/adjustment/decision/request chain.
 corrected_args=h.employee_args(org)
@@ -350,8 +366,8 @@ with psycopg.connect(APP) as c:
       operation,effective_at,event_type,session_id,ordinal,created_at)
       values(%s,%s,%s,%s,%s,'REPLACE','2020-03-10 17:00+00','CLOCK_OUT',%s,2,'2022-03-15 00:00+00')""",
       (ca,org,corrected,cd,ce,cs))
-expect_db_error(purge,(org,corrected,'2020-03-01','2026-03-14','SYN-CORR-EARLY'),'NOT_EXPIRED')
-offline(purge,(org,corrected,'2020-03-01','2026-03-15 00:00+00','SYN-CORR-EXACT'))
+expect_db_error(purge,(org,corrected,'2020-03-01','2026-03-31 21:59:59+00','SYN-CORR-EARLY'),'NOT_EXPIRED')
+offline(purge,(org,corrected,'2020-03-01','2026-03-31 22:00+00','SYN-CORR-EXACT'))
 for table in ('work_sessions','time_events','correction_requests','correction_decisions','event_adjustments'):
     check(dbone(f'select count(*) from public.{table} where employee_id=%s',(corrected,))==0,
           'RET correction expiry removes dependency '+table)
@@ -397,6 +413,8 @@ offline('select private.record_legal_hold(%s,%s,%s,%s)',(foreign,other['employee
 offline(purge,purge_args)
 active_hold=offline('select private.record_legal_hold(%s,%s,%s,%s)',(org,historical,'Later active hold','SYN-LATER-HOLD'))
 check(dbone('select count(*) from public.work_sessions where id=%s',(session,))==0,'RET authorized purge removed exact historical session')
+check(dbone('select count(*) from private.idempotency_records where organization_id=%s and key=%s',(org,replay_key))==1,
+      'RET evidence-linked idempotency receipt survives purge to prevent historical replay')
 reconcile(APP,ARCHIVE)
 subprocess.run(['docker','exec','-i',h.CONTAINER,'pg_restore','-U','supabase_admin','-d','postgres',
     '--clean','--if-exists','--exit-on-error'],input=dump,check=True,stdout=subprocess.DEVNULL)
