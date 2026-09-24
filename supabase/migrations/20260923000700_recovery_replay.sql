@@ -13,7 +13,12 @@ create trigger immutable before update or delete or truncate on private.recovery
  for each statement execute function private.immutable_record();
 grant select on public.memberships to fichaje_retention;
 grant update(active,version) on public.memberships,public.employees to fichaje_retention;
+grant update(role) on public.memberships to fichaje_retention;
+grant update(membership_id) on public.employees to fichaje_retention;
 grant update(status) on public.organizations to fichaje_retention;
+grant update(state,open_session_id,version,last_sequence,last_event_at) on private.employee_state to fichaje_retention;
+create policy recovery_projection on private.employee_state for update to fichaje_retention
+ using(organization_id=private.retention_scope()) with check(organization_id=private.retention_scope());
 create policy retention_member_read on public.memberships for select to fichaje_retention using(organization_id=private.retention_scope());
 create policy recovery_member on public.memberships for update to fichaje_retention
  using(organization_id=private.retention_scope()) with check(organization_id=private.retention_scope());
@@ -50,8 +55,15 @@ begin
  elsif p_kind='IDENTITY_STATE' then
   t:=p_payload->>'table';
   if t not in ('memberships','employees') then raise exception 'INVALID_RECOVERY_TABLE'; end if;
-  execute format('update public.%I set active=$1,version=greatest(version,$2) where organization_id=$3 and id=$4',t)
-   using (p_payload->>'active')::boolean,(p_payload->>'version')::bigint,p_org,(p_payload->>'id')::uuid;
+  if t='memberships' then
+   update public.memberships set active=(p_payload->>'active')::boolean,
+    version=greatest(version,(p_payload->>'version')::bigint),role=(p_payload->>'role')::public.member_role
+    where organization_id=p_org and id=(p_payload->>'id')::uuid;
+  else
+   update public.employees set active=(p_payload->>'active')::boolean,
+    version=greatest(version,(p_payload->>'version')::bigint),membership_id=(p_payload->>'membership_id')::uuid
+    where organization_id=p_org and id=(p_payload->>'id')::uuid;
+  end if;
   get diagnostics n=row_count;
   if n<>1 then raise exception 'RECOVERY_MISSING_IDENTITY'; end if;
  elsif p_kind='ORGANIZATION_STATE' then
@@ -59,6 +71,12 @@ begin
   update public.organizations set status=p_payload->>'status' where id=p_org;
  elsif p_kind='PURGE' then
   if private.active_legal_hold(p_org,(p_payload->>'employee_id')::uuid) then raise exception 'LEGAL_HOLD'; end if;
+  select array_agg(value::uuid) into ids from jsonb_array_elements_text(p_payload->'ids'->'work_sessions');
+  update private.employee_state set state='OUT',open_session_id=null,
+   version=greatest(version,(p_payload->'projection'->>'version')::bigint),
+   last_sequence=greatest(last_sequence,(p_payload->'projection'->>'last_sequence')::bigint),
+   last_event_at=greatest(last_event_at,(p_payload->>'recorded_at')::timestamptz)
+   where organization_id=p_org and employee_id=(p_payload->>'employee_id')::uuid and open_session_id=any(ids);
   -- These identifiers certify a prior committed legal purge. An old restored
   -- session may lack a later closing event: replay removes that already-purged
   -- evidence by exact IDs, without recalculating or inventing missing hours.

@@ -356,7 +356,7 @@ grant usage on schema private to fichaje_export_worker;
 grant select on private.export_jobs to fichaje_export_worker;
 grant update(status,checksum,object_path) on private.export_jobs to fichaje_export_worker;
 create policy export_worker_read on private.export_jobs for select to fichaje_export_worker
- using(status='PENDING' and expires_at>clock_timestamp());
+ using(status in ('PENDING','READY') and expires_at>clock_timestamp());
 create policy export_worker_update on private.export_jobs for update to fichaje_export_worker
  using(status='PENDING' and expires_at>clock_timestamp())
  with check(status='READY' and checksum ~ '^[0-9a-f]{64}$'

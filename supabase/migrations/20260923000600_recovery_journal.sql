@@ -84,9 +84,14 @@ begin
   if new.status is distinct from old.status then
    perform private.journal_prepare(new.id,'ORGANIZATION_STATE',jsonb_build_object('id',new.id,'status',new.status));
   end if;
- elsif new.active is distinct from old.active then
+ elsif tg_table_name='memberships' then
+  if new.active is distinct from old.active or new.role is distinct from old.role then
+   perform private.journal_prepare(new.organization_id,'IDENTITY_STATE',jsonb_build_object(
+    'table',tg_table_name,'id',new.id,'active',new.active,'version',new.version,'role',new.role));
+  end if;
+ elsif new.active is distinct from old.active or new.membership_id is distinct from old.membership_id then
   perform private.journal_prepare(new.organization_id,'IDENTITY_STATE',jsonb_build_object(
-   'table',tg_table_name,'id',new.id,'active',new.active,'version',new.version));
+   'table',tg_table_name,'id',new.id,'active',new.active,'version',new.version,'membership_id',new.membership_id));
  end if;
  return new;
 end $$;

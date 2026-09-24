@@ -169,6 +169,8 @@ begin
   jsonb_build_object('counts',v_counts,'digest',v_digest));
  perform private.journal_prepare(p_org,'PURGE',jsonb_build_object('run_id',v_run,
   'employee_id',p_employee,'local_month',p_month,'cutoff',p_cutoff,
+  'recorded_at',clock_timestamp(),'projection',(select jsonb_build_object('version',version,
+   'last_sequence',last_sequence) from private.employee_state where organization_id=p_org and employee_id=p_employee),
   'authorization_ref',p_authorization,'counts',v_counts,'digest',v_digest,
   'ids',jsonb_build_object('work_sessions',v_ids,'time_events',v_events,
    'correction_requests',v_requests,'correction_decisions',v_decisions,

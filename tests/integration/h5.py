@@ -214,6 +214,8 @@ with tempfile.TemporaryDirectory(prefix='h5-signer-') as temp:
             check(status==200 and 0<link['expires_in']<=300,'EXP-05 signer revalidates real Auth and caps link to five minutes')
             with urllib.request.urlopen(link['url'],timeout=10) as response:
                 check(response.read()==archive,'EXP-05 signed URL downloads complete private package')
+                check('public' not in response.headers.get('Cache-Control','').lower(),
+                      'EXP-05 evidence is never served with public cache policy')
             with psycopg.connect(APP) as c:
                 c.execute("update private.export_jobs set expires_at=clock_timestamp()+interval '3 seconds' where id=%s",(before_job['job_id'],))
             status, short = sign(employee,before_job['job_id'])
@@ -410,6 +412,8 @@ check(not offline('select private.active_legal_hold(%s,%s)',(org,None)), 'RET-04
 check(dbone('select to_jsonb(e) from public.employees e where id=%s',(other['employee'],))==foreign_before,
       'RET-04 other tenant identity unaffected by replay')
 check(replay(APP,ARCHIVE)==0,'RET-04 replay idempotent')
+expect_db_error('select private.replay_recovery(%s,%s,%s,%s)',
+    (uid(),org,'PURGE',Jsonb({'ids':{'work_sessions':[session]}})),'UNVERIFIED_RECOVERY_ENTRY')
 with psycopg.connect(ARCHIVE) as c:
     payloads=c.execute('select payload from journal.entries where source_id=%s',(source,)).fetchall()
     forbidden={'display_name','code','reason','proposal','effective_at','server_at','pin_hash'}
