@@ -26,3 +26,16 @@ it('keeps CI unprivileged and repository backup scheduled/manual, with no databa
   expect(backupText).not.toMatch(/RCLONE_CONFIG|RCLONE_DESTINATION/);
   expect(run).toContain('"BACKUP_UPLOAD_DRIVE":"0"');
 });
+
+it('runs the H6 browser suite against a local ephemeral stack without secrets or artefact upload', () => {
+  const text = readFileSync('.github/workflows/e2e.yml', 'utf8');
+  const e2e = parse(text);
+  expect(e2e.permissions).toEqual({ contents: 'read' });
+  expect(text).not.toMatch(/\bsecrets\./);
+  expect(text).not.toMatch(/upload-artifact|--trace|--video/);
+  const run = JSON.stringify(e2e.jobs.browser.steps);
+  expect(run).toContain('supabase db reset --local --no-seed');
+  expect(run).toContain('npx playwright test');
+  expect(run).toContain('scripts/scan_secrets.mjs dist test-results');
+  expect(JSON.stringify(parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs.validate.steps)).toContain('npm run scan:secrets');
+});
