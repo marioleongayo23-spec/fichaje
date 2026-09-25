@@ -90,6 +90,7 @@ describe('kiosk terminal flow (contract stub)', () => {
     expect(screen.queryByRole('button', { name: 'Finalizar pausa' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Salida' }));
     fireEvent.click(screen.getByRole('button', { name: 'Enviando…' })); // double tap ignored
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' })); // outcome cannot be hidden
     expect(gateway.recordCalls).toHaveLength(1);
     expect(gateway.recordCalls[0]).toEqual(['e1', 'CLOCK_OUT', 3, identity.challenges.CLOCK_OUT]);
     expect(screen.queryByText('Salida registrada')).toBeNull();

@@ -28,6 +28,11 @@ async function waitFor(port: number, child: ReturnType<typeof spawn>) {
 export async function startServices() {
   mkdirSync(RUN_DIR, { recursive: true });
   const { url, anon, service } = stack();
+  // Identity changes are journaled (H5) in a separate database; fail fast
+  // with the reproducible setup step instead of opaque 4xx/5xx later.
+  if (sql("select count(*) from pg_database where datname='fichaje_recovery';") !== '1') {
+    throw new Error('Recovery journal missing: run python3 tests/integration/journal_init.py after supabase db reset');
+  }
   const role = `kiosk_e2e_${randomBytes(4).toString('hex')}`;
   const password = randomBytes(32).toString('hex');
   // Same shape as the H4 suite: an ephemeral login inheriting only fichaje_gateway.

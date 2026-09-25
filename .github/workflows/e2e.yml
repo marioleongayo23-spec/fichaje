@@ -50,8 +50,10 @@ jobs:
             printf 'SUPABASE_INTERNAL_IMAGE_REGISTRY=%s\n' "$SUPABASE_INTERNAL_IMAGE_REGISTRY" >> "$GITHUB_ENV"
             sleep 5
           done
-      - name: Rebuild from empty database
-        run: supabase db reset --local --no-seed
+      - name: Rebuild from empty database and provision the H5 recovery journal
+        run: |
+          supabase db reset --local --no-seed
+          python3 tests/integration/journal_init.py
       # Real Auth/PostgREST/Storage/PostgreSQL, real H4 gateway and H5 signer on
       # loopback with ephemeral synthetic keys. No traces, videos or
       # screenshots are produced and no artefact is uploaded.

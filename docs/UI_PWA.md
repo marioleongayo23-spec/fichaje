@@ -102,7 +102,8 @@ H4 ampliada (fugas, carreras, límites) y E2E del terminal contra backend real.
 - Unitarias/componentes (Vitest, `npm test`): tiempo/DST, totales y paridad con `computable_month`,
   constructor de correcciones, errores, códigos, configuración/CSP, política del service worker,
   terminal de kiosco (stub), guardas de código fuente y escáner de secretos.
-- Navegador real (Playwright, `npm run test:e2e`, requiere Supabase local, Deno y Python): 44 pruebas
+- Navegador real (Playwright, `npm run test:e2e`; requiere Supabase local reconstruido con
+  `supabase db reset --local --no-seed` y `python3 tests/integration/journal_init.py`, Deno y Python): 44 pruebas
   en Chromium escritorio y móvil contra Auth/PostgREST/Storage/PostgreSQL reales, gateway H4 y
   firmador H5 reales. Sin trazas, vídeos ni capturas. `scripts/scan_secrets.mjs` revisa `dist` y
   `test-results`.

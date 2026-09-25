@@ -144,7 +144,9 @@ export function KioskTerminal({ gateway, online }: { gateway: KioskGateway; onli
               </button>
             ))}
           </div>
-          <button type="button" className="btn btn-secondary btn-kiosk" onClick={() => reset()}>Cancelar</button>
+          {/* While sending, the outcome must be shown: cancelling is not offered. */}
+          <button type="button" className="btn btn-secondary btn-kiosk" aria-disabled={step.kind === 'sending'}
+            onClick={() => step.kind === 'choose' && reset()}>Cancelar</button>
         </section>
       )}
       {step.kind === 'done' && (
