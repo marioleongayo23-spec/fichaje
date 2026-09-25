@@ -1,5 +1,18 @@
 # CURRENT_STATE — 2026-09-25
 ## Hito autorizado
+
+### HITO 6 — bloqueado por contrato de kiosco
+
+**ESTADO: BLOCKED (2026-09-25).** HITO 6 fue autorizado expresamente, pero se detuvo antes de modificar H1-H5 al identificar `KIO-H6-01`, un bloqueo real entre el gateway H4 y la interfaz exigida por H6.
+
+El endpoint `kiosk/authenticate` exige que el cliente envíe `action` y `expected_version` junto con código y PIN. `private.kiosk_auth_begin` sí resuelve internamente el empleado y su credencial, pero el gateway devuelve únicamente `challenge`, `employee_id`, `request_id` y `expires_in`; no devuelve el estado horario ni la versión actual. El dispositivo técnico no tiene membership ni acceso a `get_employee_state`, al directorio o a tablas laborales. No existe otro endpoint H4 autorizado para consultar esos dos datos.
+
+Por ello una UI H6 no puede, después de autenticar, mostrar únicamente las acciones válidas para OUT/WORKING/PAUSED ni enviar la versión esperada correcta. Adivinar una versión, pedirla al empleado, conservar historia laboral en el cliente o probar acciones sucesivas vulneraría los contratos de H2/H4/H6 y la regla de mínima revelación del kiosco. También impediría demostrar de forma legítima los flujos de challenge caducado/reutilizado y ACK perdido requeridos por la puerta de salida.
+
+Evidencia revisada: `supabase/functions/kiosk/index.ts` (rutas `authenticate` y `record`) y `supabase/migrations/20260923000100_kiosk.sql` (`private.kiosk_auth_begin`, `private.kiosk_auth_finish` y `private.kiosk_record_event`). No se modificaron migraciones, RLS, roles, reglas de negocio ni semántica backend. El frontend parcial de investigación fue descartado; este cambio solo registra el bloqueo.
+
+Desbloqueo necesario: aprobar un cambio backend mínimo y revisable que entregue, tras validar código+PIN y sin listar empleados, el estado/versión autoritativos y las acciones permitidas, manteniendo el challenge ligado a la acción finalmente elegida o introduciendo un flujo equivalente seguro. Tras aprobar y probar ese contrato H4, HITO 6 puede retomarse en esta misma rama. OPS-02 permanece después de H6 y antes de H7.
+
 HITO 0 Bootstrap aprobado por el usuario e integrado en `main` mediante PR #1 el 2026-09-21.
 Rama de origen: `astra/hito-0-bootstrap`. Merge: `f9a02bb150b424d9cf0a47b741496c997b7bc085`.
 HITO 1 aprobado por el usuario e integrado en `main` mediante PR #4 el 2026-09-22.
@@ -13,7 +26,7 @@ Rama de origen: `astra/hito-4-kiosco`. Merge: `76922f352a64f3bbf0d1d7ece2c7ae155
 
 HITO 5 aprobado por el usuario e integrado en `main` mediante PR #9 el 2026-09-25.
 Rama de origen: `astra/hito-5-informes-retencion`. Merge: `748186125194cf4819357d57a4d8567a8cdf3bab`.
-HITO 6 no iniciado. OPS-02 permanece después de H6 y antes de H7.
+HITO 6 autorizado y bloqueado por KIO-H6-01. OPS-02 permanece después de H6 y antes de H7.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -178,7 +191,7 @@ producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
 
 ## Siguiente paso
-HITO 5 cerrado. Esperar autorización expresa antes de iniciar H6. OPS-02 se implementará después de H6 y antes de H7.
+HITO 5 cerrado. HITO 6 autorizado pero bloqueado por KIO-H6-01. Esperar autorización expresa para corregir el contrato H4 mínimo descrito arriba; no continuar la UI ni iniciar OPS-02. OPS-02 se implementará después de H6 y antes de H7.
 
 ## HITO 3 — correcciones append-only
 ESTADO: PASS — HITO 3 aprobado por el usuario y PR #7 integrado en `main`.
