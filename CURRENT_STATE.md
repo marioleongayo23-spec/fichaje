@@ -306,22 +306,30 @@ Evidencia del código `a820a417d03b543ebb8ff7470cffc0ee3e07c755`:
 Este commit documental registra la evidencia anterior y no cambia código probado.
 PR #8 integrado por autorización expresa del usuario. Sin iniciar H5 ni OPS-02; sin producción, secretos reales ni datos reales. OPS-02 permanece después de H6 y antes de H7. Trabajo detenido.
 
-## HITO 5 — trabajo en curso
-ESTADO: FAIL / INCOMPLETO. PR #9 es borrador y no se debe integrar.
-Implementados parcialmente: snapshot materializado, clasificación append-only, paquete real CSV/JSON/PDF,
-worker y firmador privados, holds append-only y purga operativa acotada.
-Continuación: añadidas purga laboral offline por periodo con RLS acotada y manifiesto transaccional,
-entrega controlada con recibo, journal síncrono en base PostgreSQL separada y replay offline.
-La suite H5 ahora incluye concurrencia real de worker/corrección, Storage/Auth/firmador reales,
-fallos forzados de manifest/audit/Storage/journal y pg_dump/pg_restore sintético con replay.
-Estas ampliaciones siguen pendientes de ejecución completa: código y tests escritos no equivalen a PASS.
-Último bloqueo observado de CI: aprovisionamiento efímero del foreign server del journal sin USAGE
-sobre dblink_fdw; corregido en el inicializador sintético, pendiente de revalidación.
-Evidencia parcial del commit `13b27bad2e7e7e33710cd32512126851f8014f7f`:
-- [Database run 35879913197](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35879913197):
-  PASS en Supabase local efímero reconstruido desde vacío: 275 aserciones SQL/pgTAP,
-  4 tests de generación CSV/JSON/PDF y DST, y 356 checks H1-H4 de Auth/REST/Storage/concurrencia.
-  Las pruebas nuevas H5 cubren solo una parte de EXP/RET; este PASS de CI no aprueba el hito.
-- [CI run 35879913192](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35879913192):
-  PASS, 21 tests frontend, typecheck, lint y build.
-No hay producción, datos reales, secretos reales ni backup DB. OPS-02 permanece después de H6 y antes de H7.
+## HITO 5 — implementación completa, pendiente de aprobación
+ESTADO TÉCNICO: PASS. HITO 5 todavía no está aprobado ni integrado; PR #9 listo para revisión.
+
+Entregado: snapshot materializado consistente; exportación privada determinista CSV/JSON/PDF;
+clasificaciones append-only; entrega controlada con recibo; purga laboral y operativa mediante
+proceso offline mínimo; holds append-only; manifiestos transaccionales; journal PostgreSQL separado
+de bajas, holds, liberaciones y purgas; y replay idempotente después de restore.
+
+Evidencia del código `263e1e0b983c74fbd60dc449f310dc83a49b9237`, 2026-09-24:
+- [Database H1 + H2 + H3 + H4 + H5, run 35955532919](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35955532919): PASS.
+  Supabase local efímero reconstruido desde vacío, PostgreSQL 17, Auth, PostgREST y Storage reales.
+  **297 aserciones SQL/pgTAP PASS**, **4 tests de generación CSV/JSON/PDF/DST PASS** y
+  **429 checks de integración PASS: 356 H1-H4 + 73 H5**. Sin tests omitidos.
+- H5 prueba transacciones PostgreSQL concurrentes: una corrección aprobada durante la generación
+  conserva un paquete íntegramente anterior al cutoff, nunca híbrido. Prueba Auth y RLS de empleado,
+  OWNER/ADMIN, kiosco y cross-tenant; Storage privado, URL firmada y expirada, revocación y TTL.
+- Purga laboral real leaf-first sin CASCADE, plazo exacto y ampliación por correcciones, sesiones
+  incompletas bloqueadas, receipts conservados, holds de organización/empleado, counts/digest y
+  rollback completo ante fallos forzados de audit, manifest, Storage y journal.
+- Restore sintético real: `pg_dump`, cambios posteriores, `pg_restore` sobre PostgreSQL y replay del
+  journal externo. Verifica bajas, holds/liberaciones, tombstones, RLS, idempotencia y otro tenant intacto.
+- [CI general, run 35955532862](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35955532862): PASS.
+  Typecheck, lint, **21 tests**, build, shell y whitespace.
+- Verificación local final: `npm run check`, Python compile, shell y `git diff --check` PASS.
+
+Todo usa datos y credenciales exclusivamente sintéticos y efímeros. No hay producción, backup DB real,
+datos/secretos reales, UI/PWA, H6 ni OPS-02. OPS-02 permanece después de H6 y antes de H7.
