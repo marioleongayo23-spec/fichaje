@@ -8,7 +8,7 @@ import { clearStoredSession, KIOSK_DEVICE_KEY, KIOSK_STORAGE_KEY } from '../lib/
 import { createSessionClient } from '../lib/supabase';
 import { formatDate, formatTime } from '../lib/time';
 import { Field, LiveRegion, Loading, Notice } from '../ui/components';
-import { H4KioskGateway, type KioskGateway, type KioskIdentity } from './gateway';
+import { HttpKioskGateway, type KioskGateway, type KioskIdentity } from './gateway';
 import { KioskTerminal } from './KioskTerminal';
 
 function readDevice(): KioskIdentity | null {
@@ -39,7 +39,7 @@ export function KioskApp({ config }: { config: AppConfig }) {
     return () => { active = false; data.subscription.unsubscribe(); };
   }, [client]);
 
-  const gateway: KioskGateway | null = useMemo(() => device ? new H4KioskGateway(config.kioskGatewayUrl, device,
+  const gateway: KioskGateway | null = useMemo(() => device ? new HttpKioskGateway(config.kioskGatewayUrl, device,
     async () => (await client.auth.getSession()).data.session?.access_token ?? null) : null, [client, config, device]);
 
   const unconfigure = async () => {
@@ -70,14 +70,9 @@ export function KioskApp({ config }: { config: AppConfig }) {
             window.localStorage.setItem(KIOSK_DEVICE_KEY, JSON.stringify(identity));
             setDevice(identity);
           }} />
-        ) : gateway && gateway.supportsIdentification ? (
+        ) : gateway ? (
           <KioskTerminal gateway={gateway} online={online} />
-        ) : (
-          <Notice tone="warning" title="El fichaje en este kiosco todavía no está disponible.">
-            <p>El dispositivo está configurado, pero el servicio aún no permite al kiosco identificar a la persona y conocer su estado. No se ha registrado ni se registrará ningún fichaje desde aquí.</p>
-            <p>Sigue el procedimiento de contingencia de tu empresa y solicita después la corrección de tu registro.</p>
-          </Notice>
-        )}
+        ) : <Loading />}
         {device && session && (
           <details className="details kiosk-options">
             <summary>Opciones del dispositivo</summary>

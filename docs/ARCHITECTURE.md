@@ -77,4 +77,5 @@ limitaciones de despliegue y umbral adicional 60/15 min en SECURITY.md.
 SPA sin framework adicional: sesión Supabase Auth, selector de tenant en memoria, RPC/lecturas RLS
 H1-H5 sin cambios y confirmación solo tras ACK. Service worker de shell público, sin cola offline.
 Gateway de kiosco y firmador de exportaciones por rutas del mismo origen (proxy inverso en despliegue,
-decisión H7). El kiosco queda en fallo seguro por el bloqueo H4-KIOSK-01. Ver `docs/UI_PWA.md`.
+decisión H7). El kiosco identifica con código+PIN y el servidor devuelve estado, versión y un
+challenge por acción legal (KIO-H6-01, único cambio backend de H6). Ver `docs/UI_PWA.md`.

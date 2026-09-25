@@ -1,6 +1,7 @@
 # H6 — interfaz y PWA (decisiones y límites)
 Revisado 2026-09-25. Documento técnico: describe decisiones de producto/implementación de H6,
-no requisitos legales. Sin cambios en migraciones, RLS, RPC, gateway ni semántica backend H1-H5.
+no requisitos legales. Único cambio backend: KIO-H6-01 (identificación de kiosco), autorizado
+expresamente el 2026-09-25; el resto de H1-H5 (RLS, RPC, motor, auditoría) no cambia.
 
 ## Alcance entregado
 React + TypeScript + Vite, sin framework adicional ni router externo. Español, mobile-first.
@@ -21,11 +22,13 @@ React + TypeScript + Vite, sin framework adicional ni router externo. Español, 
   de kiosco), personas y roles (invitación, rol, retirada de acceso, transferencia de propiedad),
   horarios versionados, bandeja de correcciones, clasificación de horas, exportaciones con entrega
   controlada y kioscos (preparar/revocar).
-- **Kiosco** (`/kiosco`): configuración del dispositivo con su identidad técnica, pantalla neutra y
-  fallo seguro. El flujo interactivo está bloqueado por contrato (ver H4-KIOSK-01).
+- **Kiosco** (`/kiosco`): configuración del dispositivo con su identidad técnica; código → PIN →
+  estado autoritativo y solo las acciones legales → confirmación tras ACK; sin directorio, navegación
+  ni exportaciones; código/PIN borrados al enviarse y pantalla limpia antes de 15 s (14 s sin
+  interacción; recibo a los 10 s).
 
 ## Confirmación de fichaje (regla absoluta)
-Nada se confirma hasta el ACK de `record_time_event` (recibo tras COMMIT): acción, hora del servidor
+Nada se confirma hasta el ACK de `record_time_event` o de `kiosk/record` (recibo tras COMMIT): acción, hora del servidor
 (`server_at`, con segundos y zona) y estado resultante. Mientras tanto solo «Enviando…».
 - Sin respuesta, timeout o 5xx: **resultado desconocido**. «Comprobar resultado» reenvía la misma
   petición con el mismo `request_id` y `expected_version`: el servidor devuelve el mismo recibo si
@@ -81,29 +84,38 @@ pruebas las sirve el proxy de `vite preview`. En producción hará falta un prox
 origen o una lista de orígenes explícita en esas funciones (cambio backend que requiere aprobación).
 Tras un proxy, SEC-H4-01 agrupa los intentos por la dirección del proxy: revisar antes del piloto.
 
-## Bloqueo H4-KIOSK-01 (no resuelto en H6)
-**Hecho**: `/authenticate` exige `action` y `expected_version` antes de verificar el PIN y vincula el
-challenge a ellos; ningún endpoint accesible al kiosco devuelve estado ni versión del empleado (el
-dispositivo no tiene membresía y `get_employee_state` lo rechaza). Las pruebas H4 obtienen la versión
-con SQL privilegiado. Por tanto el kiosco no puede mostrar las acciones permitidas ni enviar una
-versión válida: el flujo código → PIN → acciones → ACK no puede funcionar contra el backend real.
-**Decisión del usuario (2026-09-25)**: continuar H6 sin tocar backend y cerrar H6 como BLOCKED.
-**Estado en H6**: el kiosco configurado muestra «fichaje no disponible» y no pide PIN ni envía nada.
-El flujo completo existe tras el adaptador `KioskGateway` (`supportsIdentification=false` con el
-contrato H4) y se prueba con un stub del paso ausente, sin valor de evidencia de backend.
-**Propuesta mínima (requiere autorización y revisión de seguridad)**: permitir `/authenticate` con
-solo código+PIN (mismo Argon2id, límites 5/30/60, suelo de 300 ms y error genérico) que devuelva
-únicamente `state` y `version` del empleado autenticado y un challenge por cada acción permitida en
-ese estado, con el binding actual (tenant, empleado, dispositivo, acción, versión, request_id,
-TTL 60 s, versión de credencial). `/record` no cambia. Pruebas: pgTAP de privilegios, integración
-H4 ampliada (fugas, carreras, límites) y E2E del terminal contra backend real.
+## KIO-H6-01 — identificación de kiosco (resuelto en H6)
+**Problema** (detectado al iniciar H6): `/authenticate` exigía `action` y `expected_version` antes de
+verificar el PIN y ningún endpoint accesible al kiosco devolvía estado ni versión, así que el kiosco no
+podía mostrar las acciones permitidas. **Autorización**: el 2026-09-25 se autorizó corregirlo con un
+contrato cerrado. **Contrato implementado** (`20260925000100_kiosk_identification.sql`, gateway Deno):
+- `/authenticate` recibe solo `organization_id`, `device_id`, `code`, `pin`. Cualquier campo antiguo
+  (`action`, `expected_version`, `request_id`, `employee_id`) se rechaza con el error genérico.
+- Tras el PIN correcto el servidor obtiene internamente empleado, estado (OUT/WORKING/PAUSED) y versión y
+  devuelve únicamente `state`, `version`, `actions` y un challenge por acción legal
+  (`{action, challenge, request_id}`): OUT→CLOCK_IN; WORKING→BREAK_START+CLOCK_OUT;
+  PAUSED→BREAK_END+CLOCK_OUT. Nunca devuelve el identificador, código ni nombre del empleado.
+- Cada challenge queda ligado en servidor a organización, dispositivo, empleado, acción,
+  `expected_version`, su propio `request_id`, versión de credencial y TTL ≤ 60 s; no hay challenge
+  genérico. Los hermanos comparten `grant_id`: ejecutar uno los consume todos, así que el segundo no
+  puede generar evento (403); dos grants distintos sobre la misma versión acaban en VERSION_CONFLICT.
+- `/record` ya no acepta `employee_id`: el challenge identifica al empleado. Se mantienen Argon2id,
+  pepper, límites 5 empleado / 30 dispositivo / 60 red, IP minimizada (HMAC), errores genéricos,
+  suelo de 300 ms, `no-store`, hashes de challenge, idempotencia, revocación, recuperación de ACK,
+  máquina H2 y RLS/FORCE RLS. El dispositivo sigue sin acceso libre a estado, eventos, directorio,
+  historial ni RPC humanas.
+- UI: el adaptador `HttpKioskGateway` valida estrictamente la respuesta (forma desconocida = fallo de
+  identificación) y el terminal muestra solo las acciones ofrecidas por el servidor. Tras un resultado
+  desconocido, «Comprobar» reenvía la misma tupla; si entonces el servidor la rechaza, la UI no afirma
+  que no se registró: pide volver a identificarse para ver el estado real.
 
 ## Pruebas
 - Unitarias/componentes (Vitest, `npm test`): tiempo/DST, totales y paridad con `computable_month`,
   constructor de correcciones, errores, códigos, configuración/CSP, política del service worker,
-  terminal de kiosco (stub), guardas de código fuente y escáner de secretos.
+  terminal de kiosco y adaptador KIO-H6-01 (parser estricto y cuerpos exactos enviados), guardas de
+  código fuente, workflows y escáner de secretos.
 - Navegador real (Playwright, `npm run test:e2e`; requiere Supabase local reconstruido con
-  `supabase db reset --local --no-seed` y `python3 tests/integration/journal_init.py`, Deno y Python): 44 pruebas
+  `supabase db reset --local --no-seed` y `python3 tests/integration/journal_init.py`, Deno y Python): 45 pruebas
   en Chromium escritorio y móvil contra Auth/PostgREST/Storage/PostgreSQL reales, gateway H4 y
   firmador H5 reales. Sin trazas, vídeos ni capturas. `scripts/scan_secrets.mjs` revisa `dist` y
   `test-results`.

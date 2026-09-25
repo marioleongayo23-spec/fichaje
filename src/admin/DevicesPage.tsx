@@ -37,9 +37,6 @@ export function DevicesPage() {
       <PageHeader title="Kioscos">
         <p>Dispositivos compartidos para fichar con código y PIN, pensados para personas sin correo. El kiosco no puede ver el directorio, exportaciones ni la gestión.</p>
       </PageHeader>
-      <Notice tone="warning" title="Fichaje en kiosco pendiente de ampliación del servicio.">
-        <p>El servicio actual no permite al kiosco conocer el estado de la persona tras validar el PIN, así que el kiosco muestra un aviso de no disponibilidad y no registra fichajes. Puedes preparar dispositivos y PIN; la empresa debe usar su procedimiento de contingencia mientras tanto.</p>
-      </Notice>
       <button type="button" className="btn btn-primary" onClick={() => { setStatus(null); setProvisioning(true); }}>Preparar un kiosco</button>
       <LiveRegion tone="success" message={status} />
       {devices.loading && <Loading />}

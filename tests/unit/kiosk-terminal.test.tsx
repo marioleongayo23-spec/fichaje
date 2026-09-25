@@ -1,18 +1,19 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { H4KioskGateway, IDENTIFICATION_UNAVAILABLE, type Identification, type KioskChallenge, type KioskGateway } from '../../src/kiosk/gateway';
+import { HttpKioskGateway, parseIdentification, type Identification, type KioskChallenge, type KioskGateway } from '../../src/kiosk/gateway';
 import { CLEAR_AFTER_MS, KioskTerminal, RECEIPT_MS } from '../../src/kiosk/KioskTerminal';
 import { ApiError } from '../../src/lib/errors';
-import type { ClockReceipt, TimeAction } from '../../src/domain/types';
+import type { ClockReceipt } from '../../src/domain/types';
 
-// The terminal flow is exercised with a contract stub of the identification
-// step that H4 lacks (documented blocker). This proves UI behaviour only; it is
-// NOT evidence against the real backend.
+// UI behaviour with a stub of the KIO-H6-01 gateway contract. The real
+// gateway, database and browser are exercised in kio_h6.py and kiosk.e2e.ts.
 const PIN = '48213975';
+const R1 = '6f1f2c1e-8d4b-4c3a-9e2f-0a1b2c3d4e5f', R2 = '7a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d';
 const identity: Identification = {
-  employeeId: 'e1', state: 'WORKING', version: 3, expiresIn: 60,
-  challenges: { BREAK_START: { challenge: 'c'.repeat(64), requestId: 'r1' }, CLOCK_OUT: { challenge: 'd'.repeat(64), requestId: 'r2' } },
+  state: 'WORKING', version: 3, actions: ['BREAK_START', 'CLOCK_OUT'],
+  challenges: { BREAK_START: { action: 'BREAK_START', challenge: 'c'.repeat(64), requestId: R1 },
+    CLOCK_OUT: { action: 'CLOCK_OUT', challenge: 'd'.repeat(64), requestId: R2 } },
 };
 const receipt: ClockReceipt = { event_id: 'ev', session_id: 's', server_at: '2026-09-22T15:00:07.123456+00:00', state: 'OUT', version: 4, sequence: 9, request_id: 'r2' };
 
@@ -23,14 +24,13 @@ function deferred<T>() {
 }
 
 class StubGateway implements KioskGateway {
-  readonly supportsIdentification = true;
   identifyCalls: [string, string][] = [];
-  recordCalls: [string, TimeAction, number, KioskChallenge][] = [];
+  recordCalls: [number, KioskChallenge][] = [];
   identifyResult: () => Promise<Identification> = () => Promise.resolve(identity);
   recordResults: (() => Promise<ClockReceipt>)[] = [];
   identify(code: string, pin: string) { this.identifyCalls.push([code, pin]); return this.identifyResult(); }
-  record(employee: string, action: TimeAction, version: number, challenge: KioskChallenge) {
-    this.recordCalls.push([employee, action, version, challenge]);
+  record(version: number, challenge: KioskChallenge) {
+    this.recordCalls.push([version, challenge]);
     return (this.recordResults.shift() ?? (() => Promise.resolve(receipt)))();
   }
 }
@@ -92,7 +92,7 @@ describe('kiosk terminal flow (contract stub)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enviando…' })); // double tap ignored
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' })); // outcome cannot be hidden
     expect(gateway.recordCalls).toHaveLength(1);
-    expect(gateway.recordCalls[0]).toEqual(['e1', 'CLOCK_OUT', 3, identity.challenges.CLOCK_OUT]);
+    expect(gateway.recordCalls[0]).toEqual([3, identity.challenges.CLOCK_OUT]);
     expect(screen.queryByText('Salida registrada')).toBeNull();
     await act(async () => { ack.resolve(receipt); await ack.promise; });
     expect(screen.getByRole('heading', { name: 'Salida registrada' })).toBeTruthy();
@@ -100,7 +100,8 @@ describe('kiosk terminal flow (contract stub)', () => {
     act(() => { vi.advanceTimersByTime(RECEIPT_MS); });
     expect(screen.queryByText('Salida registrada')).toBeNull();
     expect(screen.getByLabelText('Código de empleado')).toBeTruthy();
-    expect(RECEIPT_MS).toBeLessThanOrEqual(15_000);
+    expect(RECEIPT_MS).toBeLessThan(15_000);
+    expect(CLEAR_AFTER_MS).toBeLessThan(15_000);
   });
 
   it('shows an unknown result on a lost ACK and retries the same tuple', async () => {
@@ -118,6 +119,42 @@ describe('kiosk terminal flow (contract stub)', () => {
     expect(screen.getByRole('heading', { name: 'Salida registrada' })).toBeTruthy();
   });
 
+  it('never claims "not recorded" when a retry after an unknown outcome is refused', async () => {
+    const gateway = new StubGateway();
+    gateway.recordResults = [() => Promise.reject(new ApiError('timeout', 'TIMEOUT')), () => Promise.reject(new ApiError('forbidden', 'AUTH_FAILED', 403))];
+    render(<KioskTerminal gateway={gateway} online />);
+    await identify(gateway);
+    fireEvent.click(screen.getByRole('button', { name: 'Salida' }));
+    await flush();
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobar' }));
+    await flush();
+    expect(screen.getByRole('alert').textContent).toMatch(/No se ha podido confirmar/);
+    expect(screen.getByRole('alert').textContent).not.toMatch(/No se ha registrado/);
+    expect(screen.getByLabelText('Código de empleado')).toBeTruthy();
+  });
+
+  it('reports a refused first attempt as not recorded and returns to identification', async () => {
+    const gateway = new StubGateway();
+    gateway.recordResults = [() => Promise.reject(new ApiError('forbidden', 'AUTH_FAILED', 403))];
+    render(<KioskTerminal gateway={gateway} online />);
+    await identify(gateway);
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar pausa' }));
+    await flush();
+    expect(gateway.recordCalls[0]).toEqual([3, identity.challenges.BREAK_START]);
+    expect(screen.getByRole('alert').textContent).toMatch(/No se ha registrado el fichaje/);
+    expect(screen.queryByText('Estado: Trabajando')).toBeNull();
+  });
+
+  it('shows only the actions the server offered', async () => {
+    const gateway = new StubGateway();
+    gateway.identifyResult = () => Promise.resolve({ state: 'OUT', version: 0, actions: ['CLOCK_IN'],
+      challenges: { CLOCK_IN: { action: 'CLOCK_IN', challenge: 'e'.repeat(64), requestId: R1 } } });
+    render(<KioskTerminal gateway={gateway} online />);
+    await identify(gateway);
+    expect(screen.getByRole('heading', { name: 'Estado: Fuera de jornada' })).toBeTruthy();
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Entrada', 'Cancelar']);
+  });
+
   it('answers identification failures generically and clears after inactivity', async () => {
     const gateway = new StubGateway();
     gateway.identifyResult = () => Promise.reject(new ApiError('forbidden', 'FORBIDDEN'));
@@ -128,7 +165,7 @@ describe('kiosk terminal flow (contract stub)', () => {
     expect(screen.getByRole('alert').textContent).toBe('');
   });
 
-  it('drops the identified state and challenges after 15 s without interaction', async () => {
+  it('drops the identified state and challenges before 15 s without interaction', async () => {
     const gateway = new StubGateway();
     render(<KioskTerminal gateway={gateway} online />);
     await identify(gateway);
@@ -152,10 +189,46 @@ describe('kiosk terminal flow (contract stub)', () => {
   });
 });
 
-describe('H4 gateway adapter', () => {
-  it('declares that the approved H4 contract cannot identify an employee state', async () => {
-    const gateway = new H4KioskGateway('/gateway/kiosk', { organizationId: 'o', deviceId: 'd' }, async () => 'token');
-    expect(gateway.supportsIdentification).toBe(false);
-    await expect(gateway.identify()).rejects.toMatchObject({ code: IDENTIFICATION_UNAVAILABLE });
+describe('KIO-H6-01 gateway adapter', () => {
+  const valid = { state: 'WORKING', version: 7, actions: ['BREAK_START', 'CLOCK_OUT'], challenges: [
+    { action: 'BREAK_START', challenge: 'a'.repeat(64), request_id: R1 }, { action: 'CLOCK_OUT', challenge: 'b'.repeat(64), request_id: R2 }] };
+
+  it('parses state, version, legal actions and one challenge per action', () => {
+    expect(parseIdentification(valid)).toEqual({ state: 'WORKING', version: 7, actions: ['BREAK_START', 'CLOCK_OUT'], challenges: {
+      BREAK_START: { action: 'BREAK_START', challenge: 'a'.repeat(64), requestId: R1 },
+      CLOCK_OUT: { action: 'CLOCK_OUT', challenge: 'b'.repeat(64), requestId: R2 } } });
+  });
+
+  it.each([
+    ['unknown state', { ...valid, state: 'AWAY' }], ['negative version', { ...valid, version: -1 }], ['fractional version', { ...valid, version: 1.5 }],
+    ['no actions', { ...valid, actions: [], challenges: [] }], ['action without challenge', { ...valid, actions: ['BREAK_START', 'BREAK_END'] }],
+    ['duplicate challenge', { ...valid, challenges: [valid.challenges[0], valid.challenges[0]] }],
+    ['malformed secret', { ...valid, challenges: [{ ...valid.challenges[0], challenge: 'x' }, valid.challenges[1]] }],
+    ['malformed request', { ...valid, challenges: [{ ...valid.challenges[0], request_id: 'r1' }, valid.challenges[1]] }],
+    ['unknown action', { ...valid, actions: ['BREAK_START', 'NAP'], challenges: [valid.challenges[0], { ...valid.challenges[1], action: 'NAP' }] }],
+    ['not an object', null],
+  ])('rejects %s', (_label, raw) => {
+    expect(() => parseIdentification(raw)).toThrow('INVALID_RESPONSE');
+  });
+
+  it('sends only code+PIN to authenticate and the bound tuple to record', async () => {
+    const bodies: unknown[] = [];
+    const urls: string[] = [];
+    const replies = [valid, { event_id: 'ev', session_id: 's', server_at: '2026-09-22T15:00:07Z', state: 'PAUSED', version: 8, sequence: 3, request_id: R1 }];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+      urls.push(url); bodies.push(JSON.parse(String(init.body)));
+      expect(init.cache).toBe('no-store');
+      expect(init.credentials).toBe('omit');
+      expect(new Headers(init.headers).get('Authorization')).toBe('Bearer device-jwt');
+      return new Response(JSON.stringify(replies.shift()), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }));
+    const gateway = new HttpKioskGateway('/gateway/kiosk', { organizationId: 'org', deviceId: 'dev' }, async () => 'device-jwt');
+    const result = await gateway.identify('A-17', PIN);
+    await gateway.record(result.version, result.challenges.BREAK_START!);
+    expect(urls).toEqual(['/gateway/kiosk/authenticate', '/gateway/kiosk/record']);
+    expect(bodies[0]).toEqual({ organization_id: 'org', device_id: 'dev', code: 'A-17', pin: PIN });
+    expect(bodies[1]).toEqual({ organization_id: 'org', device_id: 'dev', request_id: R1, challenge: 'a'.repeat(64), action: 'BREAK_START', expected_version: 7 });
+    expect(JSON.stringify(bodies[1])).not.toContain(PIN);
+    vi.unstubAllGlobals();
   });
 });
