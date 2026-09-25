@@ -379,7 +379,16 @@ Deno 2.9.6, Python 3.11, Chromium 141 / Playwright 1.56.1):
   no aprovisionaba el journal de recuperación H5 (`tests/integration/journal_init.py`), requerido por
   las mutaciones de identidad; reproducido localmente sobre base recién reconstruida y corregido en el
   workflow (paso añadido y comprobación temprana en el arnés). Revalidado local: 44 PASS.
-La ejecución en GitHub Actions se registra en el PR; no sustituirla por el resultado local.
+Evidencia GitHub Actions sobre el código `4c139c1` (2026-09-25):
+- [CI, run 36178485697](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36178485697): PASS.
+  npm ci, typecheck (app + SW), lint, **83 tests**, build, escaneo de secretos del build, shell y whitespace.
+- [Database H1 + H2 + H3 + H4 + H5, run 36178485570](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36178485570): PASS.
+  **297 pgTAP**, **4 render H5** y **429 checks de integración H1-H5**: sin regresiones.
+- [E2E H6, run 36178485502](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36178485502): PASS.
+  Supabase local reconstruido desde vacío + journal, gateway H4 y firmador H5 reales, Chromium:
+  **44 pruebas PASS** (24 escritorio + 20 móvil); escaneo de `dist` y `test-results`: 0 hallazgos.
+El commit posterior solo registra esta evidencia; sus Checks repiten la suite sin cambiar código.
+Pese a CI verde, H6 no puede declararse PASS: la puerta «flujos kiosco contra backend real» depende de H4-KIOSK-01.
 
 BLOQUEADOR H4-KIOSK-01: `/authenticate` exige acción y `expected_version` antes de verificar el PIN
 y el kiosco no tiene forma de conocer el estado ni la versión del empleado; los tests H4 la leen con
