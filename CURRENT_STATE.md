@@ -3,10 +3,23 @@
 
 ### HITO 6 — UX/UI + PWA sobre H1-H5, con KIO-H6-01 resuelto
 
-**ESTADO: EN CURSO (2026-09-25).** Implementación completa en la rama `astra/hito-6-ux-pwa`,
-[PR #10](https://github.com/marioleongayo23-spec/fichaje/pull/10) contra `main`, sin merge. No se
-declara PASS hasta que los Checks del PR sobre el commit final estén en verde; esta sección solo
-registra evidencia ya ejecutada.
+**ESTADO: PASS técnico en CI sobre el código `80a5ccd4874d53e79162169b0f675d998f1fb353`
+(2026-09-25); pendiente de revisión y aprobación del usuario.** Rama `astra/hito-6-ux-pwa`,
+[PR #10](https://github.com/marioleongayo23-spec/fichaje/pull/10) contra `main`, sin merge. Esta
+sección solo registra evidencia ya ejecutada.
+
+Evidencia de CI del código `80a5ccd`:
+- [Database H1 + H2 + H3 + H4 + KIO-H6-01 + H5, run 36192804446](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36192804446): PASS.
+  Supabase local efímero reconstruido desde vacío (`supabase db reset --local --no-seed`), Deno 2.9.6
+  strict check de kiosk y export-link y tests Deno de red. **352 aserciones SQL/pgTAP PASS**
+  (297 + 55 KIO-H6-01). **506 comprobaciones de integración real PASS: 102 H1 + 70 H2 + 80 H3 +
+  181 H4 (incluidas 63 KIO-H6-01) + 73 H5**, con el gate KIO-07 de PIN, IP, digests y secretos de challenge.
+- [Browser E2E, run 36192804457](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36192804457): PASS.
+  **45/45 Playwright** (Chromium escritorio y móvil) contra Auth/PostgREST/Storage/PostgreSQL, gateway
+  y firmador reales; `scan_secrets.mjs dist test-results`: 0 hallazgos.
+- [CI general, run 36192804458](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36192804458): PASS
+  (npm ci, typecheck, lint, 98 tests unitarios, build, escáner de secretos, shell y whitespace).
+El commit posterior solo registra esta evidencia; sus Checks repiten automáticamente toda la validación.
 
 **KIO-H6-01** (detectado al iniciar H6): `kiosk/authenticate` exigía `action` y `expected_version`
 antes de validar código+PIN y ningún endpoint del kiosco devolvía estado ni versión, así que la UI no
@@ -87,7 +100,7 @@ Rama de origen: `astra/hito-4-kiosco`. Merge: `76922f352a64f3bbf0d1d7ece2c7ae155
 
 HITO 5 aprobado por el usuario e integrado en `main` mediante PR #9 el 2026-09-25.
 Rama de origen: `astra/hito-5-informes-retencion`. Merge: `748186125194cf4819357d57a4d8567a8cdf3bab`.
-HITO 6 autorizado; KIO-H6-01 resuelto con autorización expresa. En curso en PR #10. OPS-02 permanece después de H6 y antes de H7.
+HITO 6 autorizado; KIO-H6-01 resuelto con autorización expresa. PASS técnico en CI en PR #10, pendiente de aprobación del usuario. OPS-02 permanece después de H6 y antes de H7.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -252,7 +265,7 @@ producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
 
 ## Siguiente paso
-HITO 5 cerrado. HITO 6 en PR #10: completar Checks verdes sobre el commit final y esperar revisión y aprobación del usuario; sin merge automático. No iniciar OPS-02 ni H7. OPS-02 se implementará después de H6 y antes de H7.
+HITO 5 cerrado. HITO 6 en PR #10 con Checks verdes: esperar revisión y aprobación expresa del usuario; sin merge automático. No iniciar OPS-02 ni H7. OPS-02 se implementará después de H6 y antes de H7.
 
 ## HITO 3 — correcciones append-only
 ESTADO: PASS — HITO 3 aprobado por el usuario y PR #7 integrado en `main`.
