@@ -15,3 +15,7 @@ rclone.conf
 supabase/.temp/
 supabase/.branches/
 __pycache__/
+
+test-results/
+playwright-report/
+blob-report/
