@@ -248,10 +248,11 @@ code, listing=h.api('/storage/v1/object/list/fichaje-evidence',data={'prefix':or
 check(code>=400 or listing==[],'EXP-05 anonymous object listing cannot reveal evidence')
 check(h.api('/storage/v1/object/public/fichaje-evidence/'+path)[0]>=400,'EXP-05 public object URL impossible')
 with psycopg.connect(APP) as c:
+    # Since KIO-H6-01 every challenge belongs to a grant (one per legal action).
     c.execute("""insert into private.kiosk_challenges(organization_id,device_id,employee_id,action,
-      expected_version,request_id,token_hash,credential_version,created_at,expires_at)
-      values(%s,%s,%s,'CLOCK_IN',0,%s,%s,1,statement_timestamp()-interval '25 hours',
-      statement_timestamp()-interval '25 hours'+interval '60 seconds')""",(org,device,employee['employee'],uid(),'a'*64))
+      expected_version,request_id,token_hash,credential_version,grant_id,created_at,expires_at)
+      values(%s,%s,%s,'CLOCK_IN',0,%s,%s,1,%s,statement_timestamp()-interval '25 hours',
+      statement_timestamp()-interval '25 hours'+interval '60 seconds')""",(org,device,employee['employee'],uid(),'a'*64,uid()))
     c.execute("insert into private.auth_attempt_buckets(organization_id,device_id,subject_hash,window_start) values(%s,%s,%s,clock_timestamp()-interval '25 hours')",(org,device,'b'*64))
     c.execute("insert into private.kiosk_network_buckets(organization_id,subject_hash,window_start) values(%s,%s,clock_timestamp()-interval '25 hours')",(org,'c'*64))
 purge_operational.run(APP,h.URL,h.SERVICE,org,sql('select clock_timestamp();'),'SYN-OP-EXPIRY')

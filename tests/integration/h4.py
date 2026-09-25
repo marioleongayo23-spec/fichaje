@@ -22,6 +22,7 @@ from cryptography.hazmat.primitives import hashes
 # All output is buffered until the synthetic-PIN leak gate has inspected it.
 output = io.StringIO()
 known_pins = []
+known_challenges = []
 http_outputs = []
 process = None
 scratch = tempfile.TemporaryDirectory(prefix='kiosk-h4-')
@@ -144,16 +145,22 @@ def main():
 
     def version(emp=e):
         return int(sql(f"select version from private.employee_state where organization_id='{emp['org']}' and employee_id='{emp['id']}';"))
-    def authenticate(emp=e,dev=d,action='CLOCK_IN',expected=None,request=None,pin=None,code=None,o=None):
-        b=dict(organization_id=o or emp['org'],device_id=dev['id'],request_id=request or uid(),action=action,
-               expected_version=version(emp) if expected is None else expected,code=code or emp['code'],pin=pin or emp['pin'])
+    # KIO-H6-01 contract: code+PIN only; the server answers state, version and
+    # one bound challenge per legal action. The kiosk never names the employee.
+    def authenticate(emp=e,dev=d,pin=None,code=None,o=None):
+        b=dict(organization_id=o or emp['org'],device_id=dev['id'],code=code or emp['code'],pin=pin or emp['pin'])
         c,r=gw('authenticate',dev['token'],b)
         return c,r,b
-    def challenge(emp=e,dev=d,action='CLOCK_IN',expected=None,request=None):
-        c,r,b=authenticate(emp,dev,action,expected,request)
-        assert c==200,'correct PIN produces challenge'
-        return dict(organization_id=b['organization_id'],device_id=dev['id'],employee_id=r['employee_id'],action=action,
-                    expected_version=b['expected_version'],request_id=b['request_id'],challenge=r['challenge'])
+    def offers(emp=e,dev=d):
+        c,r,b=authenticate(emp,dev)
+        assert c==200,'correct PIN produces challenges'
+        known_challenges.extend(x['challenge'] for x in r['challenges'])
+        return r,{x['action']:dict(organization_id=b['organization_id'],device_id=dev['id'],action=x['action'],
+                  expected_version=r['version'],request_id=x['request_id'],challenge=x['challenge']) for x in r['challenges']}
+    def challenge(emp=e,dev=d,action='CLOCK_IN'):
+        r,bodies=offers(emp,dev)
+        assert action in bodies,'challenge offered only for a legal action'
+        return bodies[action]
     def record(b,dev=d): return gw('record',dev['token'],b)
     def snap(emp=e):
         return sql(f"select jsonb_build_array((select to_jsonb(s) from private.employee_state s where employee_id='{emp['id']}'),(select count(*) from public.time_events where employee_id='{emp['id']}'),(select count(*) from public.audit_log where organization_id='{emp['org']}'),(select count(*) from private.idempotency_records where organization_id='{emp['org']}'),(select jsonb_agg(c order by id) from private.kiosk_challenges c where employee_id='{emp['id']}'));")
@@ -171,12 +178,10 @@ def main():
     sql(f"update private.kiosk_challenges set created_at=statement_timestamp()-interval '62 seconds',expires_at=statement_timestamp()-interval '2 seconds' where request_id='{b['request_id']}';")
     check(record(b)==(200,r),'consumed expired challenge only recovers same committed receipt')
     check(record(dict(b,request_id=uid()))[0]==403,'consumed challenge cannot authorize new request')
-    # Distinct payload requires fresh valid challenge yet conflicts with persistent request.
-    changed=challenge(action='BREAK_START',request=b['request_id'])
-    check(record(changed)==(409,{'error':'IDEMPOTENCY_CONFLICT'}),'same request different payload conflicts')
+    check(record(dict(b,action='BREAK_START',expected_version=b['expected_version']+1))[0]==403,'consumed challenge cannot authorize a different payload')
 
     b=challenge(action='BREAK_START')
-    cases=[('device',dict(b,device_id=d2['id']),d2),('employee',dict(b,employee_id=e2['id']),d),
+    cases=[('device',dict(b,device_id=d2['id']),d2),('employee field',dict(b,employee_id=e2['id']),d),
            ('tenant',dict(b,organization_id=foreign),d),('action',dict(b,action='CLOCK_OUT'),d),
            ('version',dict(b,expected_version=b['expected_version']+1),d),('request',dict(b,request_id=uid()),d)]
     before=snap()
@@ -192,7 +197,9 @@ def main():
     expired=challenge()
     sql(f"update private.kiosk_challenges set created_at=statement_timestamp()-interval '62 seconds',expires_at=statement_timestamp()-interval '2 seconds' where request_id='{expired['request_id']}';")
     check(record(expired)[0]==403,'expired challenge rejected')
-    before=snap(); c,r=record(challenge(action='BREAK_START'));check(c==400 and r['error']=='INVALID_TRANSITION','H2 invalid transition enforced')
+    r,bodies=offers(); before=snap()
+    check(sorted(bodies)==['CLOCK_IN'] and r['state']=='OUT','illegal transitions are never offered')
+    check(record(dict(bodies['CLOCK_IN'],action='BREAK_START'))[0]==403 and snap()==before,'challenge cannot be redirected to an illegal action')
     # Audit insertion failure must roll back everything including challenge consumption.
     audit_challenge=challenge(); before=snap()
     sql("create function private.h4_fail_audit() returns trigger language plpgsql as $$ begin if new.actor_kind='KIOSK' then raise exception 'H4_AUDIT_FAILURE'; end if; return new; end $$; create trigger h4_fail before insert on public.audit_log for each row execute function private.h4_fail_audit();")
@@ -220,7 +227,8 @@ def main():
     check(lost and committed and committed[0][0]==200 and record(timeout_body)==committed[0],'timeout after real commit recovers same receipt')
     record(challenge(action='CLOCK_OUT'))
 
-    # Full H2 state matrix through the actual PIN/challenge gateway.
+    # Full H2 state matrix through the actual PIN/challenge gateway: exactly the
+    # legal actions are offered; each executes; nothing else can be authorized.
     transitions={('OUT','CLOCK_IN'):'WORKING',('WORKING','BREAK_START'):'PAUSED',
                  ('WORKING','CLOCK_OUT'):'OUT',('PAUSED','BREAK_END'):'WORKING',('PAUSED','CLOCK_OUT'):'OUT'}
     for initial_state in ['OUT','WORKING','PAUSED']:
@@ -228,16 +236,21 @@ def main():
             matrix=employee()
             if initial_state!='OUT':assert record(challenge(matrix))[0]==200
             if initial_state=='PAUSED':assert record(challenge(matrix,action='BREAK_START'))[0]==200
-            body=challenge(matrix,action=action);before=snap(matrix)
-            c,r=record(body)
+            r,bodies=offers(matrix);before=snap(matrix)
+            legal=sorted(a for (st,a) in transitions if st==initial_state)
+            check(r['state']==initial_state and r['version']==version(matrix) and sorted(bodies)==legal,'kiosk offers exactly legal actions '+initial_state+'/'+action)
             if (initial_state,action) in transitions:
-                check(c==200 and r['state']==transitions[(initial_state,action)],'kiosk state matrix '+initial_state+'/'+action)
+                c,res=record(bodies[action])
+                check(c==200 and res['state']==transitions[(initial_state,action)],'kiosk state matrix '+initial_state+'/'+action)
             else:
-                check(c==400 and r['error']=='INVALID_TRANSITION' and snap(matrix)==before,'kiosk illegal transition atomic '+initial_state+'/'+action)
+                any_body=next(iter(bodies.values()))
+                check(record(dict(any_body,action=action))[0]==403 and snap(matrix)==before,'kiosk illegal transition atomic '+initial_state+'/'+action)
     no_policy=employee(policy=False)
     check(record(challenge(no_policy))==(400,{'error':'POLICY_REQUIRED'}),'kiosk uses H2 policy gate')
-    stale=challenge(expected=version()+1)
-    check(record(stale)==(409,{'error':'VERSION_CONFLICT'}),'kiosk uses H2 expected_version gate')
+    # Two independent grants at the same version: the first wins, the second hits the H2 gate.
+    first_grant=challenge(); stale=challenge()
+    check(record(first_grant)[0]==200 and record(stale)==(409,{'error':'VERSION_CONFLICT'}),'kiosk uses H2 expected_version gate')
+    record(challenge(action='CLOCK_OUT'))
     clock_worker=employee()
     first=record(challenge(clock_worker))[1]
     regression=challenge(clock_worker,action='CLOCK_OUT')
@@ -325,11 +338,11 @@ def main():
     # SEC-H4-01: real TCP source, never forwarded/JSON client assertions.
     net_ip='127.81.82.83'; second_ip='127.81.82.84'
     net_employee=employee(); net_devices=[provision() for _ in range(3)]
-    net_body=dict(organization_id=org,device_id=net_devices[0]['id'],request_id=uid(),action='CLOCK_IN',expected_version=0,code='missing-network-code',pin='0'*8)
+    net_body=dict(organization_id=org,device_id=net_devices[0]['id'],code='missing-network-code',pin='0'*8)
     network_hash=hmac.new(base64.b64decode(env['KIOSK_NETWORK_SECRET']),f'kiosk-network-v1\n{org}\n{net_ip}'.encode(),hashlib.sha256).hexdigest()
     for i in range(60):
         dev=net_devices[i//20]
-        status,result=gw('authenticate',dev['token'],dict(net_body,device_id=dev['id'],request_id=uid()),source=net_ip,
+        status,result=gw('authenticate',dev['token'],dict(net_body,device_id=dev['id']),source=net_ip,
             extra_headers={'X-Forwarded-For':f'198.51.100.{i+1}','X-Real-IP':second_ip,'CF-Connecting-IP':second_ip,'Forwarded':f'for={second_ip}'})
         assert (status,result)==(403,{'error':'AUTH_FAILED'}),'network failures stay generic'
     check(sql(f"select failures=60 and locked_until>clock_timestamp() from private.kiosk_network_buckets where organization_id='{org}' and subject_hash='{network_hash}';")=='t','network bucket persists across devices despite arbitrary forwarded headers')
@@ -351,6 +364,10 @@ def main():
     sql(f"update private.kiosk_network_buckets set window_start=clock_timestamp()-interval '31 minutes',locked_until=clock_timestamp()-interval '1 second' where organization_id='{org}' and subject_hash='{network_hash}';")
     check(gw('authenticate',net_devices[0]['token'],valid_body,source=net_ip)[0]==200,'expired network lock resets using server clock')
 
+    # KIO-H6-01 identification contract on its own tenant, before the leak gate.
+    import kio_h6
+    kio_h6.run(dict(locals(),known_challenges=known_challenges))
+
     # Entire database serialization plus ALL actual Docker logs, gateway output,
     # captured HTTP responses and generated build/test artifacts are scanned in memory.
     database=sql("select string_agg(row_to_json(t)::text,E'\\n') from (select 'placeholder' as value) t;")
@@ -366,6 +383,10 @@ def main():
         if base.exists():buffers.extend(p.read_bytes() for p in base.rglob('*') if p.is_file())
     for pin in known_pins:
         assert all(pin.encode() not in blob for blob in buffers),'PIN_LEAK_DETECTED'
+    # Challenge secrets exist only in the kiosk's HTTP responses; the database keeps hashes.
+    stored=[b for b in buffers if all(b is not out for out in http_outputs)]
+    for token in known_challenges:
+        assert all(token.encode() not in blob for blob in stored),'CHALLENGE_LEAK_DETECTED'
     for address in [net_ip,second_ip]:
         assert all(address.encode() not in blob for blob in buffers),'NETWORK_PLAINTEXT_LEAK_DETECTED'
     audit=sql("select coalesce(string_agg(row_to_json(t)::text,chr(10)),'') from public.audit_log t;")
@@ -373,6 +394,7 @@ def main():
         assert all(digest.encode() not in blob for blob in buffers[1:]) and digest not in audit,'NETWORK_DIGEST_LEAK_DETECTED'
     check(True,'KIO-07 network plaintext absent from DB/logs/responses/artifacts; hashes absent outside private buckets')
     check(len(known_pins)>0,'KIO-07 known synthetic PIN absent from DB/logs/responses/cacheable responses/generated artifacts')
+    check(len(known_challenges)>0,'KIO-07 raw challenge secrets absent from DB/logs/gateway output/artifacts (hash only)')
     print(f'H4 real gateway checks: {h.checks-initial}; full H1+H2+H3 retained.')
 
 

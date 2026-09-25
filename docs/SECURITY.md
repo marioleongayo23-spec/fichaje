@@ -52,9 +52,13 @@ PIN hash Argon2id (mínimo 19 MiB, t=2, p=1, recalibrar) con salt por credencial
 Rate limit persistente: 5 intentos fallidos/empleado/15 min y 30/dispositivo/15 min; IP de forma
 minimizada como defensa adicional, nunca prueba de identidad. Respuesta genérica y tiempo uniforme.
 Reset por gestor auditado, revoca credencial anterior; no recuperar PIN original ni registrarlo.
-Tras validación, gateway crea challenge 256 bits, hash almacenado, TTL 60 s, ligado a tenant,
-empleado, dispositivo, acción, expected_version y request_id. RPC solo para rol backend dedicado
-(no usar service_role como acceso universal habitual); consume challenge y ficha en la misma transacción.
+Tras validación (KIO-H6-01), el servidor obtiene empleado, estado y versión autoritativos y emite
+un challenge de 256 bits por cada acción legal de ese estado (nunca uno genérico): hash almacenado,
+TTL 60 s, ligado a tenant, empleado, dispositivo, acción, expected_version, request_id propio y
+versión de credencial, agrupados en un grant. El kiosco solo recibe estado, versión, acciones y
+challenges; nunca el identificador del empleado ni acceso libre a estado, eventos o directorio.
+RPC solo para rol backend dedicado (no usar service_role como acceso universal habitual); consume
+challenge y ficha en la misma transacción, e invalida los challenges hermanos del grant.
 Reintento mismo request_id devuelve recibo previo tras reautenticar dispositivo/empleado;
 no consume de nuevo challenge ni permite cambiar payload. Revocación gana si obtiene lock primero.
 Kiosco sin consultas libres, exports ni roles administrativos; limpia PIN/recibo a los 15 s, no persistir
@@ -207,4 +211,5 @@ cachea solo el shell listado en el build y no intercepta API, Auth, Storage, fun
 Tokens de invitación y claves RSA de entrega se generan en el navegador; solo el hash o la clave
 pública salen de él y los secretos entregados se muestran una vez. Guardas de código fuente y
 `scripts/scan_secrets.mjs` fallan la CI ante service_role, claves secretas, JWT, pepper o credenciales
-PostgreSQL en el build o en artefactos de prueba. Bloqueo de kiosco: H4-KIOSK-01 en `docs/UI_PWA.md`.
+PostgreSQL en el build o en artefactos de prueba. Contrato de identificación del kiosco (KIO-H6-01)
+en `docs/UI_PWA.md` y `supabase/README.md`.
