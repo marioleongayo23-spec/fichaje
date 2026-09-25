@@ -57,3 +57,17 @@ no desbloquea, expiración por reloj servidor y límites anteriores intactos.
 Escanear IP sintética en DB completa, logs, respuestas y artefactos; escanear todos
 los digests contra logs/respuestas/artefactos/audit laboral. RLS real: SELECT/INSERT/
 UPDATE cross-tenant y modificación de identidad denegados. Sin mocks de RLS.
+
+## H6 — asignación de evidencia
+Navegador real: Playwright + Chromium en proyectos escritorio (1280×800) y móvil (Pixel 5) contra
+Supabase local (Auth, PostgREST, Storage, PostgreSQL), gateway H4 y firmador H5 reales. Datos
+sintéticos por prueba; los efectos se comprueban en PostgreSQL. Detalle en `docs/UI_PWA.md`.
+
+| Criterio | Evidencia |
+|---|---|
+| PWA-01 | `pwa.e2e.ts`: sin red no hay acciones ni peticiones de fichaje; shell servido por el SW; cambio de estado en servidor visible al reconectar sin reproducir clics. `employee.e2e.ts`: ACK perdido y 5xx → resultado desconocido y reintento con el mismo `request_id` (un solo evento) |
+| PWA-02 | `pwa.e2e.ts`: Cache Storage solo contiene la lista precargada; sin API/Auth/tokens/registros/exportaciones; localStorage solo sesión Auth. `kiosk.e2e.ts`: PIN, credencial y tokens ausentes de almacenamiento, cachés, consola, logs y artefactos. `sw-policy.test.ts`, `scan_secrets.mjs` |
+| PWA-03 | `a11y.e2e.ts`: axe WCAG 2.2 A/AA + buenas prácticas en todas las pantallas y diálogos (ambos viewports), teclado real, orden y foco visible, diálogos, reflujo a 320 px, texto al 200 % y tamaño de objetivos |
+| Empleado | `employee.e2e.ts`: login, ciclo completo, salida desde pausa, doble clic, ACK perdido, error servidor, rechazos, revocación, evidencia, corrección con revisión y aprobación independiente, exportación propia |
+| OWNER/ADMIN | `manager.e2e.ts`: tenant correcto, denegación cross-tenant con sesión real, cambio de tenant, empleados sin email, roles, invitación, bandeja con independencia/obsolescencia/negativa del servidor, clasificación, exportación y entrega controlada, horarios |
+| Kiosco | `kiosk.e2e.ts`: preparación y revocación reales, dispositivo sin directorio ni navegación y en fallo seguro, reset de PIN mostrado una vez, contrato H4 real (PIN erróneo/código desconocido genéricos, ACK, recuperación de recibo, challenge reutilizado y caducado, dispositivo revocado). Flujo del terminal solo con stub (`kiosk-terminal.test.tsx`): **bloqueado por H4-KIOSK-01** |
