@@ -11,6 +11,8 @@ Rama de origen: `astra/hito-3-correcciones`. Merge: `a848c1c5adef50ada215d736208
 HITO 4 aprobado por el usuario, incluida SEC-H4-01, e integrado en `main` mediante PR #8 el 2026-09-23.
 Rama de origen: `astra/hito-4-kiosco`. Merge: `76922f352a64f3bbf0d1d7ece2c7ae155f58d1a0`.
 
+HITO 5 autorizado el 2026-09-23; trabajo en `astra/hito-5-informes-retencion`, PR #9 en borrador. No aprobado ni integrado.
+
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
   estados, tiempo servidor, inmutabilidad/correcciones, audit, concurrencia/idempotencia y kiosco.
@@ -303,3 +305,31 @@ Evidencia del código `a820a417d03b543ebb8ff7470cffc0ee3e07c755`:
 - Verificación local: npm run check, Deno check/test, Python compile, shell y whitespace PASS. DB/Auth se ejecutaron en CI, no se simularon localmente.
 Este commit documental registra la evidencia anterior y no cambia código probado.
 PR #8 integrado por autorización expresa del usuario. Sin iniciar H5 ni OPS-02; sin producción, secretos reales ni datos reales. OPS-02 permanece después de H6 y antes de H7. Trabajo detenido.
+
+## HITO 5 — implementación completa, pendiente de aprobación
+ESTADO TÉCNICO: PASS. HITO 5 todavía no está aprobado ni integrado; PR #9 listo para revisión.
+
+Entregado: snapshot materializado consistente; exportación privada determinista CSV/JSON/PDF;
+clasificaciones append-only; entrega controlada con recibo; purga laboral y operativa mediante
+proceso offline mínimo; holds append-only; manifiestos transaccionales; journal PostgreSQL separado
+de bajas, holds, liberaciones y purgas; y replay idempotente después de restore.
+
+Evidencia del código `263e1e0b983c74fbd60dc449f310dc83a49b9237`, 2026-09-24:
+- [Database H1 + H2 + H3 + H4 + H5, run 35955532919](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35955532919): PASS.
+  Supabase local efímero reconstruido desde vacío, PostgreSQL 17, Auth, PostgREST y Storage reales.
+  **297 aserciones SQL/pgTAP PASS**, **4 tests de generación CSV/JSON/PDF/DST PASS** y
+  **429 checks de integración PASS: 356 H1-H4 + 73 H5**. Sin tests omitidos.
+- H5 prueba transacciones PostgreSQL concurrentes: una corrección aprobada durante la generación
+  conserva un paquete íntegramente anterior al cutoff, nunca híbrido. Prueba Auth y RLS de empleado,
+  OWNER/ADMIN, kiosco y cross-tenant; Storage privado, URL firmada y expirada, revocación y TTL.
+- Purga laboral real leaf-first sin CASCADE, plazo exacto y ampliación por correcciones, sesiones
+  incompletas bloqueadas, receipts conservados, holds de organización/empleado, counts/digest y
+  rollback completo ante fallos forzados de audit, manifest, Storage y journal.
+- Restore sintético real: `pg_dump`, cambios posteriores, `pg_restore` sobre PostgreSQL y replay del
+  journal externo. Verifica bajas, holds/liberaciones, tombstones, RLS, idempotencia y otro tenant intacto.
+- [CI general, run 35955532862](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35955532862): PASS.
+  Typecheck, lint, **21 tests**, build, shell y whitespace.
+- Verificación local final: `npm run check`, Python compile, shell y `git diff --check` PASS.
+
+Todo usa datos y credenciales exclusivamente sintéticos y efímeros. No hay producción, backup DB real,
+datos/secretos reales, UI/PWA, H6 ni OPS-02. OPS-02 permanece después de H6 y antes de H7.

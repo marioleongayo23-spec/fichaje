@@ -72,3 +72,32 @@ En staging se inducirá al menos una release degradada/fallo controlado para dem
 Objetivos propuestos para piloto: RPO <=24 h con copia diaria y RTO <=8 h. No son garantías actuales.
 Antes de venta, determinar si se requiere PITR/menor RPO y su coste; ensayo trimestral y tras cambio mayor.
 Retención DB móvil 35 días, registros laborales en base activa según COMPLIANCE; no confundir ambos.
+
+## H5 — journal independiente y ensayo sintético
+Las migraciones H5 capturan bajas/cambios de estado y holds/liberaciones mediante triggers;
+la purga offline escribe los UUID eliminados, counts, autorización y digest. No se archivan
+nombres, fichajes, motivos libres, propuestas de corrección, PIN ni documentos laborales.
+`journal_prepare` requiere el foreign server `fichaje_recovery` y falla cerrado si no está disponible.
+La conexión técnica solo puede invocar el append de metadatos en la base externa.
+Las migraciones no configuran ninguna conexión ni credencial de producción.
+
+El archive confirma PREPARED antes del commit de la aplicación. `scripts/recovery_journal.py`
+reconcilia la transacción original mediante `pg_xact_status` y el outbox inmutable: añade COMMITTED
+o ABORTED, sin borrar ni editar entradas. Una subtransacción revertida no conserva outbox y se
+clasifica ABORTED cuando la transacción principal termina. Esta reconciliación solo se ejecuta
+contra la instancia original viva, nunca deduciendo resultados desde una base ya restaurada.
+Si se pierde la instancia antes de resolver un PREPARED, la recuperación queda bloqueada para
+reconciliación offline autorizada; no se presume commit ni rollback y no se reabre el servicio.
+
+El archive necesita persistencia y custodia independientes del backup que se restaure. Restaurar
+ambas bases al mismo punto invalidaría la garantía. Antes de reabrir: aislar Auth/REST, verificar
+que el archive no tiene PREPARED sin resolver, reproducir sus eventos COMMITTED en orden,
+comprobar bajas/holds/liberaciones/tombstones y RLS. El replay es transaccional e idempotente,
+restringido al rol offline NOLOGIN; cada purga restaurada genera counts de lo realmente eliminado
+en esa transacción, que pueden diferir del manifiesto original por el punto del backup.
+
+CI aprovisiona exclusivamente una segunda base efímera en el contenedor local, con credencial
+aleatoria que no se imprime. `tests/integration/h5.py` captura en memoria public/private mediante
+pg_dump, ejecuta cambios posteriores, restaura realmente con pg_restore y reaplica el journal
+que quedó fuera del dump. No se suben dumps ni journal como artefactos. `backup_database.sh`
+sigue bloqueado; este ensayo no habilita backup ni restore de producción.

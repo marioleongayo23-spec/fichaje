@@ -1,4 +1,4 @@
-name: Database H1 + H2 + H3 + H4
+name: Database H1 + H2 + H3 + H4 + H5
 on:
   pull_request:
     branches: [main]
@@ -28,18 +28,36 @@ jobs:
           python-version: '3.12'
       - name: Gateway dependencies and strict typecheck
         run: |
-          python -m pip install cryptography==46.0.3
+          python -m pip install cryptography==46.0.3 reportlab==4.4.9 pypdf==6.1.0 'psycopg[binary]==3.2.10'
           deno check --config supabase/functions/kiosk/deno.json supabase/functions/kiosk/index.ts
+          deno check supabase/functions/export-link/index.ts
       - name: Network minimization tests
         run: deno test supabase/functions/kiosk/network_test.ts
       - name: Start isolated local Supabase
-        run: supabase start -x realtime,imgproxy,edge-runtime,logflare,vector,supavisor > /dev/null
+        run: |
+          for attempt in 1 2 3; do
+            if supabase start -x realtime,imgproxy,edge-runtime,logflare,vector,supavisor > /dev/null; then
+              exit 0
+            fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            if [ "$attempt" = 1 ]; then
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=public.ecr.aws
+            else
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io
+            fi
+            printf 'SUPABASE_INTERNAL_IMAGE_REGISTRY=%s\n' "$SUPABASE_INTERNAL_IMAGE_REGISTRY" >> "$GITHUB_ENV"
+            sleep 5
+          done
       - name: Rebuild from empty database
         run: supabase db reset --local --no-seed
       - name: Real SQL and RLS tests
-        run: supabase test db
+        run: |
+          python3 tests/integration/journal_init.py
+          supabase test db
+      - name: Render real H5 evidence package
+        run: python3 tests/integration/h5_render.py
       - name: Real Auth, REST, Storage and concurrency tests
-        run: python3 tests/integration/h4.py
+        run: python3 tests/integration/h5.py
       - name: Stop local containers
         if: always()
         run: supabase stop --no-backup
