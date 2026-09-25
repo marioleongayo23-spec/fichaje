@@ -1,4 +1,4 @@
-# CURRENT_STATE — 2026-09-23
+# CURRENT_STATE — 2026-09-25
 ## Hito autorizado
 HITO 0 Bootstrap aprobado por el usuario e integrado en `main` mediante PR #1 el 2026-09-21.
 Rama de origen: `astra/hito-0-bootstrap`. Merge: `f9a02bb150b424d9cf0a47b741496c997b7bc085`.
@@ -11,7 +11,9 @@ Rama de origen: `astra/hito-3-correcciones`. Merge: `a848c1c5adef50ada215d736208
 HITO 4 aprobado por el usuario, incluida SEC-H4-01, e integrado en `main` mediante PR #8 el 2026-09-23.
 Rama de origen: `astra/hito-4-kiosco`. Merge: `76922f352a64f3bbf0d1d7ece2c7ae155f58d1a0`.
 
-HITO 5 autorizado el 2026-09-23; trabajo en `astra/hito-5-informes-retencion`, PR #9 en borrador. No aprobado ni integrado.
+HITO 5 aprobado por el usuario e integrado en `main` mediante PR #9 el 2026-09-25.
+Rama de origen: `astra/hito-5-informes-retencion`. Merge: `748186125194cf4819357d57a4d8567a8cdf3bab`.
+HITO 6 no iniciado. OPS-02 permanece después de H6 y antes de H7.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -176,7 +178,7 @@ producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
 
 ## Siguiente paso
-HITO 4 cerrado. Esperar autorización expresa antes de iniciar H5. OPS-02 se implementará después de H6 y antes de H7.
+HITO 5 cerrado. Esperar autorización expresa antes de iniciar H6. OPS-02 se implementará después de H6 y antes de H7.
 
 ## HITO 3 — correcciones append-only
 ESTADO: PASS — HITO 3 aprobado por el usuario y PR #7 integrado en `main`.
@@ -306,16 +308,16 @@ Evidencia del código `a820a417d03b543ebb8ff7470cffc0ee3e07c755`:
 Este commit documental registra la evidencia anterior y no cambia código probado.
 PR #8 integrado por autorización expresa del usuario. Sin iniciar H5 ni OPS-02; sin producción, secretos reales ni datos reales. OPS-02 permanece después de H6 y antes de H7. Trabajo detenido.
 
-## HITO 5 — implementación completa, pendiente de aprobación
-ESTADO TÉCNICO: PASS. HITO 5 todavía no está aprobado ni integrado; PR #9 listo para revisión.
+## HITO 5 — aprobado e integrado
+ESTADO: PASS. HITO 5 aprobado por el usuario e integrado en `main` mediante PR #9.
 
 Entregado: snapshot materializado consistente; exportación privada determinista CSV/JSON/PDF;
 clasificaciones append-only; entrega controlada con recibo; purga laboral y operativa mediante
 proceso offline mínimo; holds append-only; manifiestos transaccionales; journal PostgreSQL separado
 de bajas, holds, liberaciones y purgas; y replay idempotente después de restore.
 
-Evidencia del código `263e1e0b983c74fbd60dc449f310dc83a49b9237`, 2026-09-24:
-- [Database H1 + H2 + H3 + H4 + H5, run 35955532919](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35955532919): PASS.
+Evidencia final del código `4ee30b5f43828d7076eba9252f9779c58c392c89`, 2026-09-25:
+- [Database H1 + H2 + H3 + H4 + H5, run 36149687175](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36149687175): PASS.
   Supabase local efímero reconstruido desde vacío, PostgreSQL 17, Auth, PostgREST y Storage reales.
   **297 aserciones SQL/pgTAP PASS**, **4 tests de generación CSV/JSON/PDF/DST PASS** y
   **429 checks de integración PASS: 356 H1-H4 + 73 H5**. Sin tests omitidos.
@@ -327,7 +329,7 @@ Evidencia del código `263e1e0b983c74fbd60dc449f310dc83a49b9237`, 2026-09-24:
   rollback completo ante fallos forzados de audit, manifest, Storage y journal.
 - Restore sintético real: `pg_dump`, cambios posteriores, `pg_restore` sobre PostgreSQL y replay del
   journal externo. Verifica bajas, holds/liberaciones, tombstones, RLS, idempotencia y otro tenant intacto.
-- [CI general, run 35955532862](https://github.com/marioleongayo23-spec/fichaje/actions/runs/35955532862): PASS.
+- [CI general, run 36149687094](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36149687094): PASS.
   Typecheck, lint, **21 tests**, build, shell y whitespace.
 - Verificación local final: `npm run check`, Python compile, shell y `git diff --check` PASS.
 
