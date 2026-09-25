@@ -13,7 +13,8 @@ Rama de origen: `astra/hito-4-kiosco`. Merge: `76922f352a64f3bbf0d1d7ece2c7ae155
 
 HITO 5 aprobado por el usuario e integrado en `main` mediante PR #9 el 2026-09-25.
 Rama de origen: `astra/hito-5-informes-retencion`. Merge: `748186125194cf4819357d57a4d8567a8cdf3bab`.
-HITO 6 no iniciado. OPS-02 permanece después de H6 y antes de H7.
+HITO 6 autorizado el 2026-09-25 y en revisión: **BLOCKED** por H4-KIOSK-01 (contrato de kiosco),
+sin cambios de backend por decisión del usuario. Ver sección HITO 6. OPS-02 permanece después de H6 y antes de H7.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -178,7 +179,8 @@ producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
 
 ## Siguiente paso
-HITO 5 cerrado. Esperar autorización expresa antes de iniciar H6. OPS-02 se implementará después de H6 y antes de H7.
+HITO 6 BLOCKED por H4-KIOSK-01: decidir si se autoriza la ampliación mínima del contrato H4 propuesta
+en `docs/UI_PWA.md`. No iniciar OPS-02 hasta cerrar H6. OPS-02 se implementará después de H6 y antes de H7.
 
 ## HITO 3 — correcciones append-only
 ESTADO: PASS — HITO 3 aprobado por el usuario y PR #7 integrado en `main`.
@@ -335,3 +337,54 @@ Evidencia final del código `4ee30b5f43828d7076eba9252f9779c58c392c89`, 2026-09-
 
 Todo usa datos y credenciales exclusivamente sintéticos y efímeros. No hay producción, backup DB real,
 datos/secretos reales, UI/PWA, H6 ni OPS-02. OPS-02 permanece después de H6 y antes de H7.
+
+## HITO 6 — UX/UI + PWA
+ESTADO: **BLOCKED**. Todo H6 implementado salvo el flujo interactivo del kiosco, que el contrato H4
+aprobado no permite conectar (H4-KIOSK-01). Por decisión expresa del usuario (2026-09-25) no se
+modifica backend: migraciones, RLS, RPC, gateway y firmador H1-H5 intactos.
+Rama `claude/tender-planck-s2x94b` (rama asignada al entorno de trabajo), creada desde `main`
+`7f5ac96`; PR único contra `main`, sin merge.
+
+Entregado (detalle y decisiones en `docs/UI_PWA.md`):
+- SPA React/TypeScript/Vite sin framework adicional; login Supabase Auth sin registro público,
+  restauración de sesión, rutas protegidas, selector explícito multiempresa con descarte de estado al
+  cambiar, revocación reflejada (401 cierra sesión, 403 revalida y retira el tenant).
+- Empleado: fichaje con confirmación solo tras ACK (acción, hora servidor, estado), resultado
+  desconocido con reintento idempotente, bloqueo offline con contingencia, evidencia propia H5,
+  correcciones H3 con revisión previa, exportación propia con enlace firmado de un solo uso.
+- OWNER/ADMIN: empleados (sin email incluido), roles/accesos/invitaciones/transferencia, horarios y
+  asignaciones, estado y evidencia, bandeja de correcciones con independencia, clasificación de
+  horas, exportaciones con entrega controlada, kioscos (preparar/revocar) y reset de PIN cifrado.
+- Kiosco: configuración del dispositivo con identidad técnica, sin directorio ni navegación, fallo
+  seguro explícito. Flujo completo tras adaptador, probado solo con stub (sin valor de backend).
+- PWA: manifest, iconos neutros sustituibles, service worker de shell (sin API/Auth/tokens/PIN/
+  registros/exportaciones/URLs firmadas, sin Background Sync ni cola), CSP estricta en build.
+- Seguridad frontend: guardas de código fuente y `scripts/scan_secrets.mjs` en `npm run check` y CI.
+- CI: nuevo workflow `E2E H6` (Supabase local efímero, gateway/firmador reales, Chromium) y escaneo
+  de secretos del build en `CI`. Sin secretos de GitHub ni subida de artefactos.
+
+Evidencia local del entorno de edición (2026-09-25; Node 24.19.0, Docker, Supabase CLI 2.117.0,
+Deno 2.9.6, Python 3.11, Chromium 141 / Playwright 1.56.1):
+- Línea base previa a cambios: `supabase db reset --local --no-seed`, **297 pgTAP**, **4 render H5**
+  y **429 checks de integración H1-H5** PASS.
+- `npm run check`: typecheck (app + service worker), lint, **83 tests Vitest**, build y escaneo de
+  secretos del build PASS. `bash -n scripts/*.sh` y `git diff --check` PASS.
+- `npx playwright test`: **44 pruebas PASS** (24 escritorio + 20 móvil) contra backend real;
+  `scan_secrets.mjs dist test-results`: 0 hallazgos.
+- Defectos detectados por las pruebas y corregidos antes del PR: desbordamiento horizontal en móvil
+  (texto oculto posicionado fuera de la tabla), diálogo no desplazable en móvil, regiones de tabla
+  con nombre duplicado, `aria-label` prohibido en el reloj del kiosco, rejilla que desbordaba con
+  texto al 200 % y menú móvil que no se cerraba al elegir la página actual.
+La ejecución en GitHub Actions se registra en el PR; no sustituirla por el resultado local.
+
+BLOQUEADOR H4-KIOSK-01: `/authenticate` exige acción y `expected_version` antes de verificar el PIN
+y el kiosco no tiene forma de conocer el estado ni la versión del empleado; los tests H4 la leen con
+SQL privilegiado. Sin ampliar H4 el kiosco no puede mostrar acciones permitidas ni fichar contra el
+backend real, por lo que la puerta «flujos kiosco contra backend real» no se cumple. Propuesta mínima
+documentada en `docs/UI_PWA.md`; requiere autorización y revisión de seguridad.
+
+Límites: datos y credenciales solo sintéticos y efímeros; sin despliegue Cloudflare/Supabase remoto
+ni producción. Gateway y firmador se sirven por proxy del mismo origen en pruebas; el enrutado de
+producción (proxy o lista de orígenes) es decisión H7 y afecta a SEC-H4-01. Sin RPC de listado de
+dispositivos ni de estado de exportación (se usan audit por RLS y memoria de sesión). Correos de
+miembros no visibles por contrato. OPS-02 no iniciado.

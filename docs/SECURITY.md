@@ -196,3 +196,15 @@ la infraestructura antes del piloto; H4 no despliega producción. Rotar el secre
 cambia buckets de red; hacerlo de forma controlada, manteniendo los límites
 persistentes empleado/dispositivo. Estos hashes operativos no son historia laboral;
 su política de retención corresponde al H5 aún pendiente.
+
+### H6 — frontend
+El navegador solo recibe URL y clave publicable. Autorización siempre en servidor: ocultar botones es
+presentación. Sin `dangerouslySetInnerHTML`, `eval` ni logs de aplicación (lint `no-console`); textos
+del backend se renderizan como texto. CSP estricta en el build. Almacenamiento limitado a la sesión de
+Supabase Auth (humana y de dispositivo con claves y clientes separados) y a identificadores públicos
+del kiosco; nunca PIN, códigos, recibos, registros, exportaciones ni URLs firmadas. El service worker
+cachea solo el shell listado en el build y no intercepta API, Auth, Storage, funciones ni gateway.
+Tokens de invitación y claves RSA de entrega se generan en el navegador; solo el hash o la clave
+pública salen de él y los secretos entregados se muestran una vez. Guardas de código fuente y
+`scripts/scan_secrets.mjs` fallan la CI ante service_role, claves secretas, JWT, pepper o credenciales
+PostgreSQL en el build o en artefactos de prueba. Bloqueo de kiosco: H4-KIOSK-01 en `docs/UI_PWA.md`.
