@@ -35,6 +35,7 @@ it('runs the H6 browser suite against a local ephemeral stack without secrets or
   expect(text).not.toMatch(/upload-artifact|--trace|--video/);
   const run = JSON.stringify(e2e.jobs.browser.steps);
   expect(run).toContain('supabase db reset --local --no-seed');
+  expect(run).toContain('tests/integration/journal_init.py');
   expect(run).toContain('npx playwright test');
   expect(run).toContain('scripts/scan_secrets.mjs dist test-results');
   expect(JSON.stringify(parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs.validate.steps)).toContain('npm run scan:secrets');

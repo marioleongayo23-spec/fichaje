@@ -375,6 +375,10 @@ Deno 2.9.6, Python 3.11, Chromium 141 / Playwright 1.56.1):
   (texto oculto posicionado fuera de la tabla), diálogo no desplazable en móvil, regiones de tabla
   con nombre duplicado, `aria-label` prohibido en el reloj del kiosco, rejilla que desbordaba con
   texto al 200 % y menú móvil que no se cerraba al elegir la página actual.
+- Primera ejecución de `E2E H6` en Actions (run 36176272595): 38 PASS, 6 FAIL. Causa raíz: el workflow
+  no aprovisionaba el journal de recuperación H5 (`tests/integration/journal_init.py`), requerido por
+  las mutaciones de identidad; reproducido localmente sobre base recién reconstruida y corregido en el
+  workflow (paso añadido y comprobación temprana en el arnés). Revalidado local: 44 PASS.
 La ejecución en GitHub Actions se registra en el PR; no sustituirla por el resultado local.
 
 BLOQUEADOR H4-KIOSK-01: `/authenticate` exige acción y `expected_version` antes de verificar el PIN

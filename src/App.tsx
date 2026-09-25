@@ -23,6 +23,7 @@ import { useOnline } from './lib/online';
 import { HUMAN_STORAGE_KEY } from './lib/storage';
 import { createSessionClient } from './lib/supabase';
 import { Loading, Notice, PageHeader } from './ui/components';
+import { ErrorBoundary } from './ui/ErrorBoundary';
 
 function Unconfigured({ invalid }: { invalid?: boolean }) {
   return (
@@ -43,8 +44,7 @@ export function App({ env = import.meta.env as AppEnvironment }: { env?: AppEnvi
     return <Unconfigured invalid />;
   }
   if (!config) return <Unconfigured />;
-  if (window.location.pathname === '/kiosco') return <KioskApp config={config} />;
-  return <HumanApp config={config} />;
+  return <ErrorBoundary>{window.location.pathname === '/kiosco' ? <KioskApp config={config} /> : <HumanApp config={config} />}</ErrorBoundary>;
 }
 
 function HumanApp({ config }: { config: AppConfig }) {
