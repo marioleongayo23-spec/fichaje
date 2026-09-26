@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { releaseId } from '../../vite.config';
+import { releaseId, withReleaseMeta } from '../../vite.config';
 import { postJson, rpc } from '../../src/lib/api';
 import { ApiError } from '../../src/lib/errors';
 import {
-  BUCKETS_MS, CLIENT_ERROR_CLASSES, CLIENT_OPERATIONS, CLIENT_OUTCOMES, flush, operationFor, outcomeOf, recordRequest, takeBatch,
+  BUCKETS_MS, CLIENT_ERROR_CLASSES, CLIENT_OPERATIONS, CLIENT_OUTCOMES, MAX_DURATION_MS, flush, operationFor, outcomeOf, recordRequest, takeBatch,
 } from '../../src/lib/telemetry';
 
 const contract = JSON.parse(readFileSync('ops/contract.json', 'utf8'));
@@ -87,7 +87,7 @@ describe('OPS-02 client telemetry aggregation and delivery', () => {
     expect(await flush(delivered.client)).toBe(true);
     expect(delivered.calls).toHaveLength(1);
     expect(delivered.calls[0].name).toBe('ops_ingest_client_metrics');
-    expect(Object.keys(delivered.calls[0].args).sort()).toEqual(['p_batch', 'p_release']);
+    expect(Object.keys(delivered.calls[0].args)).toEqual(['p_batch']);
     expect((delivered.calls[0].args.p_batch as { count: number }[])[0].count).toBe(1);
     expect(await flush(delivered.client)).toBe(true);
     expect(delivered.calls).toHaveLength(1);
@@ -100,9 +100,24 @@ describe('OPS-02 client telemetry aggregation and delivery', () => {
     for (let i = 0; i < 1500; i++) recordRequest('select', null, false, 1);
     expect(takeBatch()[0].count).toBe(1000);
   });
-  it('embeds only a bounded public release identifier', () => {
+  it('keeps durations inside the server contract (+Inf capped at 120 s)', () => {
+    recordRequest('select', null, false, 3_600_000);
+    recordRequest('select', null, false, 45_000);
+    expect(takeBatch()[0]).toMatchObject({ count: 2, sum_ms: MAX_DURATION_MS + 45_000, buckets: [0, 0, 0, 0, 0, 0, 0, 0, 0, 2] });
+  });
+  it('drops a batch the server rate-limits instead of retrying it', async () => {
+    recordRequest('select', null, false, 10);
+    const limited = fakeClient({ data: { accepted: 0, limited: true } });
+    expect(await flush(limited.client)).toBe(true);
+    expect(takeBatch()).toEqual([]);
+  });
+  it('never sends the release: it only marks the built index.html, bounded', () => {
     expect(releaseId('0.0.0+abc1234')).toBe('0.0.0+abc1234');
     expect(releaseId('ops@example.invalid')).toBe('dev');
     expect(releaseId(undefined)).toBe('dev');
+    expect(withReleaseMeta('<head><meta charset="UTF-8" /></head>', '0.0.0+abc1234'))
+      .toBe('<head><meta charset="UTF-8" />\n    <meta name="fichaje-release" content="0.0.0+abc1234" /></head>');
+    expect(withReleaseMeta('<meta charset="UTF-8" />', '"><script>')).toContain('content="dev"');
+    expect(readFileSync('src/lib/telemetry.ts', 'utf8')).not.toMatch(/p_release|__FICHAJE_RELEASE__|RELEASE\b/);
   });
 });

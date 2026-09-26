@@ -15,6 +15,9 @@ runbook). Revisado el 2026-09-26. Son decisiones técnicas de operación, no req
   de `private.employee_state` (única proyección autorizada) con `scripts/ops/rebuild_projection.py`.
 - IA/automatización: puede diagnosticar, resumir, citar checks fallidos y logs saneados, proponer runbook,
   issue o PR revisable. No recibe credenciales de producción, datos laborales completos ni SQL mutante.
+- La telemetría del navegador (`fichaje_frontend_*`) es no confiable (SEC-OPS-01): sirve de contexto, pero
+  ninguna alerta, rollback, reintento ni reconstrucción se decide con ella. Sus límites de ingesta están en
+  `private.ops_ingest_limits` (solo el propietario de la base los ajusta, dentro de sus CHECK).
 - Evidencia mínima a preservar siempre: notificación de alerta (JSON `fichaje.alert.v1`), eventos OBS-01
   del intervalo, informe de health/canary/invariantes/backup, release y commit afectados. Nunca volcados de
   datos, JWT, PIN, challenges, contraseñas, emails, nombres, códigos de empleado ni motivos.
@@ -139,8 +142,9 @@ Comandos (entorno de operación con login técnico que solo hereda el rol de ent
 
 <a id="clock-regression"></a>
 ## CLOCK_REGRESSION y VERSION_CONFLICT anómalo — `CLOCK_REGRESSION`, `VERSION_CONFLICT_HIGH`
-- **Detección**: eventos/telemetría con `CLOCK_REGRESSION` (reloj del servidor por detrás de la marca de
-  agua de originales) o proporción de `VERSION_CONFLICT` sobre fichajes ≥ umbral.
+- **Detección**: eventos OBS-01 de servidor con `CLOCK_REGRESSION` (reloj del servidor por detrás de la marca de
+  agua de originales) o proporción de `VERSION_CONFLICT` sobre fichajes ≥ umbral. La telemetría del
+  navegador con esas clases es solo contexto: nunca dispara la alerta.
 - **Impacto**: fichajes rechazados sin escritura (correcto); usuarios deben reintentar.
 - **Automático permitido**: ninguno sobre datos; revisar NTP/servicio de tiempo del proveedor.
 - **Prohibido**: aceptar hora del cliente, adelantar/atrasar `server_at`, relajar `check_clock`.

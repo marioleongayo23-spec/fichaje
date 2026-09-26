@@ -2,6 +2,7 @@
 
 Run: python3 -m unittest discover -s tests/ops
 """
+import inspect
 import io
 import json
 import socket
@@ -17,6 +18,7 @@ import metrics  # noqa: E402
 import retry  # noqa: E402
 import alerts  # noqa: E402
 import leakscan  # noqa: E402
+import release_gate  # noqa: E402
 
 UUID = '3f2b8a54-6c1d-4e8f-9a0b-1c2d3e4f5a6b'
 opslib.LOG.path, opslib.LOG.stream = '', io.StringIO()  # keep test output readable
@@ -311,6 +313,43 @@ class Obs06Alerts(unittest.TestCase):
             alerts.condition('CANARY_FAILED', channel='person@example.invalid')
         with self.assertRaises(ValueError):
             alerts.validate_payload({'schema': 'fichaje.alert.v1', 'status': 'FIRING', 'alert': 'API_DOWN', 'email': 'x'})
+
+
+class SecOps01UntrustedClientTelemetry(unittest.TestCase):
+    """Browser telemetry is shaped by any authenticated client (within server
+    quotas): it never feeds alerts, the release gate, rollback or a repair."""
+    SCRIPTS = Path(__file__).resolve().parents[2] / 'scripts' / 'ops'
+
+    @staticmethod
+    def abusive_rows():
+        return [{'operation': op, 'outcome': 'rejected', 'error_class': 'CLOCK_REGRESSION', 'requests': 1000,
+                 'duration_sum_ms': 1000 * 120000.0, 'duration_buckets': [0] * 9 + [1000]} for op in ('clock.CLOCK_IN', 'kiosk.clock.CLOCK_IN')]
+
+    def test_contract_marks_browser_metrics_untrusted_and_no_alert_reads_them(self):
+        self.assertEqual({n for n, s in CONTRACT['metrics'].items() if s.get('trust') == 'untrusted'},
+                         {n for n in CONTRACT['metrics'] if n.startswith('fichaje_frontend_')})
+        self.assertEqual({s['source'] for s in CONTRACT['alerts'].values()},
+                         {'health', 'canary', 'invariants', 'backup', 'jobs', 'journal', 'release', 'metrics'})
+
+    def test_forged_client_telemetry_never_changes_alert_decisions(self):
+        trusted = {'metrics': metrics.rates([build_event('web', 'clock.CLOCK_IN', 'success') for _ in range(30)])}
+        forged = metrics.from_client_rows(self.abusive_rows())
+        self.assertEqual(forged.value('fichaje_frontend_requests_total', operation='clock.CLOCK_IN', outcome='rejected', error_class='CLOCK_REGRESSION'), 1000)
+        baseline = alerts.evaluate(trusted)
+        polluted = alerts.evaluate({**trusted, 'client': self.abusive_rows(), 'frontend': forged, 'client_metrics': self.abusive_rows()})
+        self.assertEqual((baseline, polluted[1]), (polluted, []))
+        with tempfile.TemporaryDirectory() as tmp:
+            engine = alerts.AlertEngine(Path(tmp) / 's.json', {}, environment='ci')
+            self.assertEqual(engine.process({**trusted, 'client': self.abusive_rows()}), [])
+            self.assertEqual(engine.firing(), [])
+
+    def test_decision_code_never_reads_client_telemetry(self):
+        for name in ('alerts', 'release_gate', 'rebuild_projection', 'jobs', 'canary', 'health', 'invariants', 'backup_monitor', 'retry', 'faults'):
+            source = (self.SCRIPTS / f'{name}.py').read_text(encoding='utf-8')
+            for marker in ('ops_client_metrics', 'fichaje_frontend', 'from_client_rows', 'ops_ingest'):
+                self.assertNotIn(marker, source, name)
+        self.assertNotIn('client', inspect.getsource(metrics.rates))
+        self.assertEqual(list(inspect.signature(release_gate.gate).parameters), ['release_id', 'targets', 'canary', 'app_url'])
 
 
 class LeakScanner(unittest.TestCase):

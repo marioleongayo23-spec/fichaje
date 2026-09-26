@@ -221,6 +221,38 @@ class Obs03ApplicationProbe(unittest.TestCase):
             SpaHost.files['/'] = ('text/html', SpaHost.files['/'][1].replace(b'index-missing.js', b'index-a.js'))
 
 
+class ReleaseHost(SpaHost):
+    files = {'/': ('text/html', b'<!doctype html><meta charset="UTF-8" />\n    <meta name="fichaje-release" content="r1" />'
+                                b'<div id="root"></div><script type="module" src="/assets/index-a.js"></script>'),
+             '/assets/index-a.js': ('text/javascript', b'console.log(1)')}
+
+
+class Res02ArtifactIdentity(unittest.TestCase):
+    """SEC-OPS-01 moved the release id out of the bundle (the browser no longer
+    sends it): the gate reads it from the served index.html."""
+
+    def setUp(self):
+        self.server = ThreadingHTTPServer(('127.0.0.1', 0), ReleaseHost)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.url = f'http://127.0.0.1:{self.server.server_port}'
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+    def test_served_release_must_be_the_candidate(self):
+        self.assertTrue(release_gate.smoke(self.url, 'r1')['checks']['artifact_identity'])
+        self.assertFalse(release_gate.smoke(self.url, 'r2')['checks']['artifact_identity'])
+
+    def test_entry_bundle_must_really_be_served(self):
+        original = ReleaseHost.files['/']
+        ReleaseHost.files['/'] = ('text/html', original[1].replace(b'index-a.js', b'index-missing.js'))
+        try:
+            self.assertFalse(release_gate.smoke(self.url, 'r1')['checks']['artifact_identity'])
+        finally:
+            ReleaseHost.files['/'] = original
+
+
 class FlakyNotifier:
     """Route endpoint that can be down; records what it accepted."""
 

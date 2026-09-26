@@ -3,8 +3,10 @@ import type { ApiError } from './errors';
 
 // OPS-02 client telemetry (OBS-02). Only aggregated counters and latency buckets
 // per operation, outcome and stable error class leave the browser, through a
-// write-only RPC. No tenant, person, record, request_id, URL or free text is
-// kept or sent, and nothing is written to browser storage.
+// write-only RPC. No tenant, person, record, request_id, release, URL or free
+// text is kept or sent, and nothing is written to browser storage. The limits
+// below only keep honest clients inside the server contract (SEC-OPS-01): the
+// server enforces its own, and a batch it rate-limits is dropped, not retried.
 export const CLIENT_OPERATIONS = [
   'clock.CLOCK_IN', 'clock.BREAK_START', 'clock.BREAK_END', 'clock.CLOCK_OUT', 'kiosk.authenticate',
   'kiosk.clock.CLOCK_IN', 'kiosk.clock.BREAK_START', 'kiosk.clock.BREAK_END', 'kiosk.clock.CLOCK_OUT',
@@ -26,6 +28,8 @@ export type ClientOutcome = typeof CLIENT_OUTCOMES[number];
 export type ClientErrorClass = typeof CLIENT_ERROR_CLASSES[number];
 // Upper bounds in ms; the tenth bucket is +Inf (same layout as ops/contract.json).
 export const BUCKETS_MS = [50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000];
+// The server rejects durations beyond 120 s (the cap of the +Inf bucket).
+export const MAX_DURATION_MS = 120_000;
 
 const ACTIONS = ['CLOCK_IN', 'BREAK_START', 'BREAK_END', 'CLOCK_OUT'];
 // A lost response of these may have committed: its outcome is unknown.
@@ -77,7 +81,7 @@ export function recordRequest(operation: ClientOperation, error: ApiError | null
     series.set(key, item);
   }
   if (item.count >= 1000) return; // bounded per flush window (server limit)
-  const ms = Math.max(0, Math.round(durationMs * 1000) / 1000);
+  const ms = Math.min(MAX_DURATION_MS, Math.max(0, Math.round(durationMs * 1000) / 1000));
   const index = BUCKETS_MS.findIndex((limit) => ms <= limit);
   item.buckets[index === -1 ? BUCKETS_MS.length : index] += 1;
   item.count += 1;
@@ -106,9 +110,6 @@ export function restoreBatch(batch: SeriesBatchItem[]): void {
   }
 }
 
-declare const __FICHAJE_RELEASE__: string | undefined;
-export const RELEASE = typeof __FICHAJE_RELEASE__ === 'string' && /^[0-9A-Za-z.+_-]{1,64}$/.test(__FICHAJE_RELEASE__) ? __FICHAJE_RELEASE__ : 'dev';
-
 // Flushes through the authenticated session only; delivery never blocks the UI
 // and its own outcome is not recorded (no feedback loop).
 export async function flush(client: SupabaseClient): Promise<boolean> {
@@ -117,7 +118,7 @@ export async function flush(client: SupabaseClient): Promise<boolean> {
   try {
     const { data } = await client.auth.getSession();
     if (!data.session) { restoreBatch(batch); return false; }
-    const { error } = await client.rpc('ops_ingest_client_metrics', { p_release: RELEASE, p_batch: batch })
+    const { error } = await client.rpc('ops_ingest_client_metrics', { p_batch: batch })
       .retry(false).abortSignal(AbortSignal.timeout(5000));
     if (error) { restoreBatch(batch); return false; }
     return true;

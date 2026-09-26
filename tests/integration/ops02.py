@@ -712,15 +712,15 @@ def run_suite(deployer, targets, engine, sink, monitor_dsn, reviewer_dsn, repair
     batch = [{'operation': 'clock.CLOCK_IN', 'outcome': 'success', 'error_class': 'NONE', 'count': 2, 'sum_ms': 180.5, 'buckets': [0, 1, 1, 0, 0, 0, 0, 0, 0, 0]},
              {'operation': 'clock.BREAK_END', 'outcome': 'unknown', 'error_class': 'TIMEOUT', 'count': 1, 'sum_ms': 15000, 'buckets': [0, 0, 0, 0, 0, 0, 0, 0, 1, 0]}]
     for _ in range(2):
-        check(api.rpc('ops_ingest_client_metrics', worker_token, {'p_release': 'ops02-r1', 'p_batch': batch}, 'rpc.other', True) == {'accepted': 2},
+        check(api.rpc('ops_ingest_client_metrics', worker_token, {'p_batch': batch}, 'rpc.other', True) == {'accepted': 2},
               'OBS-02 browser telemetry accepted through the write-only RPC')
     try:
-        api.rpc('ops_ingest_client_metrics', worker_token, {'p_release': 'ops02-r1', 'p_batch': [dict(batch[0], employee_id=state['tenant']['employee'])]}, 'rpc.other', True)
+        api.rpc('ops_ingest_client_metrics', worker_token, {'p_batch': [dict(batch[0], employee_id=state['tenant']['employee'])]}, 'rpc.other', True)
         raise AssertionError('identifier accepted')
     except retry.NotRetryable as error:
         check(error.error_class == 'INVALID_INPUT', 'OBS-02 telemetry carrying an identifier is rejected')
     with psycopg.connect(monitor_dsn) as connection:
-        client_rows = [dict(zip(('bucket_start', 'release', 'operation', 'outcome', 'error_class', 'requests', 'duration_sum_ms', 'duration_buckets'), row))
+        client_rows = [dict(zip(('bucket_start', 'operation', 'outcome', 'error_class', 'requests', 'duration_sum_ms', 'duration_buckets'), row))
                        for row in connection.execute('select * from private.ops_client_metrics_snapshot(null)').fetchall()]
     metrics.from_client_rows(client_rows, registry)
     check(registry.value('fichaje_frontend_requests_total', operation='clock.CLOCK_IN', outcome='success', error_class='NONE') == 4
@@ -757,7 +757,7 @@ def run_suite(deployer, targets, engine, sink, monitor_dsn, reviewer_dsn, repair
                 denied.append(error.status in (401, 403, 404))
     check(all(denied), 'OBS-07 no OWNER/ADMIN/EMPLOYEE/anon identity reaches technical OPS functions or tables')
     try:
-        api.rpc('ops_ingest_client_metrics', None, {'p_release': 'x', 'p_batch': batch}, 'rpc.other', True)
+        api.rpc('ops_ingest_client_metrics', None, {'p_batch': batch}, 'rpc.other', True)
         raise AssertionError('anonymous ingestion')
     except retry.NotRetryable as error:
         check(error.error_class in ('UNAUTHENTICATED', 'FORBIDDEN'), 'OBS-07 anonymous callers cannot add telemetry')
@@ -766,6 +766,9 @@ def run_suite(deployer, targets, engine, sink, monitor_dsn, reviewer_dsn, repair
           'OBS-07 human review is tenant-scoped: tenant A detail never includes tenant B')
     check(one("select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'ops\\_%%'") == 1,
           'OBS-07 the only OPS entry point in the API schema is the write-only ingestion RPC')
+
+    # --- SEC-OPS-01: direct abuse of the ingestion RPC (PostgREST over HTTP, no browser limits) ----
+    sec_ops_01(deployer, sink, monitor_dsn, state)
 
     # --- Absolute rule: no automated path rewrote labour history -----------------------------------
     check(one("select count(*) from public.audit_log where actor_kind='SYSTEM' and action not in ('bootstrap','rebuild_projection','legal_hold','release_hold','purge_labour','recovery_replay')") == 0,
@@ -781,6 +784,216 @@ def run_suite(deployer, targets, engine, sink, monitor_dsn, reviewer_dsn, repair
     found = leakscan.scan(blobs, known)
     check(found == [], f'OBS-01/07 no secret, credential, PIN, email, name, code, reason or record identifier in logs, metrics, alerts or reports ({len(blobs)} outputs)')
     print(f'PASS OPS-02: {checks} real checks; synthetic data only; no artefact uploaded.', flush=True)
+
+
+def sec_ops_01(deployer, sink, monitor_dsn, state):
+    """Every call goes straight to the RPC with raw HTTP: no retries, no OBS-01 event, no frontend."""
+    limited = (200, {'accepted': 0, 'limited': True})
+    abusers: list[dict] = []
+
+    def ingest(token, body):
+        try:
+            return opslib.http_json('POST', f'{URL}/rest/v1/rpc/ops_ingest_client_metrics', api.headers(token), json.dumps(body).encode(), 15)
+        except opslib.HttpError as error:
+            return error.status, error.error_class
+
+    def item(operation, outcome='failure', error_class='UPSTREAM_5XX'):
+        return {'operation': operation, 'outcome': outcome, 'error_class': error_class, 'count': 1, 'sum_ms': 60, 'buckets': [0, 1] + [0] * 8}
+
+    def identity(label):
+        person = prov.account(label)
+        person['token'] = api.token(person['email'], person['password'])
+        known.extend([person['email'], person['password'], person['id']])
+        abusers.append(person)
+        return person
+
+    def fresh_window(margin=100):
+        """Each block runs inside one 5-minute quota window (the metric bucket)."""
+        remaining = 300 - float(one('select extract(epoch from clock_timestamp())')) % 300
+        if remaining < margin:
+            time.sleep(remaining + 1)
+        return one("select date_bin('5 minutes',clock_timestamp(),timestamptz '2000-01-01 00:00:00+00')")
+
+    def total(operation, outcome='failure', error_class='UPSTREAM_5XX'):
+        return int(one('select coalesce(sum(requests),0) from private.ops_client_metrics where operation=%s and outcome=%s and error_class=%s',
+                       (operation, outcome, error_class)))
+
+    def bucket_rows(at):
+        return one('select count(*) from private.ops_client_metrics where bucket_start=%s', (at,))
+
+    def quota(person, at):
+        """Test-only recomputation of the pseudonym (needs the window's private salt)."""
+        return rows("""select s.attempts,s.events,s.series from private.ops_ingest_subjects s join private.ops_ingest_windows w using(window_start)
+                       where s.window_start=%s and s.subject=encode(sha256(w.salt||convert_to(%s,'UTF8')),'hex')""", (at, person['id']))
+
+    def operator(statement, params=()):
+        with psycopg.connect(OPERATOR, autocommit=True) as connection:
+            connection.execute(statement, params)
+
+    def trusted_state():
+        server = metrics.read_events([scratch / 'events.jsonl', *sorted((deployer.workdir / 'logs').glob('*.log'))])
+        rates = metrics.rates(server)
+        return {'history': history(), 'repairs': one('select count(*) from private.ops_projection_repairs'),
+                'projection': one("select md5(coalesce(string_agg(row_to_json(s)::text,'' order by s.organization_id,s.employee_id),'')) from private.employee_state s"),
+                'system': one("select count(*) from public.audit_log where actor_kind='SYSTEM'"), 'release': deployer.state(),
+                'notifications': len(sink.received), 'rates': rates, 'decisions': alerts.evaluate({'metrics': rates})}
+
+    limits = dict(zip(('calls', 'events', 'series', 'subjects', 'global_events', 'bucket_series', 'retention'), rows(
+        'select subject_calls,subject_events,subject_series,global_subjects,global_events,bucket_series,retention_days from private.ops_ingest_limits')[0]))
+    check(limits == {'calls': 30, 'events': 2000, 'series': 200, 'subjects': 5000, 'global_events': 200000, 'bucket_series': 1000, 'retention': 7},
+          'SEC-OPS-01 server-side limits in force per identity, per window and per bucket, with retention')
+    trusted = trusted_state()
+
+    # Many consecutive calls from one identity; a second identity keeps its own quota.
+    at = fresh_window()
+    attacker, bystander = identity('abuse-a'), identity('abuse-b')
+    before = total('rpc.classify_hours')
+    sequence = [ingest(attacker['token'], {'p_batch': [item('rpc.classify_hours')]}) for _ in range(limits['calls'] + 10)]
+    check(sequence == [(200, {'accepted': 1})] * limits['calls'] + [limited] * 10 and total('rpc.classify_hours') == before + limits['calls'],
+          f'SEC-OPS-01 {limits["calls"] + 10} consecutive calls from one identity: exactly {limits["calls"]} reach the aggregates')
+    check(quota(attacker, at) == [(limits['calls'] + 10, limits['calls'], limits['calls'])],
+          'SEC-OPS-01 the quota is persistent: limited attempts are committed too')
+    check(ingest(bystander['token'], {'p_batch': [item('rpc.classify_hours')]}) == (200, {'accepted': 1})
+          and total('rpc.classify_hours') == before + limits['calls'] + 1, 'SEC-OPS-01 a second identity does not inherit the first one\'s block')
+
+    # Inflated, oversized, out-of-vocabulary or identifying payloads: rejected before any write.
+    vocab = CONTRACT['client_vocabulary']
+    combos = [{'operation': o, 'outcome': r, 'error_class': e, 'count': 1, 'sum_ms': 10, 'buckets': [1] + [0] * 9}
+              for o in vocab['operations'] if o.startswith('kiosk.') for r in vocab['outcomes'] for e in vocab['error_classes']]
+    malformed = {
+        'count=9999': [dict(item('select', 'success', 'NONE'), count=9999, sum_ms=100, buckets=[9999] + [0] * 9)],
+        'count=1001': [dict(item('select', 'success', 'NONE'), count=1001, sum_ms=100, buckets=[1001] + [0] * 9)],
+        'duration outside its bucket': [dict(item('select', 'success', 'NONE'), sum_ms=999999999)],
+        'open bucket over 120 s': [dict(item('select', 'success', 'NONE'), sum_ms=120001, buckets=[0] * 9 + [1])],
+        '101 series': combos[:101],
+        'duplicated series': [item('select'), item('select')],
+        'operation out of vocabulary': [item('clock.FORGED')],
+        'outcome out of vocabulary': [item('select', outcome='maybe')],
+        'error class out of vocabulary': [item('select', error_class='SQLSTATE_23505')],
+        'tenant as operation': [item(state['tenant']['org'])],
+        'employee attached': [dict(item('select'), employee_id=state['tenant']['employee'])],
+        'email attached': [dict(item('select'), email=bystander['email'])],
+        'request attached': [dict(item('select'), request_id=uid())],
+    }
+    rows_before = one('select count(*) from private.ops_client_metrics')
+    rejected = {name: ingest(bystander['token'], {'p_batch': payload}) for name, payload in malformed.items()}
+    check(all(result == (400, 'INVALID_INPUT') for result in rejected.values()) and one('select count(*) from private.ops_client_metrics') == rows_before
+          and quota(bystander, at) == [(1, 1, 1)],
+          f'SEC-OPS-01 {len(rejected)} inflated/oversized/out-of-vocabulary/identifying payloads (count=9999 included) rejected with no write')
+    anonymous = ingest(None, {'p_batch': [item('select')]})
+    check(anonymous[0] in (401, 403) and one('select count(*) from private.ops_client_metrics') == rows_before, 'SEC-OPS-01 anonymous calls refused, nothing written')
+
+    # Random releases: no parameter, key, column or label can carry them.
+    releases = [f'{secrets.token_hex(4)}.{n}' for n in range(20)]
+    forged_release = [ingest(bystander['token'], {'p_release': release, 'p_batch': [item('select')]}) for release in releases]
+    smuggled = [ingest(bystander['token'], {'p_batch': [dict(item('select'), release=release)]}) for release in releases[:5]]
+    check(all(status in (400, 404) for status, _ in forged_release) and all(result == (400, 'INVALID_INPUT') for result in smuggled)
+          and one('select count(*) from private.ops_client_metrics') == rows_before
+          and one("select count(*) from information_schema.columns where table_schema='private' and table_name like 'ops%%' and column_name='release'") == 0
+          and rows("select p.proargnames from pg_proc p where p.pronamespace='public'::regnamespace and p.proname='ops_ingest_client_metrics'") == [(['p_batch'],)],
+          'SEC-OPS-01 20 random releases refused: the RPC takes no release, no store has a release column, no row added')
+
+    # 100 series per call: repeated series add no rows; the per-identity series quota stops the third call.
+    at = fresh_window()
+    heavy = identity('abuse-c')
+    rows_before = bucket_rows(at)
+    hundred = [ingest(heavy['token'], {'p_batch': combos[:100]}) for _ in range(3)]
+    check(hundred == [(200, {'accepted': 100}), (200, {'accepted': 100}), limited] and bucket_rows(at) == rows_before + 100
+          and quota(heavy, at) == [(3, 200, 200)], 'SEC-OPS-01 100 series per call bounded: rows grow only by distinct accepted series')
+
+    # Concurrency: two identities fire 40 simultaneous calls each.
+    at = fresh_window()
+    racers = [identity('race-a'), identity('race-b')]
+    before = total('rpc.create_invitation')
+    barrier = threading.Barrier(80)
+    raced: dict[str, list] = {person['id']: [] for person in racers}
+
+    def race(person):
+        barrier.wait()
+        raced[person['id']].append(ingest(person['token'], {'p_batch': [item('rpc.create_invitation')]}))
+
+    threads = [threading.Thread(target=race, args=(person,)) for _ in range(40) for person in racers]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    check(all(len(results) == 40 and results.count((200, {'accepted': 1})) == limits['calls'] and results.count(limited) == 40 - limits['calls']
+              for results in raced.values())
+          and total('rpc.create_invitation') == before + 2 * limits['calls']
+          and all(quota(person, at) == [(40, limits['calls'], limits['calls'])] for person in racers),
+          f'SEC-OPS-01 concurrency cannot bypass the quota: 2 identities x 40 simultaneous calls, exactly {limits["calls"]} accepted each, no error')
+
+    # Window expiry: the next window resets the quota and purges stale pseudonymous state.
+    at = fresh_window()
+    spent = [ingest(attacker['token'], {'p_batch': [item('rpc.classify_hours')]}) for _ in range(limits['calls'] + 1)]
+    operator("update private.ops_ingest_subjects set window_start=window_start-interval '1 hour'")
+    operator("update private.ops_ingest_windows set window_start=window_start-interval '1 hour'")
+    reset = ingest(attacker['token'], {'p_batch': [item('rpc.classify_hours')]})
+    check(spent[-1] == limited and reset == (200, {'accepted': 1}) and quota(attacker, at) == [(1, 1, 1)]
+          and one('select count(*) from private.ops_ingest_windows where window_start<%s', (at,)) == 0
+          and one('select count(*) from private.ops_ingest_subjects where window_start<%s', (at,)) == 0,
+          'SEC-OPS-01 an expired window resets the identity\'s quota; stale quota rows and salts are purged')
+
+    # Intentional global limits (operator-tuned): volume, identities and rows per window. The caps are
+    # set from the live window counters, so the next call of any identity crosses them.
+    at = fresh_window()
+    g1, g2, g3 = identity('global-a'), identity('global-b'), identity('global-c')
+    seen = item('export.link', 'timeout', 'TIMEOUT')
+    first = ingest(g1['token'], {'p_batch': [seen]})
+    try:
+        operator('update private.ops_ingest_limits set global_events=(select events from private.ops_ingest_windows where window_start=%s)', (at,))
+        volume = [ingest(g1['token'], {'p_batch': [seen]}), ingest(g2['token'], {'p_batch': [seen]})]
+        operator('update private.ops_ingest_limits set global_events=%s,global_subjects=(select subjects from private.ops_ingest_windows where window_start=%s)',
+                 (limits['global_events'], at))
+        crowd = ingest(g3['token'], {'p_batch': [seen]})
+        crowd_row = quota(g3, at)
+        operator('update private.ops_ingest_limits set global_subjects=%s,bucket_series=(select series from private.ops_ingest_windows where window_start=%s)',
+                 (limits['subjects'], at))
+        full = [ingest(g3['token'], {'p_batch': [item('auth.sign_in', 'rejected', 'AUTH_FAILED')]}), ingest(g3['token'], {'p_batch': [seen]})]
+    finally:
+        operator('update private.ops_ingest_limits set global_events=%s,global_subjects=%s,bucket_series=%s',
+                 (limits['global_events'], limits['subjects'], limits['bucket_series']))
+    relaxed = ingest(g3['token'], {'p_batch': [item('auth.sign_in', 'rejected', 'AUTH_FAILED')]})
+    check(first == (200, {'accepted': 1}) and volume == [limited, limited] and crowd == limited and crowd_row == []
+          and full == [limited, (200, {'accepted': 1})] and relaxed == (200, {'accepted': 1})
+          and rows('select subject_calls,subject_events,subject_series,global_subjects,global_events,bucket_series,retention_days from private.ops_ingest_limits')
+          == [tuple(limits.values())],
+          'SEC-OPS-01 intentional global limits (volume, identities, bucket rows) apply to every identity and lift when relaxed')
+
+    # Forged failures: visible on dashboards only; never an alert, rollback, repair or labour change.
+    fresh_window()
+    forger = identity('forger')
+    forged = ingest(forger['token'], {'p_batch': [{'operation': 'clock.CLOCK_IN', 'outcome': 'rejected', 'error_class': 'CLOCK_REGRESSION',
+                                                   'count': 1000, 'sum_ms': 120000000, 'buckets': [0] * 9 + [1000]}]})
+    with psycopg.connect(monitor_dsn) as connection:
+        client_rows = [dict(zip(('bucket_start', 'operation', 'outcome', 'error_class', 'requests', 'duration_sum_ms', 'duration_buckets'), row))
+                       for row in connection.execute('select * from private.ops_client_metrics_snapshot(null)').fetchall()]
+    dashboard = metrics.from_client_rows(client_rows)
+    after = trusted_state()
+    decisions = alerts.evaluate({'metrics': after['rates'], 'client': client_rows, 'frontend': dashboard})
+    check(forged == (200, {'accepted': 1})
+          and dashboard.value('fichaje_frontend_requests_total', operation='clock.CLOCK_IN', outcome='rejected', error_class='CLOCK_REGRESSION') >= 1000,
+          'SEC-OPS-01 forged client failures are stored only as untrusted dashboard aggregates')
+    check(alerts.evaluate({'client': client_rows, 'frontend': dashboard}) == (set(), []),
+          'SEC-OPS-01 browser telemetry alone (1000 forged CLOCK_REGRESSION) is no alert source and raises no condition')
+    changed = sorted(key for key in trusted if after[key] != trusted[key])   # key names only, never values
+    check(not changed and decisions == trusted['decisions'],
+          'SEC-OPS-01 abuse left trusted metrics, alert decisions, notifications, release state (no rollback), repairs, projection and labour history unchanged'
+          + (f' (changed: {",".join(changed)})' if changed else ''))
+
+    # No identity anywhere; bounded growth.
+    subjects = [r[0] for r in rows('select subject from private.ops_ingest_subjects')]
+    known.extend(subjects)
+    prom = dashboard.render()
+    reports['metrics-after-abuse'] = prom
+    columns = [r[0] for r in rows("select column_name from information_schema.columns where table_schema='private' and table_name='ops_ingest_subjects' order by ordinal_position")]
+    check(columns == ['window_start', 'subject', 'attempts', 'events', 'series'] and subjects
+          and not any(p['id'] in s or s in (hashlib.sha256(p['id'].encode()).hexdigest(), hashlib.sha256(p['email'].encode()).hexdigest()) for p in abusers for s in subjects)
+          and not any(v in prom for p in abusers for v in (p['id'], p['email'])) and not any(s in prom for s in subjects),
+          'SEC-OPS-01 quota state holds per-window keyed pseudonyms only; no uid, email or pseudonym reaches metrics')
+    check(one('select max(n) from (select count(*) as n from private.ops_client_metrics group by bucket_start) b') <= limits['bucket_series']
+          and one('select count(*) from private.ops_ingest_windows') <= 2 and one('select count(*) from private.ops_ingest_subjects') <= 2 * limits['subjects'],
+          'SEC-OPS-01 bounded growth: rows per bucket under the cap; quota state only for the current and previous window')
 
 
 def wait_report(targets, timeout_ms, predicate, timeout_s=45):

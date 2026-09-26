@@ -131,7 +131,10 @@ def from_events(events, registry: Registry | None = None) -> Registry:
 
 
 def from_client_rows(rows, registry: Registry | None = None) -> Registry:
-    """Aggregated browser telemetry read by the ops monitor role."""
+    """Aggregated browser telemetry read by the ops monitor role. Untrusted
+    (SEC-OPS-01): any authenticated client shapes it within server quotas, so it
+    is exposed for dashboards only and never feeds rates(), alerts, the release
+    gate or a repair."""
     registry = registry or Registry()
     for row in rows:
         registry.inc('fichaje_frontend_requests_total', {'operation': row['operation'], 'outcome': row['outcome'],

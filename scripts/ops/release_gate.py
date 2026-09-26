@@ -144,8 +144,12 @@ def smoke(app_url: str, release_id: str) -> dict:
     checks = {}
     try:
         _, raw, _ = http_raw('GET', app_url + '/', {'Accept': 'text/html'}, 5)
-        entry = re.search(r'src="(/assets/index-[^"]+\.js)"', raw.decode('utf-8', 'replace'))
-        checks['artifact_identity'] = bool(entry) and release_id.encode() in health.fetch_asset(app_url + entry.group(1), 5)
+        html = raw.decode('utf-8', 'replace')
+        entry = re.search(r'src="(/assets/index-[^"]+\.js)"', html)
+        # The release id lives only in the served index.html; the bundle it references must be real JS.
+        served = re.search(r'<meta name="fichaje-release" content="([^"]*)"', html)
+        checks['artifact_identity'] = bool(entry and served) and served.group(1) == release_id \
+            and bool(health.fetch_asset(app_url + entry.group(1), 5))
     except (HttpError, OSError, OpsError):
         checks['artifact_identity'] = False
     try:

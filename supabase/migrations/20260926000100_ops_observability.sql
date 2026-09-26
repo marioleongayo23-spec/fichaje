@@ -56,17 +56,47 @@ create table private.ops_repair_context (
  organization_id uuid not null, employee_id uuid not null,
  primary key(backend_pid,transaction_id)
 );
--- Aggregated client telemetry: no tenant, user, employee, request or free text.
+-- Aggregated client telemetry: no tenant, user, employee, request, release or
+-- free text. Browser data is untrusted: it never feeds alerts, gates or repairs.
 create table private.ops_telemetry_vocabulary (
  kind text not null check(kind in ('operation','outcome','error_class')), value text not null,
  primary key(kind,value)
 );
 create table private.ops_client_metrics (
- bucket_start timestamptz not null, release text not null check(release ~ '^[0-9A-Za-z.+_-]{1,64}$'),
- operation text not null, outcome text not null, error_class text not null,
+ bucket_start timestamptz not null, operation text not null, outcome text not null, error_class text not null,
  requests bigint not null check(requests>=0), duration_sum_ms double precision not null check(duration_sum_ms>=0),
  duration_buckets bigint[] not null check(cardinality(duration_buckets)=10),
- primary key(bucket_start,release,operation,outcome,error_class)
+ primary key(bucket_start,operation,outcome,error_class)
+);
+-- SEC-OPS-01: ingestion limits enforced by the server, never by the browser.
+-- One row, readable only by the ingestion definer; only the database owner
+-- can tune it, within these bounds.
+create table private.ops_ingest_limits (
+ id boolean primary key default true check(id),
+ subject_calls integer not null check(subject_calls between 1 and 600),
+ subject_events integer not null check(subject_events between 1 and 60000),
+ subject_series integer not null check(subject_series between 1 and 6000),
+ global_subjects integer not null check(global_subjects between 1 and 100000),
+ global_events bigint not null check(global_events between 1 and 100000000),
+ bucket_series integer not null check(bucket_series between 1 and 4000),
+ retention_days integer not null check(retention_days between 1 and 31)
+);
+insert into private.ops_ingest_limits(subject_calls,subject_events,subject_series,global_subjects,global_events,bucket_series,retention_days)
+values(30,2000,200,5000,200000,1000,7);
+-- Fixed 5-minute windows (the metric bucket). The random salt lives and dies
+-- with its window: once purged, a subject can no longer be recomputed.
+create table private.ops_ingest_windows (
+ window_start timestamptz primary key, salt bytea not null check(octet_length(salt)=32),
+ subjects integer not null default 0 check(subjects>=0), calls integer not null default 0 check(calls>=0),
+ events bigint not null default 0 check(events>=0), series integer not null default 0 check(series>=0)
+);
+-- Per-identity quota under a keyed, per-window pseudonym: no uid, email,
+-- membership, employee, name or code is stored.
+create table private.ops_ingest_subjects (
+ window_start timestamptz not null, subject text not null check(subject ~ '^[0-9a-f]{64}$'),
+ attempts integer not null default 0 check(attempts>=0), events integer not null default 0 check(events>=0),
+ series integer not null default 0 check(series>=0),
+ primary key(window_start,subject)
 );
 insert into private.ops_telemetry_vocabulary(kind,value)
 select 'operation',x from unnest(array[
@@ -85,7 +115,7 @@ union all select 'error_class',x from unnest(array['NONE','VERSION_CONFLICT','ID
 
 do $$ declare t text; begin
  foreach t in array array['ops_invariant_runs','ops_invariant_findings','ops_original_baselines','ops_projection_repairs',
-  'ops_repair_context','ops_telemetry_vocabulary','ops_client_metrics'] loop
+  'ops_repair_context','ops_telemetry_vocabulary','ops_client_metrics','ops_ingest_limits','ops_ingest_windows','ops_ingest_subjects'] loop
   execute format('alter table private.%I enable row level security',t);
   execute format('alter table private.%I force row level security',t);
   execute format('revoke all on private.%I from public,anon,authenticated,service_role',t);
@@ -429,10 +459,10 @@ begin
 end $$;
 
 create function private.ops_client_metrics_snapshot(p_since timestamptz)
-returns table(bucket_start timestamptz,release text,operation text,outcome text,error_class text,requests bigint,duration_sum_ms double precision,duration_buckets bigint[])
+returns table(bucket_start timestamptz,operation text,outcome text,error_class text,requests bigint,duration_sum_ms double precision,duration_buckets bigint[])
 language sql security definer set search_path='' as $$
- select m.bucket_start,m.release,m.operation,m.outcome,m.error_class,m.requests,m.duration_sum_ms,m.duration_buckets
- from private.ops_client_metrics m where m.bucket_start>=coalesce(p_since,'-infinity') order by 1,2,3,4,5
+ select m.bucket_start,m.operation,m.outcome,m.error_class,m.requests,m.duration_sum_ms,m.duration_buckets
+ from private.ops_client_metrics m where m.bucket_start>=coalesce(p_since,'-infinity') order by 1,2,3,4
 $$;
 
 do $$ declare f regprocedure; begin
@@ -533,47 +563,103 @@ grant execute on function private.ops_rebuild_projection(uuid,uuid,uuid,text) to
 revoke create on schema private from fichaje_ops_repair;
 
 -- OBS-02 client telemetry: authenticated clients add aggregated counters only.
--- Nothing identifies the tenant, person, device, request or record; no client
--- can read any telemetry back.
-grant select on private.ops_telemetry_vocabulary to fichaje_ops_ingest;
-grant select,insert,update on private.ops_client_metrics to fichaje_ops_ingest;
+-- Nothing identifies the tenant, person, device, request, release or record; no
+-- client can read any telemetry back. SEC-OPS-01: the server bounds every call
+-- (closed vocabulary, counts, durations, series) and every identity and window
+-- (persistent quotas, concurrency-safe); the browser's own limits are not trusted.
+grant select on private.ops_telemetry_vocabulary,private.ops_ingest_limits to fichaje_ops_ingest;
+grant select,insert,update,delete on private.ops_client_metrics,private.ops_ingest_windows,private.ops_ingest_subjects to fichaje_ops_ingest;
 grant execute on function private.request_uid() to fichaje_ops_ingest;
 create policy ingest_vocabulary on private.ops_telemetry_vocabulary for select to fichaje_ops_ingest using(true);
 create policy ops_vocabulary on private.ops_telemetry_vocabulary for select to fichaje_ops using(true);
 grant select on private.ops_telemetry_vocabulary to fichaje_ops;
+create policy ingest_limits on private.ops_ingest_limits for select to fichaje_ops_ingest using(true);
 create policy ingest_metrics on private.ops_client_metrics to fichaje_ops_ingest using(true) with check(true);
-create function public.ops_ingest_client_metrics(p_release text,p_batch jsonb) returns jsonb
+create policy ingest_windows on private.ops_ingest_windows to fichaje_ops_ingest using(true) with check(true);
+create policy ingest_subjects on private.ops_ingest_subjects to fichaje_ops_ingest using(true) with check(true);
+-- Lock order: [new window row] -> own subject row -> window row -> metric rows.
+-- Validation errors write nothing; a quota rejection commits the attempt and
+-- answers {"accepted":0,"limited":true} (the browser drops that batch). Every
+-- quota check fails closed (a missing limit or counter means limited).
+create function public.ops_ingest_client_metrics(p_batch jsonb) returns jsonb
 language plpgsql security definer set search_path='' as $$
-declare x jsonb; bucket timestamptz; accepted integer:=0; counts bigint[];
+declare caller uuid:=private.request_uid(); x jsonb; counts bigint[]; lo numeric; hi numeric; n_events integer:=0; n_series integer; n_new integer;
+ w timestamptz; lim private.ops_ingest_limits; win private.ops_ingest_windows; sub private.ops_ingest_subjects; s text;
 begin
- if private.request_uid() is null then raise exception using errcode='42501',message='UNAUTHENTICATED'; end if;
- if p_release is null or p_release !~ '^[0-9A-Za-z.+_-]{1,64}$' or p_batch is null or jsonb_typeof(p_batch)<>'array'
-  or jsonb_array_length(p_batch) not between 1 and 100 or octet_length(p_batch::text)>32768
+ if caller is null then raise exception using errcode='42501',message='UNAUTHENTICATED'; end if;
+ if p_batch is null or jsonb_typeof(p_batch)<>'array' or jsonb_array_length(p_batch) not between 1 and 100 or octet_length(p_batch::text)>32768
  then raise exception using errcode='22023',message='INVALID_INPUT'; end if;
- bucket:=date_bin('5 minutes',clock_timestamp(),timestamptz '2000-01-01 00:00:00+00');
  for x in select value from jsonb_array_elements(p_batch) loop
   if jsonb_typeof(x)<>'object'
    or (select array_agg(k order by k) from jsonb_object_keys(x) k) is distinct from array['buckets','count','error_class','operation','outcome','sum_ms']
    or not exists(select 1 from private.ops_telemetry_vocabulary v where v.kind='operation' and v.value=x->>'operation')
    or not exists(select 1 from private.ops_telemetry_vocabulary v where v.kind='outcome' and v.value=x->>'outcome')
    or not exists(select 1 from private.ops_telemetry_vocabulary v where v.kind='error_class' and v.value=x->>'error_class')
-   or jsonb_typeof(x->'count')<>'number' or (x->>'count') !~ '^[1-9][0-9]{0,3}$'
+   or jsonb_typeof(x->'count')<>'number' or (x->>'count') !~ '^([1-9][0-9]{0,2}|1000)$'
    or jsonb_typeof(x->'sum_ms')<>'number' or (x->>'sum_ms') !~ '^[0-9]{1,9}(\.[0-9]{1,3})?$'
    or jsonb_typeof(x->'buckets')<>'array' or jsonb_array_length(x->'buckets')<>10
    or exists(select 1 from jsonb_array_elements(x->'buckets') as e(b) where jsonb_typeof(e.b)<>'number' or e.b::text !~ '^(0|[1-9][0-9]{0,3})$')
   then raise exception using errcode='22023',message='INVALID_INPUT'; end if;
   select array_agg(e.b::text::bigint order by e.o) into counts from jsonb_array_elements(x->'buckets') with ordinality as e(b,o);
-  if (select sum(u) from unnest(counts) u)<>(x->>'count')::bigint then raise exception using errcode='22023',message='INVALID_INPUT'; end if;
-  insert into private.ops_client_metrics as m(bucket_start,release,operation,outcome,error_class,requests,duration_sum_ms,duration_buckets)
-  values(bucket,p_release,x->>'operation',x->>'outcome',x->>'error_class',(x->>'count')::bigint,(x->>'sum_ms')::double precision,counts)
-  on conflict(bucket_start,release,operation,outcome,error_class) do update set requests=m.requests+excluded.requests,
-   duration_sum_ms=m.duration_sum_ms+excluded.duration_sum_ms,
-   duration_buckets=(select array_agg(u.a+u.b order by u.i) from unnest(m.duration_buckets,excluded.duration_buckets) with ordinality u(a,b,i));
-  accepted:=accepted+1;
+  -- Every duration lies inside its bucket; the +Inf bucket is capped at 120 s.
+  select sum(b.c*b.l),sum(b.c*b.h) into lo,hi from unnest(counts,array[0,50,100,250,500,1000,2500,5000,10000,30000]::numeric[],
+   array[50,100,250,500,1000,2500,5000,10000,30000,120000]::numeric[]) as b(c,l,h);
+  if (select sum(c) from unnest(counts) c)<>(x->>'count')::bigint or (x->>'sum_ms')::numeric not between lo and hi
+  then raise exception using errcode='22023',message='INVALID_INPUT'; end if;
+  n_events:=n_events+(x->>'count')::integer;
  end loop;
- return jsonb_build_object('accepted',accepted);
+ n_series:=jsonb_array_length(p_batch);
+ if (select count(distinct (e.v->>'operation',e.v->>'outcome',e.v->>'error_class')) from jsonb_array_elements(p_batch) as e(v))<>n_series
+ then raise exception using errcode='22023',message='INVALID_INPUT'; end if;
+
+ w:=date_bin('5 minutes',now(),timestamptz '2000-01-01 00:00:00+00');
+ select * into lim from private.ops_ingest_limits;
+ insert into private.ops_ingest_windows(window_start,salt)
+ values(w,decode(replace(gen_random_uuid()::text||gen_random_uuid()::text,'-',''),'hex')) on conflict do nothing;
+ if found then
+  -- First call of a window: quota state keeps only this and the previous window;
+  -- metric buckets beyond the retention are removed in bounded steps.
+  delete from private.ops_ingest_subjects where window_start<w-interval '5 minutes';
+  delete from private.ops_ingest_windows where window_start<w-interval '5 minutes';
+  delete from private.ops_client_metrics m using (select o.bucket_start,o.operation,o.outcome,o.error_class from private.ops_client_metrics o
+   where o.bucket_start<w-make_interval(days=>lim.retention_days) order by 1 limit 5000) expired
+  where m.bucket_start=expired.bucket_start and m.operation=expired.operation and m.outcome=expired.outcome and m.error_class=expired.error_class;
+ end if;
+ select * into win from private.ops_ingest_windows where window_start=w;
+ s:=encode(sha256(win.salt||convert_to(caller::text,'UTF8')),'hex');
+ insert into private.ops_ingest_subjects(window_start,subject) values(w,s) on conflict do nothing;
+ if found then
+  -- Intentional global limit: a bounded number of identities per window.
+  select * into win from private.ops_ingest_windows where window_start=w for no key update;
+  if coalesce(win.subjects>=lim.global_subjects,true) then
+   delete from private.ops_ingest_subjects where window_start=w and subject=s;
+   return jsonb_build_object('accepted',0,'limited',true);
+  end if;
+  update private.ops_ingest_windows set subjects=subjects+1 where window_start=w;
+ end if;
+ update private.ops_ingest_subjects set attempts=attempts+1 where window_start=w and subject=s returning * into sub;
+ if coalesce(sub.attempts>lim.subject_calls or sub.events+n_events>lim.subject_events or sub.series+n_series>lim.subject_series,true) then
+  return jsonb_build_object('accepted',0,'limited',true);
+ end if;
+ -- Global volume and distinct rows of this bucket, serialised on the window row.
+ select * into win from private.ops_ingest_windows where window_start=w for no key update;
+ select count(*) into n_new from jsonb_array_elements(p_batch) as e(v) where not exists(select 1 from private.ops_client_metrics m
+  where m.bucket_start=w and m.operation=e.v->>'operation' and m.outcome=e.v->>'outcome' and m.error_class=e.v->>'error_class');
+ if coalesce(win.events+n_events>lim.global_events or win.series+n_new>lim.bucket_series,true) then
+  return jsonb_build_object('accepted',0,'limited',true);
+ end if;
+ insert into private.ops_client_metrics as m(bucket_start,operation,outcome,error_class,requests,duration_sum_ms,duration_buckets)
+ select w,e.v->>'operation',e.v->>'outcome',e.v->>'error_class',(e.v->>'count')::bigint,(e.v->>'sum_ms')::double precision,
+  (select array_agg(b.b::text::bigint order by b.o) from jsonb_array_elements(e.v->'buckets') with ordinality as b(b,o))
+ from jsonb_array_elements(p_batch) as e(v)
+ on conflict(bucket_start,operation,outcome,error_class) do update set requests=m.requests+excluded.requests,
+  duration_sum_ms=m.duration_sum_ms+excluded.duration_sum_ms,
+  duration_buckets=(select array_agg(u.a+u.b order by u.i) from unnest(m.duration_buckets,excluded.duration_buckets) with ordinality u(a,b,i));
+ update private.ops_ingest_subjects set events=events+n_events,series=series+n_series where window_start=w and subject=s;
+ update private.ops_ingest_windows set calls=calls+1,events=events+n_events,series=series+n_new where window_start=w;
+ return jsonb_build_object('accepted',n_series);
 end $$;
-alter function public.ops_ingest_client_metrics(text,jsonb) owner to fichaje_ops_ingest;
-revoke all on function public.ops_ingest_client_metrics(text,jsonb) from public,anon,service_role;
-grant execute on function public.ops_ingest_client_metrics(text,jsonb) to authenticated;
+alter function public.ops_ingest_client_metrics(jsonb) owner to fichaje_ops_ingest;
+revoke all on function public.ops_ingest_client_metrics(jsonb) from public,anon,service_role;
+grant execute on function public.ops_ingest_client_metrics(jsonb) to authenticated;
 revoke create on schema public from fichaje_ops_ingest;

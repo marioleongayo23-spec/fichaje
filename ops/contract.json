@@ -63,8 +63,8 @@
   "metrics": {
     "fichaje_ops_events_total": {"type": "counter", "help": "Operational events by component, operation, outcome and stable error class", "labels": {"component": "components", "operation": "operations", "outcome": "outcomes", "error_class": "error_classes"}},
     "fichaje_ops_duration_ms": {"type": "histogram", "help": "Operation latency in milliseconds", "labels": {"component": "components", "operation": "operations"}},
-    "fichaje_frontend_requests_total": {"type": "counter", "help": "Browser API requests aggregated by the client (no identity)", "labels": {"operation": "operations", "outcome": "outcomes", "error_class": "error_classes"}},
-    "fichaje_frontend_duration_ms": {"type": "histogram", "help": "Browser API latency in milliseconds", "labels": {"operation": "operations"}},
+    "fichaje_frontend_requests_total": {"type": "counter", "trust": "untrusted", "help": "Browser API requests aggregated by the client (no identity; untrusted: never an alert, gate or repair input)", "labels": {"operation": "operations", "outcome": "outcomes", "error_class": "error_classes"}},
+    "fichaje_frontend_duration_ms": {"type": "histogram", "trust": "untrusted", "help": "Browser API latency in milliseconds (untrusted: never an alert, gate or repair input)", "labels": {"operation": "operations"}},
     "fichaje_probe_up": {"type": "gauge", "help": "1 UP, 0.5 DEGRADED, 0 DOWN", "labels": {"check": "checks"}},
     "fichaje_probe_latency_ms": {"type": "gauge", "help": "Latency of the last health probe", "labels": {"check": "checks"}},
     "fichaje_canary_success": {"type": "gauge", "help": "1 when the last synthetic cycle passed", "labels": {"channel": "channels"}},

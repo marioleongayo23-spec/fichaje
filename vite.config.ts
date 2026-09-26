@@ -62,16 +62,24 @@ function gatewayProxy(): Record<string, ProxyOptions> {
   return proxy;
 }
 
-// OPS-02 release metadata for client telemetry correlation (public, bounded).
+// OPS-02 release identity of the built artifact (public, bounded). It is only
+// written into index.html for the release gate: the browser never sends it.
 export function releaseId(value = process.env.FICHAJE_RELEASE): string {
   return value && /^[0-9A-Za-z.+_-]{1,64}$/.test(value) ? value : 'dev';
+}
+
+export function withReleaseMeta(html: string, release = releaseId()): string {
+  return html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n    <meta name="fichaje-release" content="${releaseId(release)}" />`);
+}
+
+function releaseMeta(): Plugin {
+  return { name: 'fichaje-release', apply: 'build', transformIndexHtml: (html) => withReleaseMeta(html) };
 }
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   return {
-    plugins: [react(), serviceWorker(), csp(env)],
-    define: { __FICHAJE_RELEASE__: JSON.stringify(releaseId()) },
+    plugins: [react(), serviceWorker(), csp(env), releaseMeta()],
     build: {
       rolldownOptions: {
         input: { index: 'index.html', sw: 'src/pwa/sw.ts' },

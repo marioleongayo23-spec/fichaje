@@ -5,7 +5,7 @@ import { login } from './support/ui';
 // OPS-02 OBS-02 in a real browser: the page aggregates request telemetry and
 // sends it through the write-only RPC. Only operation, outcome, stable error
 // class and latency buckets leave the browser; the database stores 5-minute
-// aggregates with no tenant, person, record or request identity.
+// aggregates with no tenant, person, record, request or release (SEC-OPS-01).
 test.use({ serviceWorkers: 'block' });
 
 const total = () => Number(sql("select coalesce(sum(requests),0) from private.ops_client_metrics where operation='clock.CLOCK_IN' and outcome='success' and error_class='NONE';"));
@@ -27,7 +27,7 @@ test('browser telemetry leaves only bounded aggregates @desktop-only', async ({ 
   expect((await flushed).status()).toBe(200);
 
   const payload = JSON.parse(bodies.at(-1) ?? '{}');
-  expect(Object.keys(payload).sort()).toEqual(['p_batch', 'p_release']);
+  expect(Object.keys(payload)).toEqual(['p_batch']);
   const item = payload.p_batch.find((x: { operation: string; outcome: string }) => x.operation === 'clock.CLOCK_IN' && x.outcome === 'success');
   expect(item).toMatchObject({ error_class: 'NONE', count: 1 });
   for (const entry of payload.p_batch) expect(Object.keys(entry).sort()).toEqual(['buckets', 'count', 'error_class', 'operation', 'outcome', 'sum_ms']);
@@ -37,7 +37,7 @@ test('browser telemetry leaves only bounded aggregates @desktop-only', async ({ 
   }
   expect(body).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-|@|eyJ/);
   await expect.poll(total).toBeGreaterThanOrEqual(before + 1);
-  // The store has no identity column at all: only the bucket, release and bounded labels.
+  // The store has no identity or release column at all: only the bucket and bounded labels.
   expect(sql("select string_agg(column_name, ',' order by ordinal_position) from information_schema.columns where table_schema='private' and table_name='ops_client_metrics';"))
-    .toBe('bucket_start,release,operation,outcome,error_class,requests,duration_sum_ms,duration_buckets');
+    .toBe('bucket_start,operation,outcome,error_class,requests,duration_sum_ms,duration_buckets');
 });
