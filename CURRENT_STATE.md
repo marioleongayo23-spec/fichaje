@@ -1,6 +1,93 @@
 # CURRENT_STATE — 2026-09-26
 ## Hito autorizado
 
+### OPS-02 — observabilidad, canaries, invariantes, alertas y self-healing seguro
+
+**ESTADO: implementado y validado en local;
+[PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12) abierto contra `main`, pendiente de CI y
+de aprobación. Sin merge. H7 no autorizado.** Rama `astra/ops-02-observabilidad-resiliencia` creada desde
+`main` `754c7f184fb14db151303c7ab7db72bb2629e7aa` (la rama de trabajo
+`claude/ops-02-observabilidad-resiliencia-kzk0z9` contiene los mismos commits).
+
+Regla absoluta, verificada por la suite: ninguna automatización, script, agente o IA modifica
+`time_events`, fichajes originales, decisiones o ajustes de corrección, horas efectivas ni historia
+laboral; no hay cierre automático de jornadas ni fichajes inventados. El único dato derivado reescribible
+es `private.employee_state`, solo desde fuentes inmutables, con referencia de autorización, idempotente,
+auditado y BLOCKED si la fuente es incoherente.
+
+Entregado:
+- OBS-01: contrato `ops/contract.json`; eventos JSON por allowlist en scripts (`scripts/ops/opslib.py`),
+  gateway del kiosco y firmador (`supabase/functions/_shared/ops.ts`) con release, commit y `request_id`;
+  las excepciones se reducen a una clase estable (sin SQL, parámetros, cuerpos ni trazas).
+- OBS-02: métricas en formato Prometheus derivadas de eventos e informes (`metrics.py`); telemetría del
+  navegador agregada (`src/lib/telemetry.ts`) enviada por la RPC de solo escritura
+  `public.ops_ingest_client_metrics` (cubos de 5 min sin identidad, vocabulario cerrado en base de datos).
+- OBS-03: `/health/live` y `/health/ready` (cacheado 5 s, acotado a 2 s) en gateway y firmador; `health.py`
+  agrega app, API, Auth, PostgreSQL (`private.ops_db_health()`), gateway y firmador en UP/DEGRADED/DOWN.
+- OBS-04: `canary.py` web y kiosco sobre tenant sintético; si un ciclo quedó a medias rota a un empleado
+  sintético nuevo y deja la sesión abierta como está.
+- OBS-05: 21 invariantes read-only (`private.ops_invariant_*`, `invariants.py`) con evidencia append-only y
+  líneas base de originales; el detalle solo se consulta por tenant.
+- OBS-06: `alerts.py` con catálogo, severidad, runbook, CRITICAL→pager, WARNING→ticket, FIRING/RESOLVED,
+  formato `fichaje.alert.v1` y sink de prueba local.
+- OBS-07: roles `fichaje_ops*` NOLOGIN/NOINHERIT/NOBYPASSRLS; monitor (agregados), reviewer (un tenant, solo
+  lectura) y repairer (solo reconstrucción); ningún OWNER/ADMIN/EMPLOYEE/anon alcanza funciones o tablas OPS.
+- RES-01 `retry.py`/`jobs.py`; RES-02 `release_gate.py` (`promote()` + `LocalDeployer` de releases
+  inmutables); RES-03 `rebuild_projection.py` (`--check` READ ONLY, `--apply` autorizado); RES-04
+  `backup_monitor.py` y `.github/workflows/ops-monitor.yml` (diario, token de solo lectura).
+- Runbooks (`docs/RUNBOOKS.md`, 12), inyección de fallos `faults.py` (solo loopback y
+  `OPS_FAULT_INJECTION=1`), puerta `.github/workflows/ops02.yml`, `ci.yml` con los tests OPS-02 y
+  `bash -n scripts/*.sh`, reglas nuevas en `scan_secrets.mjs`. Documentación: ARCHITECTURE (implementación y
+  fuente de verdad de RES-03), SECURITY, RECOVERY y ACCEPTANCE_TESTS (asignación de evidencia OPS-02).
+
+Evidencia local ejecutada el 2026-09-26 (Docker; Supabase CLI 2.117.0, PostgreSQL 17, GoTrue, PostgREST y
+Storage locales, Deno 2.9.6, Node 24.19.0, Python 3.12), sobre el código de este PR:
+- `supabase db reset --local --no-seed` + `journal_init.py` + `supabase test db`: **411 aserciones pgTAP
+  PASS** (352 previas + 59 de `ops_observability.test.sql`).
+- `python3 tests/integration/ops02.py` tras el mismo reset: **139 comprobaciones reales PASS**. Releases
+  construidas desde el commit con el gateway y el firmador reales; tenants sintéticos. Fallos inducidos de
+  verdad y detectados por el código operativo sin modificar: API 5xx, Auth rechazando, latencia, PostgreSQL
+  rechazando, contenedor Auth detenido y PostgreSQL pausado (health, gateway, canary, alertas y
+  resolución); ACK perdido tras commit y timeout de cliente (mismo payload y clave, una mutación, audit y
+  recibo); error permanente, backoff acotado y circuito; POLICY_REQUIRED y CLOCK_REGRESSION del motor real;
+  deriva de proyección, originales borrados y alterados, audit cross-tenant, ajuste de una decisión
+  rechazada, guarda deshabilitada, sesión abierta antigua y exportación atrasada; reconstrucción exacta e
+  idempotente con historia byte a byte igual y BLOCKED ante fuente alterada; jobs de exportación,
+  retención y journal; release con defecto real en el gateway (lo detecta el canary de kiosco) y release
+  sin asset (lo detecta health) con rollback automático; backups correcto, cercano al umbral, antiguo,
+  fallido, ausente, sin artefacto, corrupto y sin checksums con PostgreSQL siempre `NOT_CONFIGURED`;
+  escáner final sin secretos, PIN, emails, nombres, códigos, motivos ni identificadores de registro.
+  Si falla, la suite solo imprime la etiqueta del check, el tipo o clase de error, ubicaciones de código
+  y eventos por campos enumerados (mismo criterio que H4): nunca valores, SQL ni cuerpos HTTP.
+- `python3 -m unittest discover -s tests/ops`: **41 tests PASS**; Deno `ops_test.ts`: **5 PASS**;
+  `deno check` de kiosk y export-link PASS.
+- `npm run check`: typecheck, lint, **109 tests unitarios**, build y escáner de `dist`: PASS.
+  `bash -n scripts/*.sh`, `py_compile` y `git diff --check`: PASS.
+- Playwright 1.56.1 + Chromium (escritorio y móvil) tras reset desde vacío, contra Auth/PostgREST/Storage/
+  PostgreSQL, gateway y firmador reales: **46/46 PASS** (45 de H6 sin cambios + `telemetry.e2e.ts`: el
+  navegador solo envía agregados acotados, sin tenant, persona, registro, request_id, email ni token).
+  `node scripts/scan_secrets.mjs dist test-results`: 0 hallazgos.
+
+Hallazgos corregidos durante la validación:
+- `record_time_event` responde VERSION_CONFLICT con HTTP 500 (SQLSTATE 40001): la clasificación operativa lo
+  trataba como UPSTREAM_5XX y lo reintentaba. Ahora el código estable manda sobre el estado HTTP, como en
+  `src/lib/errors.ts`; el conflicto se intenta una sola vez.
+- El probe de la aplicación aceptaba un asset ausente porque el host estático responde `index.html` con 200
+  (fallback SPA, igual que Cloudflare Pages): ahora comprueba tipo y contenido.
+- `kiosk_identification.test.sql` era intermitente bajo carga: un INSERT dependía de dos
+  `clock_timestamp()` por defecto y saltaba el CHECK de 60 s antes del índice único. Solo cambia el test;
+  las inserciones reales ya fijan `t` y `t+60 s`.
+
+Límites: sin producción, staging, DNS, dominio, Cloudflare/Supabase remotos, secretos, claves age ni datos
+reales. RES-02 se ha probado en un arnés CI aislado y efímero (`LocalDeployer`); su repetición en staging
+sigue siendo puerta de H7. Rutas reales de alerta (pager/ticket), dashboards, retención de la telemetría y
+de la evidencia OPS, canary e invariantes programados contra producción y el adaptador de despliegue real
+quedan para H7. `ops-monitor.yml` solo puede ejecutarse desde `main` (primera ejecución real tras el
+merge). El backup PostgreSQL sigue bloqueado y se informa `NOT_CONFIGURED`, nunca en verde. La telemetría
+del navegador es informativa: un cliente autenticado podría enviar agregados falsos (sin identidad,
+vocabulario cerrado y lotes acotados); no alimenta ninguna decisión sobre datos laborales y su límite de
+tasa dedicado queda para H7.
+
 ### HITO 6 — UX/UI + PWA sobre H1-H5, con KIO-H6-01 resuelto
 
 **ESTADO: PASS — HITO 6 aprobado por el usuario e integrado en `main` mediante
@@ -110,7 +197,8 @@ HITO 5 aprobado por el usuario e integrado en `main` mediante PR #9 el 2026-09-2
 Rama de origen: `astra/hito-5-informes-retencion`. Merge: `748186125194cf4819357d57a4d8567a8cdf3bab`.
 HITO 6 aprobado por el usuario e integrado en `main` mediante PR #10 el 2026-09-26.
 Rama de origen: `astra/hito-6-ux-pwa`. Merge: `3c374358e1c17853c62cb29047642bee37a4efe5`.
-OPS-02 no iniciado: es el siguiente bloque obligatorio, después de H6 y antes de H7.
+OPS-02 implementado en [PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12), pendiente de
+CI y de aprobación (ver la sección OPS-02 al inicio). Puerta obligatoria antes de H7.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -271,11 +359,13 @@ guard real, sin sustituir reloj/RPC. Timeout usa proxy local que pierde el ACK t
 Serialización conservadora por tenant, documentada. No H3, kiosco, informes H5, UI/PWA,
 producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 
-## OPS-02 — observabilidad y resiliencia (planificado)
+## OPS-02 — observabilidad y resiliencia (especificación original)
+Implementado en PR #12 (ver la sección OPS-02 al inicio de este documento). Texto original:
 Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
 
 ## Siguiente paso
-HITO 6 cerrado. Siguiente bloque obligatorio: OPS-02, después de H6 y antes de H7. Esperar autorización expresa antes de iniciarlo; no iniciar H7.
+Revisión de OPS-02 en PR #12 con CI completa en verde y aprobación expresa del usuario antes del merge.
+H7 sigue sin autorizar: no iniciarlo hasta que OPS-02 esté aprobado e integrado y el usuario lo autorice.
 
 ## HITO 3 — correcciones append-only
 ESTADO: PASS — HITO 3 aprobado por el usuario y PR #7 integrado en `main`.
