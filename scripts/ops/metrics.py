@@ -165,7 +165,7 @@ def from_reports(reports: dict, registry: Registry | None = None) -> Registry:
             registry.set('fichaje_invariant_findings', {'invariant': row['invariant'], 'severity': row['severity']}, row['findings'])
     backup = reports.get('backup')
     if backup:
-        for kind, result in backup.items():
+        for kind, result in ((k, backup[k]) for k in sorted(enum('backup_kinds')) if isinstance(backup.get(k), dict)):
             registry.set('fichaje_backup_ok', {'kind': kind}, 1.0 if result['status'] == 'OK' else 0.0)
             if result.get('age_seconds') is not None:
                 registry.set('fichaje_backup_age_seconds', {'kind': kind}, result['age_seconds'])

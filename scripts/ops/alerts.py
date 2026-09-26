@@ -82,7 +82,7 @@ def evaluate(signals: dict) -> tuple[set[str], list[dict]]:
     backup = signals.get('backup')
     if backup is not None:
         sources.add('backup')
-        for kind, result in backup.items():
+        for kind, result in ((k, backup[k]) for k in sorted(enum('backup_kinds')) if isinstance(backup.get(k), dict)):
             status = result['status']
             if status == 'NOT_CONFIGURED':
                 active.append(condition('DB_BACKUP_NOT_CONFIGURED', kind=kind))
