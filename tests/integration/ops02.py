@@ -911,8 +911,26 @@ def backup_checks(engine):
         server.server_close()
 
 
+def report_failure(error: BaseException) -> None:
+    """Safe failure report (as H4): the static check label, the exception type or stable class,
+    code locations and failing operational events by enumerated fields only. Never values, SQL,
+    HTTP bodies or synthetic secrets (CI logs may be public)."""
+    import traceback
+    detail = str(error) if isinstance(error, AssertionError) else getattr(error, 'error_class', '')
+    print(f'FAIL OPS-02 after {checks} checks: {type(error).__name__} {detail}'.rstrip(), flush=True)
+    for frame in traceback.extract_tb(error.__traceback__):
+        print(f'  {frame.filename}:{frame.lineno} in {frame.name}', flush=True)
+    paths = [scratch / 'events.jsonl', *sorted((scratch / 'deploy' / 'logs').glob('*.log'))]
+    failures = [e for e in metrics.read_events([p for p in paths if p.exists()]) if e['outcome'] in ('failure', 'unknown', 'timeout')]
+    for event in failures[-20:]:
+        print('  event', *(event.get(k, '-') for k in ('component', 'operation', 'outcome', 'error_class', 'stage')), flush=True)
+
+
 if __name__ == '__main__':
     try:
         main()
+    except BaseException as failure:  # noqa: BLE001 -- reported safely, then re-raised as exit 1
+        report_failure(failure)
+        raise SystemExit(1)
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
