@@ -119,7 +119,10 @@ HITO 6: PR #10 integrado en `main` el 2026-09-26 antes de la aprobación formal 
 autorización expresa); auditado después de forma independiente y aprobado técnicamente ahora por
 autorización expresa del usuario, sin revertir el código.
 Rama de origen: `astra/hito-6-ux-pwa`. Merge: `3c374358e1c17853c62cb29047642bee37a4efe5`.
-OPS-02 no iniciado: es el siguiente bloque obligatorio, después de H6 y antes de H7.
+Estado actual: HITO 6 aprobado y cerrado según la cronología corregida arriba. OPS-02 iniciado y en
+revisión en la rama `astra/ops-02-observabilidad-resiliencia` mediante
+[PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12); todavía NO aprobado ni integrado en
+`main`. H7 sigue sin iniciar y bloqueado hasta la aprobación de OPS-02.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -281,10 +284,10 @@ Serialización conservadora por tenant, documentada. No H3, kiosco, informes H5,
 producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 
 ## OPS-02 — observabilidad y resiliencia (planificado)
-Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
+Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. Estado actual: OPS-02 iniciado y en revisión mediante PR #12 (rama `astra/ops-02-observabilidad-resiliencia`); todavía NO aprobado ni integrado en `main`.
 
 ## Siguiente paso
-HITO 6 cerrado. Siguiente bloque obligatorio: OPS-02, después de H6 y antes de H7. Esperar autorización expresa antes de iniciarlo; no iniciar H7.
+HITO 6 aprobado y cerrado. OPS-02 (bloque obligatorio después de H6 y antes de H7) está iniciado y en revisión mediante PR #12, sin aprobar ni integrar en `main`. H7 sigue sin iniciar y bloqueado hasta la aprobación de OPS-02.
 
 ## HITO 3 — correcciones append-only
 ESTADO: PASS — HITO 3 aprobado por el usuario y PR #7 integrado en `main`.
