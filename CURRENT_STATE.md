@@ -3,9 +3,16 @@
 
 ### HITO 6 — UX/UI + PWA sobre H1-H5, con KIO-H6-01 resuelto
 
-**ESTADO: PASS — HITO 6 aprobado por el usuario e integrado en `main` mediante
-[PR #10](https://github.com/marioleongayo23-spec/fichaje/pull/10) el 2026-09-26.** Rama de origen
-`astra/hito-6-ux-pwa`. Merge: `3c374358e1c17853c62cb29047642bee37a4efe5`. Código probado:
+**ESTADO: PASS — HITO 6 aprobado técnicamente por autorización expresa del usuario el 2026-09-26, después
+de una auditoría independiente posterior al merge.** Cronología (corrección documental del 2026-09-26):
+1. [PR #10](https://github.com/marioleongayo23-spec/fichaje/pull/10) se integró en `main` el 2026-09-26
+   (commit de merge `3c374358e1c17853c62cb29047642bee37a4efe5`, fechado a las 03:47 UTC) antes de la
+   aprobación formal y sin autorización expresa de merge del usuario: el merge fue prematuro.
+2. Después, HITO 6 se auditó de forma independiente; la revisión confirma que el contenido integrado supera
+   la puerta técnica H6, por lo que el código no se revierte.
+3. HITO 6 queda aprobado ahora por autorización expresa del usuario. La aprobación no fue anterior al merge.
+
+Rama de origen `astra/hito-6-ux-pwa`. Merge: `3c374358e1c17853c62cb29047642bee37a4efe5`. Código probado:
 `80a5ccd4874d53e79162169b0f675d998f1fb353`; commit final revisado:
 `49d74ea6731d62e5d2374a8aba573fecfb36c28c` (solo documentación, Checks repetidos en verde).
 CI en `main` sobre el merge `3c37435`: PASS en
@@ -108,7 +115,9 @@ Rama de origen: `astra/hito-4-kiosco`. Merge: `76922f352a64f3bbf0d1d7ece2c7ae155
 
 HITO 5 aprobado por el usuario e integrado en `main` mediante PR #9 el 2026-09-25.
 Rama de origen: `astra/hito-5-informes-retencion`. Merge: `748186125194cf4819357d57a4d8567a8cdf3bab`.
-HITO 6 aprobado por el usuario e integrado en `main` mediante PR #10 el 2026-09-26.
+HITO 6: PR #10 integrado en `main` el 2026-09-26 antes de la aprobación formal (merge prematuro, sin
+autorización expresa); auditado después de forma independiente y aprobado técnicamente ahora por
+autorización expresa del usuario, sin revertir el código.
 Rama de origen: `astra/hito-6-ux-pwa`. Merge: `3c374358e1c17853c62cb29047642bee37a4efe5`.
 OPS-02 no iniciado: es el siguiente bloque obligatorio, después de H6 y antes de H7.
 
