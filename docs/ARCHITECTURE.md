@@ -1,6 +1,6 @@
 # Arquitectura
 ## Componentes y fronteras
-React + TypeScript + Vite: cliente no fiable. PWA diferida hasta aprobar lógica.
+React + TypeScript + Vite: cliente no fiable. PWA instalable desde H6 (shell público únicamente).
 Cloudflare Pages alojará únicamente estáticos; no se configura cuenta, dominio ni despliegue H0.
 Supabase Auth identifica usuarios; PostgreSQL decide permisos, estados, tiempos y transacciones.
 PostgREST expone lecturas RLS y RPC permitidas. Supabase Edge Function futura solo para gateway
@@ -72,3 +72,10 @@ y HMAC-SHA256 por tenant con `KIOSK_NETWORK_SECRET` independiente del pepper.
 Cabeceras de red no se usan. Tras un proxy el peer es el proxy, sin inferir IP
 original; metadata no confiable/no disponible deniega autenticación. Contrato,
 limitaciones de despliegue y umbral adicional 60/15 min en SECURITY.md.
+
+## H6 — cliente web y PWA
+SPA sin framework adicional: sesión Supabase Auth, selector de tenant en memoria, RPC/lecturas RLS
+H1-H5 sin cambios y confirmación solo tras ACK. Service worker de shell público, sin cola offline.
+Gateway de kiosco y firmador de exportaciones por rutas del mismo origen (proxy inverso en despliegue,
+decisión H7). El kiosco identifica con código+PIN y el servidor devuelve estado, versión y un
+challenge por acción legal (KIO-H6-01, único cambio backend de H6). Ver `docs/UI_PWA.md`.

@@ -190,7 +190,8 @@ posterior en H7; no se crea aquí. El entorno Edge recibe también estas variabl
 No llamar al endpoint desde Internet sin TLS y política de origen en el despliegue futuro.
 
 POST JSON con Authorization Bearer validado por `/auth/v1/user` (no decode sin verificar).
-Campos comunes: `organization_id`, `request_id` UUID. Campos desconocidos rechazados,
+Campos comunes: `organization_id`; `request_id` UUID en todas las rutas salvo `/authenticate`
+(sus request_id los genera el servidor por challenge). Campos desconocidos rechazados,
 cuerpo máximo 8 KiB y respuestas `Cache-Control: no-store`, sin CORS abierto.
 
 | Ruta | Campos adicionales | Resultado |
@@ -198,8 +199,8 @@ cuerpo máximo 8 KiB y respuestas `Cache-Control: no-store`, sin CORS abierto.
 | `/provision` | device_id UUID, name, expires_at ISO, delivery_key JWK RSA-OAEP-256 pública >=2048 bits | device_id y delivery cifrado de {email,password} de cuenta Auth técnica nueva |
 | `/revoke` | device_id | active:false; idempotente y auditado |
 | `/reset` | employee_id, delivery_key | credential_version y delivery cifrado del PIN nuevo de ocho dígitos |
-| `/authenticate` | device_id, code, pin, action, expected_version | challenge de 32 bytes (64 hex), employee_id, request_id, expires_in:60 |
-| `/record` | device_id, employee_id, challenge, action, expected_version | recibo H2, solo después de COMMIT |
+| `/authenticate` | device_id, code, pin (KIO-H6-01: sin action, expected_version, request_id ni employee_id) | `{state, version, actions, challenges:[{action, challenge (64 hex), request_id}]}`: estado y versión autoritativos, acciones legales y un challenge por acción; sin identificador del empleado |
+| `/record` | device_id, request_id, challenge, action, expected_version (sin employee_id) | recibo H2, solo después de COMMIT |
 
 `delivery` es ciphertext RSA-OAEP-SHA256, no PIN/password recuperable por PostgreSQL.
 El gestor conserva localmente la clave privada y descifra para entregar presencialmente
@@ -232,16 +233,34 @@ como SHA-256, ligado a tuple completa, versión de credencial y TTL 60 s servido
 crea evento/estado/audit/recibo atómicamente. Un challenge usado no autoriza otro evento;
 la misma tuple/request_id recupera exclusivamente su recibo persistente tras revalidar
 identidad de dispositivo, empleado activo y versión de credencial (aunque el TTL ya pasó).
-Una autenticación nueva con igual request_id y payload distinto devuelve IDEMPOTENCY_CONFLICT.
 Timeout significa desconocido; conservar tuple/request_id y reintentar, jamás nueva clave ni
-ACK optimista. En la futura UI se borran PIN/recibo a los 15 s; aquí no hay cliente ni caché.
+ACK optimista. La UI H6 (`/kiosco`) borra código/PIN al enviarlos y todo lo mostrado antes de 15 s.
+
+KIO-H6-01 (2026-09-25, `20260925000100_kiosk_identification.sql`): tras el PIN correcto,
+`private.kiosk_auth_grant` (misma transacción y lock de tenant que `kiosk_auth_begin`) resuelve
+el empleado por código, revierte la reserva de fallo como antes, obtiene un scope `kiosk_grant`
+de solo lectura de la proyección de ese empleado (insertado sin limpieza tras el lock, RACE-01)
+y emite, para el estado autoritativo, un challenge por acción legal (OUT→CLOCK_IN;
+WORKING→BREAK_START/CLOCK_OUT; PAUSED→BREAK_END/CLOCK_OUT), todos con el mismo `grant_id`,
+`expected_version` = versión actual, request_id propio generado en servidor, versión de
+credencial y TTL 60 s. El gateway genera dos secretos por intento (mismo trabajo en éxito y
+fallo) y solo sus SHA-256 llegan a PostgreSQL. `private.kiosk_record` localiza al empleado por
+el hash del challenge de su dispositivo (scope de lookup sin limpieza: una sola limpieza de
+contextos por transacción) y delega en `kiosk_record_event`, que conserva el binding completo,
+la recuperación de recibo y el motor H2, y al registrar consume también los hermanos del grant:
+el segundo challenge ya no puede crear evento (403). Dos grants distintos sobre la misma versión:
+el segundo recibe VERSION_CONFLICT. `kiosk_auth_finish` se elimina y el gateway ya no puede
+ejecutar `kiosk_record_event`; sus únicos EXECUTE son `kiosk_admin_prepare/apply`,
+`kiosk_auth_begin`, `kiosk_auth_grant` y `kiosk_record`. Pruebas: `kiosk_identification.test.sql`
+y `tests/integration/kio_h6.py` (ejecutado dentro de H4, antes del gate de fugas KIO-07).
 
 Web y kiosco llaman a la misma `private.apply_time_event` SECURITY INVOKER. Web mantiene su
 wrapper/gate H2; kiosco tiene capability propia. Se conservan reloj y high-water original H3,
 política de sesión, secuencia, versión, proyección e inmutabilidad. Audit usa actor_kind KIOSK
 con actor_id Auth técnico (FK existente); time_events.kiosk_device_id identifica dispositivo.
-Orden conservador por tenant: bind único antes de lock organización → revalidación →
-challenge → estado (no contención cruzada por estar serializado por organización).
+Orden conservador por tenant: una única limpieza de contextos (bind) antes del lock de
+organización → revalidación → challenge → estado (no contención cruzada por estar serializado
+por organización). Los scopes añadidos por KIO-H6-01 solo insertan la fila de su transacción.
 No grants de escritura de identidad, memberships, correcciones ni exports al rol kiosco.
 
 Prueba de fugas: PIN generado conocido exclusivamente en memoria del test, escaneo de todas

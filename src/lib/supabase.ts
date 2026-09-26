@@ -4,8 +4,9 @@ export interface PublicEnvironment {
   VITE_SUPABASE_URL?: string;
   VITE_SUPABASE_PUBLISHABLE_KEY?: string;
 }
+export interface SupabaseConfig { url: string; key: string }
 
-export function readSupabaseConfig(env: PublicEnvironment) {
+export function readSupabaseConfig(env: PublicEnvironment): SupabaseConfig | null {
   const url = env.VITE_SUPABASE_URL?.trim();
   const key = env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
   if (!url && !key) return null;
@@ -31,4 +32,10 @@ export function createSupabaseClient(env: PublicEnvironment): SupabaseClient | n
   });
 }
 
-// No client instantiated on import; Auth/session strategy belongs to H1.
+// H6: Supabase Auth restores sessions from its own storage key. Human and kiosk
+// identities use distinct keys and clients so they can never share a session.
+export function createSessionClient(config: SupabaseConfig, storageKey: string, storage: Storage): SupabaseClient {
+  return createClient(config.url, config.key, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey, storage },
+  });
+}

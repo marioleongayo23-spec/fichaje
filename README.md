@@ -1,10 +1,13 @@
 # Fichaje APP
-SaaS de registro horario multiempresa. HITO 0: documentación y bootstrap, sin producto operativo.
+SaaS de registro horario multiempresa. H1-H5 backend aprobado; H6 añade interfaz web y PWA (ver estado).
 
 ## Desarrollo
 Node 24 LTS y npm 11. `npm ci`, `npm run dev`. `npm run check` ejecuta typecheck, lint, tests y build.
 Copiar `.env.example` a `.env.local` únicamente para un futuro entorno local autorizado.
-El bootstrap funciona sin variables ni conexión Supabase; no contiene autenticación ni fichaje implementados.
+Sin variables la app muestra que el servicio no está configurado. Pruebas de navegador: con Supabase
+local arrancado y reconstruido (`supabase/README.md`), `python3 tests/integration/journal_init.py`, Deno,
+Python, `npx playwright install chromium` y `npm run test:e2e`.
+Decisiones de interfaz, PWA y bloqueo de kiosco: [UI y PWA](docs/UI_PWA.md).
 Solo URL y publishable key pública pueden llegar al navegador. Nunca service_role ni credenciales PostgreSQL.
 
 ## Navegación

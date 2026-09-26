@@ -1,5 +1,92 @@
 # CURRENT_STATE — 2026-09-25
 ## Hito autorizado
+
+### HITO 6 — UX/UI + PWA sobre H1-H5, con KIO-H6-01 resuelto
+
+**ESTADO: PASS técnico en CI sobre el código `80a5ccd4874d53e79162169b0f675d998f1fb353`
+(2026-09-25); pendiente de revisión y aprobación del usuario.** Rama `astra/hito-6-ux-pwa`,
+[PR #10](https://github.com/marioleongayo23-spec/fichaje/pull/10) contra `main`, sin merge. Esta
+sección solo registra evidencia ya ejecutada.
+
+Evidencia de CI del código `80a5ccd`:
+- [Database H1 + H2 + H3 + H4 + KIO-H6-01 + H5, run 36192804446](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36192804446): PASS.
+  Supabase local efímero reconstruido desde vacío (`supabase db reset --local --no-seed`), Deno 2.9.6
+  strict check de kiosk y export-link y tests Deno de red. **352 aserciones SQL/pgTAP PASS**
+  (297 + 55 KIO-H6-01). **506 comprobaciones de integración real PASS: 102 H1 + 70 H2 + 80 H3 +
+  181 H4 (incluidas 63 KIO-H6-01) + 73 H5**, con el gate KIO-07 de PIN, IP, digests y secretos de challenge.
+- [Browser E2E, run 36192804457](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36192804457): PASS.
+  **45/45 Playwright** (Chromium escritorio y móvil) contra Auth/PostgREST/Storage/PostgreSQL, gateway
+  y firmador reales; `scan_secrets.mjs dist test-results`: 0 hallazgos.
+- [CI general, run 36192804458](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36192804458): PASS
+  (npm ci, typecheck, lint, 98 tests unitarios, build, escáner de secretos, shell y whitespace).
+El commit posterior solo registra esta evidencia; sus Checks repiten automáticamente toda la validación.
+
+**KIO-H6-01** (detectado al iniciar H6): `kiosk/authenticate` exigía `action` y `expected_version`
+antes de validar código+PIN y ningún endpoint del kiosco devolvía estado ni versión, así que la UI no
+podía ofrecer las acciones válidas. El usuario autorizó expresamente el 2026-09-25 resolverlo con un
+contrato cerrado. Implementado en `supabase/migrations/20260925000100_kiosk_identification.sql` y
+`supabase/functions/kiosk/index.ts`:
+- `/authenticate` recibe solo código+PIN. Tras el PIN correcto el servidor resuelve empleado, estado
+  OUT/WORKING/PAUSED y versión autoritativos y devuelve únicamente `state`, `version`, `actions` y un
+  challenge por acción legal (OUT→CLOCK_IN; WORKING→BREAK_START+CLOCK_OUT; PAUSED→BREAK_END+CLOCK_OUT).
+- Cada challenge queda ligado en servidor a organización, dispositivo, empleado, acción,
+  `expected_version`, request_id propio, versión de credencial y TTL ≤ 60 s; no hay challenge genérico.
+  Los hermanos comparten `grant_id`; ejecutar uno consume todos, y el segundo no crea evento.
+- `/record` ya no acepta `employee_id` (lo determina el challenge). El gateway solo puede ejecutar
+  `kiosk_admin_prepare/apply`, `kiosk_auth_begin`, `kiosk_auth_grant` y `kiosk_record`;
+  `kiosk_auth_finish` se elimina y `kiosk_record_event` pasa a ser interno.
+- Se mantienen Argon2id, pepper, límites 5/30/60, IP minimizada, errores genéricos, suelo de 300 ms,
+  `no-store`, hashes de challenge, idempotencia, revocación, recuperación de ACK, máquina H2 y
+  RLS/FORCE RLS. Scope `kiosk_grant` de solo lectura de la proyección del empleado verificado; el
+  dispositivo sigue sin acceso libre a estado, eventos, directorio, historial ni RPC humanas.
+- Fallo encontrado y corregido durante la validación: `kiosk_record` hacía dos limpiezas de contextos
+  por transacción y el doble clic concurrente (12 peticiones) produjo `40P01`. Los scopes nuevos solo
+  insertan la fila de su transacción (una única limpieza, como H1-H4); revalidado sin deadlocks.
+
+**UI/PWA H6** (sin cambios de H1-H5 salvo KIO-H6-01): login, sesión, selector de organización,
+empleado (fichar, «Mi registro», correcciones, exportación propia), OWNER/ADMIN (empleados, personas y
+roles, horarios, bandeja de correcciones, clasificación, exportaciones con entrega controlada, kioscos y
+PIN), kiosco `/kiosco` conectado al gateway real, PWA instalable con service worker de shell público
+sin cola offline ni Background Sync. Decisiones y límites en `docs/UI_PWA.md`.
+
+Evidencia local ejecutada el 2026-09-25 (entorno de edición con Docker; Supabase CLI 2.117.0,
+PostgreSQL 17, GoTrue/PostgREST/Storage locales, Deno 2.9.6, Node 24.19.0, Python 3):
+- `supabase db reset --local --no-seed` + `python3 tests/integration/journal_init.py` +
+  `supabase test db`: **352 aserciones SQL/pgTAP PASS** (297 previas + 55
+  `kiosk_identification.test.sql`), tres ejecuciones consecutivas.
+- `python3 tests/integration/h5_render.py` PASS y `python3 tests/integration/h5.py` (cadena real
+  completa): **PASS H1 102 + H2 70 + H3 80 + H4 181 + H5 73 = 506 comprobaciones**; H4 incluye las
+  **63 comprobaciones KIO-H6-01** de `tests/integration/kio_h6.py` (tenant propio, gateway HTTP real)
+  y el gate KIO-07 ampliado: PIN, IP y secretos de challenge ausentes de DB, logs de contenedores,
+  gateway, salida y artefactos (los secretos de challenge solo existen en las respuestas HTTP).
+- KIO-H6-01 cubierto en real: OUT/WORKING/PAUSED con solo acciones legales y versión correcta;
+  challenges independientes; ejecutar uno invalida el hermano (secuencial y 8 peticiones
+  concurrentes: una acción, un evento); caducado; reutilizado; otra acción, versión, request,
+  empleado, dispositivo y tenant; PIN erróneo y código inexistente indistinguibles (≥ 300 ms);
+  dispositivo revocado, empleado desactivado por RPC real y reset de credencial; límites de
+  empleado y dispositivo; dispositivo sin tablas, RPC humanas ni rutas de consulta.
+- Gateway: `deno check` estricto de kiosk y export-link y **2 tests Deno** de red PASS.
+- `npm run check` (typecheck app+SW, lint sin avisos, **98 tests unitarios**, build, escáner de
+  secretos de `dist`): PASS. `bash -n scripts/*.sh`, `py_compile` y `git diff --check`: PASS.
+- Playwright 1.56.1 + Chromium, proyectos escritorio 1280×800 y móvil Pixel 5, tras
+  `supabase db reset --local --no-seed` + `journal_init.py`, contra Auth/PostgREST/Storage/PostgreSQL
+  locales, gateway Deno y firmador H5 reales: **45/45 PASS** (a11y, empleado, gestión, kiosco, PWA).
+  Kiosco: empleado sin email ficha OUT→WORKING→PAUSED→OUT solo con las acciones ofrecidas por el
+  servidor; confirmación solo tras el ACK (ACK retenido: solo «Enviando…»); ACK perdido tras commit y
+  timeout antes del servidor → resultado desconocido y un único evento; doble toque; challenge
+  reutilizado y caducado; dispositivo revocado; recibo limpio a 10 s y pantalla identificada en < 15 s
+  (medido en la página); axe en todos los pasos; PIN, código, credencial, JWT del dispositivo y los 7
+  secretos de challenge ausentes de almacenamiento, cachés, consola, logs y artefactos.
+  `node scripts/scan_secrets.mjs dist test-results`: 0 hallazgos.
+- Fallo intermedio corregido: la primera ejecución dio 44/45 porque la pantalla identificada se
+  limpiaba a 15 s exactos más el renderizado (15,9 s medidos con sondeo de 1 s). El temporizador pasa
+  a 14 s (estrictamente < 15 s) y la prueba mide dentro de la página con sondeo de 50 ms.
+
+Límites: solo datos y secretos sintéticos efímeros; sin producción, despliegue ni datos reales. El
+gateway y el firmador se sirven por proxy del mismo origen (`vite preview` en pruebas); el proxy
+inverso de producción y su efecto en SEC-H4-01 quedan para H7. El listado de kioscos se deriva del
+audit (sin nombre ni caducidad). Sin OPS-02 ni H7. OPS-02 permanece después de H6 y antes de H7.
+
 HITO 0 Bootstrap aprobado por el usuario e integrado en `main` mediante PR #1 el 2026-09-21.
 Rama de origen: `astra/hito-0-bootstrap`. Merge: `f9a02bb150b424d9cf0a47b741496c997b7bc085`.
 HITO 1 aprobado por el usuario e integrado en `main` mediante PR #4 el 2026-09-22.
@@ -13,7 +100,7 @@ Rama de origen: `astra/hito-4-kiosco`. Merge: `76922f352a64f3bbf0d1d7ece2c7ae155
 
 HITO 5 aprobado por el usuario e integrado en `main` mediante PR #9 el 2026-09-25.
 Rama de origen: `astra/hito-5-informes-retencion`. Merge: `748186125194cf4819357d57a4d8567a8cdf3bab`.
-HITO 6 no iniciado. OPS-02 permanece después de H6 y antes de H7.
+HITO 6 autorizado; KIO-H6-01 resuelto con autorización expresa. PASS técnico en CI en PR #10, pendiente de aprobación del usuario. OPS-02 permanece después de H6 y antes de H7.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -178,7 +265,7 @@ producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
 
 ## Siguiente paso
-HITO 5 cerrado. Esperar autorización expresa antes de iniciar H6. OPS-02 se implementará después de H6 y antes de H7.
+HITO 5 cerrado. HITO 6 en PR #10 con Checks verdes: esperar revisión y aprobación expresa del usuario; sin merge automático. No iniciar OPS-02 ni H7. OPS-02 se implementará después de H6 y antes de H7.
 
 ## HITO 3 — correcciones append-only
 ESTADO: PASS — HITO 3 aprobado por el usuario y PR #7 integrado en `main`.

@@ -58,12 +58,13 @@ export async function handler(req: Request, info: Deno.ServeHandlerInfo): Promis
       provision: ['organization_id','request_id','device_id','name','expires_at','delivery_key'],
       revoke: ['organization_id','request_id','device_id'],
       reset: ['organization_id','request_id','employee_id','delivery_key'],
-      authenticate: ['organization_id','request_id','device_id','code','pin','action','expected_version'],
-      record: ['organization_id','request_id','device_id','employee_id','challenge','action','expected_version'],
+      // KIO-H6-01: the kiosk proves code+PIN before it learns state; it never names employee, action or version.
+      authenticate: ['organization_id','device_id','code','pin'],
+      record: ['organization_id','request_id','device_id','challenge','action','expected_version'],
     };
     if (!route || !permitted[route] || Object.keys(body).some(k => !permitted[route].includes(k))) return fail();
     const org = body.organization_id as string, request = body.request_id as string, device = body.device_id as string;
-    if (!uuid(org) || !uuid(request)) return fail();
+    if (!uuid(org) || (route !== 'authenticate' && !uuid(request))) return fail();
     stage = 'jwt';
     const auth = await fetch(authURL + '/auth/v1/user', { headers: { apikey: apiKey, Authorization: req.headers.get('authorization') || '' }, signal: AbortSignal.timeout(5000) });
     if (!auth.ok) return fail();
@@ -110,11 +111,14 @@ export async function handler(req: Request, info: Deno.ServeHandlerInfo): Promis
         throw err;
       }
     }
-    const action = body.action as string, expected = body.expected_version as number;
-    if (!uuid(device) || !['CLOCK_IN','BREAK_START','BREAK_END','CLOCK_OUT'].includes(action) || !Number.isSafeInteger(expected) || expected < 0) return fail();
+    if (!uuid(device)) return fail();
     if (route === 'authenticate') {
       if (typeof body.code !== 'string' || body.code.length > 64 || typeof body.pin !== 'string' || !/^\d{8,32}$/.test(body.pin)) return fail();
       const network = await networkIdentifier(info.remoteAddr,org,networkSecret);
+      // Two candidate secrets for every request (same work whatever the outcome);
+      // the database stores only their hashes, one per legal action it offers.
+      const tokens = [hex(random(32)), hex(random(32))];
+      const hashes = await Promise.all(tokens.map(digest));
       const result = await db.begin(async tx => {
         await identity(tx,id);
         const [r] = await tx.unsafe('select private.kiosk_auth_begin($1::uuid,$2::uuid,$3,$4) as r',[org,device,body.code as string,network]);
@@ -123,17 +127,23 @@ export async function handler(req: Request, info: Deno.ServeHandlerInfo): Promis
         const valid = await argon2Verify({ password: body.pin as string, secret: pepper, hash: a.pin_hash || dummy });
         body.pin = '';
         if (!valid || a.blocked || !a.employee_id || !a.pin_hash) return null; // COMMIT failure buckets.
-        const challenge = hex(random(32)), tokenHash = await digest(challenge);
-        await tx.unsafe('select private.kiosk_auth_finish($1::uuid,$2::uuid,$3::uuid,$4::bigint,$5::public.time_action,$6::bigint,$7::uuid,$8,$9)',[org,device,a.employee_id,a.credential_version,action,expected,request,tokenHash,network]);
-        return { challenge, employee_id: a.employee_id, request_id: request, expires_in: 60 };
+        const [g] = await tx.unsafe('select private.kiosk_auth_grant($1::uuid,$2::uuid,$3,$4::bigint,$5,$6::jsonb) as r',
+          [org,device,body.code as string,a.credential_version,network,tx.json(hashes)]);
+        const grant = g.r as { state: string; version: number; challenges: { action: string; request_id: string }[] };
+        // Only state, version, legal actions and one bound challenge per action leave the gateway.
+        return { state: grant.state, version: grant.version, actions: grant.challenges.map(c => c.action),
+          challenges: grant.challenges.map((c, i) => ({ action: c.action, request_id: c.request_id, challenge: tokens[i] })) };
       });
+      tokens.fill('');
       return result ? response(200,result) : fail();
     }
-    if (!uuid(body.employee_id) || typeof body.challenge !== 'string' || !/^[0-9a-f]{64}$/.test(body.challenge)) return fail();
+    const action = body.action as string, expected = body.expected_version as number;
+    if (!['CLOCK_IN','BREAK_START','BREAK_END','CLOCK_OUT'].includes(action) || !Number.isSafeInteger(expected) || expected < 0) return fail();
+    if (typeof body.challenge !== 'string' || !/^[0-9a-f]{64}$/.test(body.challenge)) return fail();
     const tokenHash = await digest(body.challenge); body.challenge = '';
     const result = await db.begin(async tx => {
       await identity(tx,id);
-      const [r] = await tx.unsafe('select private.kiosk_record_event($1::uuid,$2::uuid,$3::uuid,$4::public.time_action,$5::bigint,$6::uuid,$7) as r',[org,device,body.employee_id as string,action,expected,request,tokenHash]);
+      const [r] = await tx.unsafe('select private.kiosk_record($1::uuid,$2::uuid,$3::public.time_action,$4::bigint,$5::uuid,$6) as r',[org,device,action,expected,request,tokenHash]);
       return r.r;
     });
     return response(200,result); // sql.begin resolves only after COMMIT.

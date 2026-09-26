@@ -1,0 +1,67 @@
+name: E2E H6 (browser, PWA, accessibility)
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies and Chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          python -m pip install reportlab==4.4.9 'psycopg[binary]==3.2.10'
+      - name: Start isolated local Supabase
+        run: |
+          for attempt in 1 2 3; do
+            if supabase start -x realtime,imgproxy,edge-runtime,logflare,vector,supavisor > /dev/null; then
+              exit 0
+            fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            if [ "$attempt" = 1 ]; then
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=public.ecr.aws
+            else
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io
+            fi
+            printf 'SUPABASE_INTERNAL_IMAGE_REGISTRY=%s\n' "$SUPABASE_INTERNAL_IMAGE_REGISTRY" >> "$GITHUB_ENV"
+            sleep 5
+          done
+      - name: Rebuild from empty database and provision the H5 recovery journal
+        run: |
+          supabase db reset --local --no-seed
+          python3 tests/integration/journal_init.py
+      # Real Auth/PostgREST/Storage/PostgreSQL, real H4 gateway and H5 signer on
+      # loopback with ephemeral synthetic keys. No traces, videos or
+      # screenshots are produced and no artefact is uploaded.
+      - name: Browser E2E (employee, manager, kiosk, PWA, accessibility)
+        run: npx playwright test
+      - name: Secret scan of build output and test artefacts
+        if: always()
+        run: node scripts/scan_secrets.mjs dist test-results
+      - name: Stop local containers
+        if: always()
+        run: supabase stop --no-backup

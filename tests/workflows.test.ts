@@ -26,3 +26,34 @@ it('keeps CI unprivileged and repository backup scheduled/manual, with no databa
   expect(backupText).not.toMatch(/RCLONE_CONFIG|RCLONE_DESTINATION/);
   expect(run).toContain('"BACKUP_UPLOAD_DRIVE":"0"');
 });
+
+it('runs the H6 browser suite against a local ephemeral stack without secrets or artefact upload', () => {
+  const text = readFileSync('.github/workflows/e2e.yml', 'utf8');
+  const e2e = parse(text);
+  expect(e2e.permissions).toEqual({ contents: 'read' });
+  expect(text).not.toMatch(/\bsecrets\./);
+  expect(text).not.toMatch(/upload-artifact|--trace|--video/);
+  const run = JSON.stringify(e2e.jobs.browser.steps);
+  expect(run).toContain('supabase db reset --local --no-seed');
+  expect(run).toContain('tests/integration/journal_init.py');
+  expect(run).toContain('npx playwright test');
+  expect(run).toContain('scripts/scan_secrets.mjs dist test-results');
+  expect(JSON.stringify(parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs.validate.steps)).toContain('npm run scan:secrets');
+});
+
+it('runs pgTAP and the full real H1-H5 chain, including KIO-H6-01, on every pull request', () => {
+  const text = readFileSync('.github/workflows/database.yml', 'utf8');
+  const db = parse(text);
+  expect(db.on.pull_request.branches).toEqual(['main']);
+  expect(db.permissions).toEqual({ contents: 'read' });
+  expect(text).not.toMatch(/\bsecrets\./);
+  const run = JSON.stringify(db.jobs.database.steps);
+  for (const step of ['supabase db reset --local --no-seed', 'tests/integration/journal_init.py', 'supabase test db',
+    'tests/integration/h5.py', 'deno check --config supabase/functions/kiosk/deno.json', 'deno test supabase/functions/kiosk/network_test.ts']) {
+    expect(run).toContain(step);
+  }
+  // The KIO-H6-01 real suite is part of H4, which H5 runs first.
+  expect(readFileSync('tests/integration/h5.py', 'utf8')).toContain("runpy.run_module('h4', run_name='__main__')");
+  expect(readFileSync('tests/integration/h4.py', 'utf8')).toMatch(/import kio_h6\n\s+kio_h6\.run\(/);
+  expect(readFileSync('supabase/tests/database/kiosk_identification.test.sql', 'utf8')).toContain('KIO-H6-01');
+});

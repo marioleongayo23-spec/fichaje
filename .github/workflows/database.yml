@@ -1,4 +1,4 @@
-name: Database H1 + H2 + H3 + H4 + H5
+name: Database H1 + H2 + H3 + H4 + KIO-H6-01 + H5
 on:
   pull_request:
     branches: [main]
@@ -50,13 +50,14 @@ jobs:
           done
       - name: Rebuild from empty database
         run: supabase db reset --local --no-seed
-      - name: Real SQL and RLS tests
+      - name: Real SQL and RLS tests (pgTAP, including KIO-H6-01)
         run: |
           python3 tests/integration/journal_init.py
           supabase test db
       - name: Render real H5 evidence package
         run: python3 tests/integration/h5_render.py
-      - name: Real Auth, REST, Storage and concurrency tests
+      # h5.py runs H1 -> H2 -> H3 -> H4 (which runs KIO-H6-01 before the KIO-07 leak gate) -> H5.
+      - name: Real Auth, REST, Storage, kiosk gateway and concurrency tests (H1-H5 + KIO-H6-01)
         run: python3 tests/integration/h5.py
       - name: Stop local containers
         if: always()
