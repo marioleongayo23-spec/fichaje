@@ -108,7 +108,7 @@ grant select(id,organization_id,employee_id,action,entity_type,entity_id,request
 grant select(organization_id,principal_kind,operation,key,response) on private.idempotency_records to fichaje_ops;
 grant select(id,organization_id,status,checksum,object_path,created_at,expires_at) on private.export_jobs to fichaje_ops;
 grant select(organization_id,created_at) on private.kiosk_challenges to fichaje_ops;
-grant select(id,organization_id,authorization_ref,counts,digest) on private.retention_runs to fichaje_ops;
+grant select(id,organization_id,cutoff,authorization_ref,counts,digest) on private.retention_runs to fichaje_ops;
 grant select(id,organization_id,kind,payload) on private.recovery_outbox to fichaje_ops;
 grant select(id,organization_id,kind) on private.recovery_applied to fichaje_ops;
 grant select(id,organization_id) on private.legal_holds to fichaje_ops;
@@ -148,14 +148,32 @@ language sql stable security definer set search_path='' as $$
  from public.time_events t where t.organization_id=p_org and t.employee_id=p_employee and t.sequence<=p_max
 $$;
 
--- A labour purge (H5) legitimately removes closed sessions while the projection
--- keeps its high-water marks. Replayed purges only record the tenant.
+-- A labour purge (H5) legitimately removes whole closed sessions from the start of
+-- an employee's history while the projection keeps its high-water marks. The
+-- outbox names the employee. A replayed purge (after a restore) records only the
+-- tenant, so there an employee counts as purged only when its history has exactly
+-- that shape: sequence 1 gone, the remaining originals contiguous and starting a
+-- session. Every other employee of the tenant keeps the full checks.
 create function private.ops_history_purged(p_org uuid,p_employee uuid) returns boolean
 language sql stable security definer set search_path='' as $$
  select exists(select 1 from private.recovery_outbox o where o.organization_id=p_org and o.kind='PURGE'
   and o.payload->>'employee_id'=p_employee::text)
- or exists(select 1 from private.recovery_applied a where a.organization_id=p_org and a.kind='PURGE')
+ or (exists(select 1 from private.recovery_applied a where a.organization_id=p_org and a.kind='PURGE')
+  and exists(select 1 from private.employee_state s where s.organization_id=p_org and s.employee_id=p_employee and s.last_sequence>0)
+  and not exists(select 1 from public.time_events t where t.organization_id=p_org and t.employee_id=p_employee and t.sequence=1)
+  and (select count(*)=coalesce(max(t.sequence)-min(t.sequence)+1,0) from public.time_events t
+   where t.organization_id=p_org and t.employee_id=p_employee)
+  and coalesce((select t.event_type::text='CLOCK_IN' from public.time_events t
+   where t.organization_id=p_org and t.employee_id=p_employee order by t.sequence limit 1),true))
 $$;
+
+-- Receipt time for purge-cutoff comparisons; a malformed value is never trusted.
+create function private.ops_receipt_time(p_response jsonb) returns timestamptz
+language plpgsql stable set search_path='' as $$
+begin
+ return (p_response->>'server_at')::timestamptz;
+exception when others then return null;
+end $$;
 
 -- Source-level coherence of one employee's immutable evidence. Any issue here
 -- blocks automatic repair: evidence is escalated, never "fixed".
@@ -298,8 +316,10 @@ begin
   from public.audit_log a where (p_org is null or a.organization_id=p_org) and a.action in ('record_time_event','kiosk_record_event')
   and not exists(select 1 from public.time_events t where t.organization_id=a.organization_id and t.id=a.entity_id);
  return query select 'RECEIPT_WITHOUT_EVENT'::text,
-   case when exists(select 1 from private.recovery_outbox o where o.organization_id=r2.organization_id and o.kind='PURGE')
-    or exists(select 1 from private.recovery_applied a where a.organization_id=r2.organization_id and a.kind='PURGE') then 'INFO' else 'CRITICAL' end,
+   -- Legal purges keep receipts of removed originals, all older than the purge cutoff.
+   -- A receipt newer than every recorded labour cutoff means deletion outside the purge.
+   case when exists(select 1 from private.retention_runs m where m.organization_id=r2.organization_id and m.counts ? 'time_events'
+    and private.ops_receipt_time(r2.response)<=m.cutoff) then 'INFO' else 'CRITICAL' end,
    r2.organization_id,'time_event'::text,(r2.response->>'event_id')::uuid,'{}'::jsonb
   from private.idempotency_records r2 where (p_org is null or r2.organization_id=p_org)
   and r2.operation in ('record_time_event','kiosk_record_event') and r2.response ? 'event_id'
@@ -380,6 +400,7 @@ end $$;
 create function private.ops_record_invariant_run() returns jsonb
 language plpgsql security definer set search_path='' as $$
 declare run uuid:=gen_random_uuid(); started timestamptz:=clock_timestamp(); found_rows jsonb; totals jsonb; n_c integer; n_w integer; n_i integer;
+ frozen boolean; n_b integer:=0;
 begin
  select coalesce(jsonb_agg(to_jsonb(x) order by x.severity,x.invariant,x.organization_id,x.subject_id),'[]'::jsonb) into found_rows
  from private.ops_invariant_rows(null) x;
@@ -388,6 +409,9 @@ begin
  into totals,n_c,n_w,n_i
  from (select f.v->>'invariant' as invariant,f.v->>'severity' as severity,count(*) as n from jsonb_array_elements(found_rows) as f(v) group by 1,2) g;
  insert into private.ops_invariant_runs(id,started_at,finished_at,critical,warning,info,summary) values(run,started,clock_timestamp(),n_c,n_w,n_i,totals);
+ -- A structural CRITICAL finding (disabled append-only guard, unvalidated foreign key)
+ -- freezes every baseline: history altered meanwhile must never become the reference.
+ frozen:=exists(select 1 from jsonb_array_elements(found_rows) as f(v) where f.v->>'severity'='CRITICAL' and f.v->>'organization_id' is null);
  insert into private.ops_invariant_findings(run_id,ordinal,invariant,severity,organization_id,subject_kind,subject_id,detail)
  select run,f.o::integer,f.v->>'invariant',f.v->>'severity',(f.v->>'organization_id')::uuid,f.v->>'subject_kind',(f.v->>'subject_id')::uuid,f.v->'detail'
  from jsonb_array_elements(found_rows) with ordinality as f(v,o);
@@ -398,8 +422,10 @@ begin
    where b.organization_id=t.organization_id and b.employee_id=t.employee_id),0)
   and not private.ops_history_purged(t.organization_id,t.employee_id)
   and not exists(select 1 from jsonb_array_elements(found_rows) as f(v) where f.v->>'organization_id'=t.organization_id::text
-   and f.v->>'subject_id'=t.employee_id::text and f.v->>'severity'='CRITICAL' and f.v->>'invariant'<>'PROJECTION_DRIFT');
- return jsonb_build_object('run_id',run,'critical',n_c,'warning',n_w,'info',n_i,'summary',totals);
+   and f.v->>'subject_id'=t.employee_id::text and f.v->>'severity'='CRITICAL' and f.v->>'invariant'<>'PROJECTION_DRIFT')
+  and not frozen;
+ get diagnostics n_b=row_count;
+ return jsonb_build_object('run_id',run,'critical',n_c,'warning',n_w,'info',n_i,'summary',totals,'baselines',n_b,'baselines_frozen',frozen);
 end $$;
 
 create function private.ops_client_metrics_snapshot(p_since timestamptz)
@@ -411,7 +437,7 @@ $$;
 
 do $$ declare f regprocedure; begin
  for f in select p.oid::regprocedure from pg_proc p where p.pronamespace='private'::regnamespace and p.proname in
-  ('ops_originals_digest','ops_history_purged','ops_source_issues','ops_projection_candidate','ops_invariant_rows',
+  ('ops_originals_digest','ops_history_purged','ops_receipt_time','ops_source_issues','ops_projection_candidate','ops_invariant_rows',
    'ops_invariant_summary','ops_invariant_findings','ops_affected_tenants','ops_projection_candidates',
    'ops_record_invariant_run','ops_client_metrics_snapshot') loop
   execute format('alter function %s owner to fichaje_ops',f);

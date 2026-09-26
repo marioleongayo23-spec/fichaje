@@ -211,6 +211,55 @@ select ok(exists(select 1 from private.ops_invariant_summary() where invariant='
 reset role;
 alter table public.audit_log enable trigger audit_immutable;
 
+-- Baselines never advance while a structural guard is compromised.
+select set_config('request.jwt.claims','{"sub":"a1000000-0000-0000-0000-000000000004","role":"authenticated"}',true);
+set local role authenticated;
+select public.record_time_event('a2000000-0000-0000-0000-000000000002','a6000000-0000-0000-0000-000000000010','a4000000-0000-0000-0000-000000000003','BREAK_START',1);
+select public.record_time_event('a2000000-0000-0000-0000-000000000002','a6000000-0000-0000-0000-000000000011','a4000000-0000-0000-0000-000000000003','BREAK_END',2);
+select public.record_time_event('a2000000-0000-0000-0000-000000000002','a6000000-0000-0000-0000-000000000012','a4000000-0000-0000-0000-000000000003','CLOCK_OUT',3);
+select public.record_time_event('a2000000-0000-0000-0000-000000000002','a6000000-0000-0000-0000-000000000013','a4000000-0000-0000-0000-000000000003','CLOCK_IN',4);
+reset role;
+delete from private.mutation_context;
+alter table public.time_events disable trigger immutable;
+set local role fichaje_ops_monitor;
+select is((private.ops_record_invariant_run()->>'baselines_frozen')::boolean,true,'a disabled append-only guard freezes every baseline');
+reset role;
+select ok(not exists(select 1 from private.ops_original_baselines where employee_id='a4000000-0000-0000-0000-000000000003' and max_sequence=5),
+ 'no baseline advances while a structural guard is compromised');
+alter table public.time_events enable trigger immutable;
+set local role fichaje_ops_monitor;
+select is((private.ops_record_invariant_run()->>'baselines_frozen')::boolean,false,'restored guard unfreezes baselines');
+reset role;
+select ok(exists(select 1 from private.ops_original_baselines where employee_id='a4000000-0000-0000-0000-000000000003' and max_sequence=5),
+ 'baselines advance again once every guard is back');
+
+-- A replayed purge (tenant-only evidence) never marks unrelated employees as purged.
+insert into private.recovery_applied(id,organization_id,kind) values('a9000000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000002','PURGE');
+select ok(not private.ops_history_purged('a2000000-0000-0000-0000-000000000002','a4000000-0000-0000-0000-000000000003'),
+ 'a replayed tenant purge does not cover an employee whose history starts at sequence 1');
+alter table public.time_events disable trigger immutable;
+delete from public.time_events where employee_id='a4000000-0000-0000-0000-000000000003' and sequence=3;
+alter table public.time_events enable trigger immutable;
+select ok(not private.ops_history_purged('a2000000-0000-0000-0000-000000000002','a4000000-0000-0000-0000-000000000003'),
+ 'an internal gap is never taken for a purge');
+set local role fichaje_ops_reviewer;
+select ok(exists(select 1 from private.ops_invariant_findings('a2000000-0000-0000-0000-000000000002') where invariant='SEQUENCE_CONTIGUOUS' and severity='CRITICAL'),
+ 'the gap stays a critical finding in a tenant with a replayed purge');
+select ok((select bool_and(severity='CRITICAL') from private.ops_invariant_findings('a2000000-0000-0000-0000-000000000002') where invariant='RECEIPT_WITHOUT_EVENT'),
+ 'a receipt newer than every recorded purge cutoff stays critical');
+reset role;
+alter table public.time_events disable trigger immutable;
+delete from public.time_events where employee_id='a4000000-0000-0000-0000-000000000003' and sequence in (1,2,4);
+alter table public.time_events enable trigger immutable;
+select ok(private.ops_history_purged('a2000000-0000-0000-0000-000000000002','a4000000-0000-0000-0000-000000000003'),
+ 'whole sessions removed from the start with a contiguous remainder match a replayed purge');
+insert into private.retention_runs(organization_id,cutoff,authorization_ref,counts,digest)
+ values('a2000000-0000-0000-0000-000000000002',clock_timestamp(),'REPLAY:a9000000-0000-0000-0000-000000000001','{"time_events":4}',repeat('0',64));
+set local role fichaje_ops_reviewer;
+select ok((select bool_and(severity='INFO') and count(*)=4 from private.ops_invariant_findings('a2000000-0000-0000-0000-000000000002') where invariant='RECEIPT_WITHOUT_EVENT'),
+ 'receipts older than a recorded labour purge cutoff are informational');
+reset role;
+
 -- OBS-02 client telemetry: aggregated, bounded labels, write-only for clients.
 select set_config('request.jwt.claims','{"sub":"a1000000-0000-0000-0000-000000000002","role":"authenticated"}',true);
 set local role authenticated;
