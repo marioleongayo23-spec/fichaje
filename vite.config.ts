@@ -57,7 +57,8 @@ function gatewayProxy(): Record<string, ProxyOptions> {
   const kiosk = process.env.FICHAJE_KIOSK_GATEWAY_TARGET;
   const exportLink = process.env.FICHAJE_EXPORT_LINK_TARGET;
   if (kiosk) proxy['/gateway/kiosk'] = { target: kiosk, rewrite: (path) => path.replace(/^\/gateway\/kiosk/, '') };
-  if (exportLink) proxy['/gateway/export-link'] = { target: exportLink, rewrite: () => '/' };
+  // The signer answers at its root; OPS-02 health paths stay reachable same-origin.
+  if (exportLink) proxy['/gateway/export-link'] = { target: exportLink, rewrite: (path) => path.replace(/^\/gateway\/export-link/, '') || '/' };
   return proxy;
 }
 

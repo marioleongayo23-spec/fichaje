@@ -148,12 +148,13 @@ def known_code(value) -> str | None:
 
 def classify_http(status: int, body=None) -> str:
     payload = body if isinstance(body, dict) else {}
+    # A stable code is authoritative whatever the status (as in src/lib/errors.ts):
+    # PostgREST answers SQLSTATE 40001 VERSION_CONFLICT with HTTP 500, and a
+    # conflict must never be counted or retried as an upstream failure.
     code = known_code(payload.get('message')) or known_code(payload.get('error'))
-    if code == 'AUTH_FAILED':
-        return 'AUTH_FAILED'
-    if code and status < 500:
+    if code and code != 'INTERNAL':
         return code
-    if payload.get('code') in ('55P03', '57014') or code == 'RETRYABLE_TIMEOUT':
+    if payload.get('code') in ('55P03', '57014'):
         return 'RETRYABLE_TIMEOUT'
     if status in (401,) or payload.get('code') in ('PGRST301', 'PGRST303'):
         return 'UNAUTHENTICATED'
@@ -170,6 +171,8 @@ def classify_http(status: int, body=None) -> str:
 
 def classify_exception(error: BaseException, sent: bool = False) -> str:
     """sent=True: the request may have reached the server (unknown outcome)."""
+    if isinstance(error, OpsError):
+        return error.error_class
     sqlstate = getattr(error, 'sqlstate', None)
     if isinstance(sqlstate, str):
         diag = getattr(error, 'diag', None)
@@ -237,10 +240,11 @@ def http_json(method: str, url: str, headers: dict | None = None, body: bytes | 
 
 
 def http_raw(method: str, url: str, headers: dict | None = None, timeout: float = 10.0) -> tuple[int, bytes, dict]:
+    """Raw body; response header names are lower-cased (proxies differ in case)."""
     request = urllib.request.Request(url, method=method, headers=dict(headers or {}))
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            return response.status, response.read(), dict(response.headers)
+            return response.status, response.read(), {k.lower(): v for k, v in response.headers.items()}
     except urllib.error.HTTPError as error:
         error.read()
         raise HttpError(error.code, classify_http(error.code)) from None

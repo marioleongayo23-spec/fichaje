@@ -82,6 +82,10 @@ class Obs01Events(unittest.TestCase):
         self.assertEqual(classify_http(503, {'error': 'RETRYABLE_TIMEOUT'}), 'RETRYABLE_TIMEOUT')
         self.assertEqual(classify_http(403, {'error': 'AUTH_FAILED'}), 'AUTH_FAILED')
         self.assertEqual(classify_http(502), 'UPSTREAM_5XX')
+        # PostgREST maps SQLSTATE 40001 to HTTP 500: still a permanent conflict, never UPSTREAM_5XX.
+        self.assertEqual(classify_http(500, {'code': '40001', 'message': 'VERSION_CONFLICT'}), 'VERSION_CONFLICT')
+        self.assertEqual(classify_http(503, {'message': 'INJECTED_UPSTREAM_FAILURE'}), 'UPSTREAM_5XX')
+        self.assertEqual(classify_http(500, {'message': 'INTERNAL'}), 'UPSTREAM_5XX')
 
     def test_private_state_files_are_owner_only(self):
         with tempfile.TemporaryDirectory() as tmp:
