@@ -3,11 +3,12 @@
 
 ### OPS-02 — observabilidad, canaries, invariantes, alertas y self-healing seguro
 
-**ESTADO: implementado, validado en local y con CI completa en verde sobre el código final `8e54371`;
-[PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12) abierto contra `main`, pendiente de la
-aprobación del usuario. Sin merge. H7 no autorizado.** Rama `astra/ops-02-observabilidad-resiliencia` creada desde
-`main` `754c7f184fb14db151303c7ab7db72bb2629e7aa` (la rama de trabajo
-`claude/ops-02-observabilidad-resiliencia-kzk0z9` contiene los mismos commits).
+**ESTADO: implementado y en revisión en [PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12)
+contra `main`, con la corrección SEC-OPS-01 de la auditoría independiente añadida al mismo PR y validada en
+local; la evidencia de CI de SEC-OPS-01 se registra al terminar. OPS-02 no está aprobado ni integrado en
+`main`. Sin merge. H7 no autorizado.**
+Rama `astra/ops-02-observabilidad-resiliencia` creada desde `main` `754c7f184fb14db151303c7ab7db72bb2629e7aa`
+(la rama de trabajo `claude/ops-02-observabilidad-resiliencia-kzk0z9` contiene los mismos commits).
 
 Regla absoluta, verificada por la suite: ninguna automatización, script, agente o IA modifica
 `time_events`, fichajes originales, decisiones o ajustes de corrección, horas efectivas ni historia
@@ -15,13 +16,80 @@ laboral; no hay cierre automático de jornadas ni fichajes inventados. El único
 es `private.employee_state`, solo desde fuentes inmutables, con referencia de autorización, idempotente,
 auditado y BLOCKED si la fuente es incoherente.
 
+#### SEC-OPS-01 — ingesta de telemetría del navegador (auditoría independiente, 2026-09-26)
+**Causa.** `public.ops_ingest_client_metrics(p_release, p_batch)` solo validaba forma y vocabulario. Cualquier
+identidad `authenticated` podía invocarla directamente, sin límite de llamadas, con hasta 100 series y 9.999
+eventos por serie, y elegir `p_release`, creando combinaciones nuevas en `private.ops_client_metrics`. Los
+límites de `src/lib/telemetry.ts` no eran una defensa. Impacto: métricas contaminables (tasas y latencias),
+cardinalidad y crecimiento no acotados y posible degradación de la propia observabilidad.
+
+**Solución** (en la migración de OPS-02 aún no integrada; sin cambios en H1-H6 ni en la UI):
+- `release` deja de ser una dimensión de la ingesta: la RPC es `ops_ingest_client_metrics(p_batch)`, ni
+  `ops_client_metrics` ni `ops_client_metrics_snapshot` tienen columna de release y el navegador ya no la envía.
+  La identidad del artefacto que comprueba el gate RES-02 pasa a `<meta name="fichaje-release">` de
+  `index.html`. Los eventos de servidor siguen llevando release y commit; la telemetría del navegador se
+  relaciona con una release solo por tiempo (cubo de 5 min frente a promociones y rollbacks del gate).
+- Validación en servidor: claves exactas, vocabulario cerrado, ≤100 series distintas por llamada, 1..1000
+  eventos por serie y suma de duraciones dentro de los límites de sus cubos (+Inf ≤ 120 s). Un error responde
+  `INVALID_INPUT` y no escribe nada.
+- Rate limiting persistente en servidor por identidad y ventana fija de 5 min: 30 llamadas (también las
+  rechazadas), 2.000 eventos y 200 series. Límites globales intencionados por ventana: 5.000 identidades,
+  200.000 eventos y 1.000 filas por cubo. Están en `private.ops_ingest_limits` (una fila con CHECK acotados;
+  solo el propietario de la base la ajusta; sin fila no se acepta nada). Un rechazo por cuota confirma el
+  intento y responde 200 `{"accepted":0,"limited":true}`; el navegador descarta ese lote.
+- Concurrencia: bloqueos de fila con orden fijo (ventana nueva → identidad → ventana → métricas).
+- Sin PII: el emisor es `sha256(sal aleatoria de la ventana ‖ uid)`; no se guarda uid, email, membresía,
+  empleado, nombre ni código. Solo se conservan la ventana actual y la anterior (sin actividad, hasta la
+  siguiente llamada) y la sal se borra con su ventana. Nunca aparece en métricas, logs, alertas ni
+  respuestas, ni es una dimensión. Los cubos del navegador se retienen 7 días (purga acotada).
+- Señal no confiable: `trust: untrusted` en `ops/contract.json`. Ninguna alerta, gate, rollback, reintento ni
+  reconstrucción la lee; las señales críticas salen de eventos de servidor, health, canary, invariantes y
+  backups.
+- Frontend: sin `p_release` y con duraciones acotadas a 120 s. `SECURITY`, `ARCHITECTURE`, `RUNBOOKS` y
+  `ACCEPTANCE_TESTS` actualizados.
+
+**Evidencia real** (local, 2026-09-26, tras reset desde vacío, mismo orden que CI; nada se ejecuta a través
+del frontend salvo el E2E):
+- `supabase test db`: **468 aserciones pgTAP PASS**. `ops_observability.test.sql` pasa de 69 a 116, con 48
+  SEC-OPS-01: consecutivas cortadas en la cuota con los rechazados confirmados, `count=9999`, >1000, 101 series,
+  duplicadas, duraciones fuera de su cubo, fuera de vocabulario, identificadores y release dentro del lote
+  rechazados sin escritura; firma sin release; segunda identidad; cuotas de series y eventos; cubo lleno,
+  volumen e identidades globales; fallo cerrado sin límites; expiración con reset, purga, sal distinta y
+  retención; RLS forzada y ningún rol API/OPS con acceso a las tablas de cuota.
+- `tests/integration/ops02.py`: **155 comprobaciones reales PASS** (139 + 16 SEC-OPS-01), con llamadas HTTP
+  directas a PostgREST sin navegador: 40 llamadas consecutivas → exactamente 30 aceptadas y cuota persistente;
+  segunda identidad no bloqueada; 13 cargas infladas/fuera de vocabulario/identificadoras, `count=9999`
+  incluida, rechazadas sin escritura; anon rechazado; 20 releases aleatorias rechazadas sin columna ni fila;
+  100 series acotadas; **2 identidades × 40 llamadas simultáneas → exactamente 30 aceptadas cada una, sin
+  errores ni deadlocks**; reset y purga al expirar la ventana; límites globales intencionados; 1.000
+  CLOCK_REGRESSION falsos solo en el dashboard, sin fuente de alerta; historia laboral, proyección,
+  reparaciones, alertas, release (sin rollback), métricas de servidor y decisiones idénticas antes y después;
+  seudónimos sin uid/email fuera de métricas y crecimiento acotado. El escáner final incluye uid, emails,
+  contraseñas y seudónimos de las identidades atacantes: 0 hallazgos en logs, métricas, alertas e informes.
+  El gate RES-02 (rollback real incluido) pasa con la nueva identidad del artefacto.
+- `h5_render.py` (4) y `h5.py` **506 comprobaciones PASS** (H1 102 + H2 70 + H3 80 + H4 181 con KIO-H6-01 63 +
+  H5 73), sin cambios.
+- Playwright + Chromium tras reset desde vacío: **46/46 PASS** (el navegador solo envía `p_batch`;
+  el almacén no tiene columna de release); `node scripts/scan_secrets.mjs dist test-results`: 0 hallazgos.
+- `npm run check`: typecheck, lint, **111 tests unitarios**, build y escáner de `dist` PASS;
+  `python3 -m unittest discover -s tests/ops` **52 PASS** (5 nuevos: la telemetría del navegador nunca cambia
+  decisiones de alertas, ni la leen gate, reparaciones o jobs, e identidad del artefacto por `<meta>`); Deno
+  `ops_test.ts` 5 y `network_test.ts` 2 PASS; `deno check` de kiosk y export-link, `bash -n scripts/*.sh`,
+  `py_compile` y `git diff --check` PASS.
+
+Riesgo residual: una identidad autenticada todavía puede sesgar agregados informativos dentro de su cuota
+(por diseño no deciden nada). Las llamadas inválidas no escriben ni consumen cuota; limitar la inundación
+HTTP en sí corresponde a la plataforma (H7). Con el sistema inactivo, los contadores seudónimos de la última
+ventana persisten hasta la siguiente llamada.
+
 Entregado:
 - OBS-01: contrato `ops/contract.json`; eventos JSON por allowlist en scripts (`scripts/ops/opslib.py`),
   gateway del kiosco y firmador (`supabase/functions/_shared/ops.ts`) con release, commit y `request_id`;
   las excepciones se reducen a una clase estable (sin SQL, parámetros, cuerpos ni trazas).
 - OBS-02: métricas en formato Prometheus derivadas de eventos e informes (`metrics.py`); telemetría del
   navegador agregada (`src/lib/telemetry.ts`) enviada por la RPC de solo escritura
-  `public.ops_ingest_client_metrics` (cubos de 5 min sin identidad, vocabulario cerrado en base de datos).
+  `public.ops_ingest_client_metrics` (cubos de 5 min sin identidad ni release, vocabulario cerrado, cuotas en
+  servidor y señal no confiable: SEC-OPS-01).
 - OBS-03: `/health/live` y `/health/ready` (cacheado 5 s, acotado a 2 s) en gateway y firmador; `health.py`
   agrega app, API, Auth, PostgreSQL (`private.ops_db_health()`), gateway y firmador en UP/DEGRADED/DOWN.
 - OBS-04: `canary.py` web y kiosco sobre tenant sintético; si un ciclo quedó a medias rota a un empleado
@@ -41,7 +109,8 @@ Entregado:
   fuente de verdad de RES-03), SECURITY, RECOVERY y ACCEPTANCE_TESTS (asignación de evidencia OPS-02).
 
 Evidencia local ejecutada el 2026-09-26 (Docker; Supabase CLI 2.117.0, PostgreSQL 17, GoTrue, PostgREST y
-Storage locales, Deno 2.9.6, Node 24.19.0, Python 3.12), sobre el código de este PR:
+Storage locales, Deno 2.9.6, Node 24.19.0, Python 3.12), sobre el código previo a SEC-OPS-01 (`8e54371`; la
+evidencia posterior está en la sección SEC-OPS-01):
 - `supabase db reset --local --no-seed` + `journal_init.py` + `supabase test db`: **421 aserciones pgTAP
   PASS** (352 previas + 69 de `ops_observability.test.sql`).
 - `python3 tests/integration/ops02.py` tras el mismo reset: **139 comprobaciones reales PASS**. Releases
@@ -114,13 +183,11 @@ Hallazgos corregidos durante la validación:
 
 Límites: sin producción, staging, DNS, dominio, Cloudflare/Supabase remotos, secretos, claves age ni datos
 reales. RES-02 se ha probado en un arnés CI aislado y efímero (`LocalDeployer`); su repetición en staging
-sigue siendo puerta de H7. Rutas reales de alerta (pager/ticket), dashboards, retención de la telemetría y
-de la evidencia OPS, canary e invariantes programados contra producción y el adaptador de despliegue real
+sigue siendo puerta de H7. Rutas reales de alerta (pager/ticket), dashboards, retención de la evidencia OPS,
+canary e invariantes programados contra producción y el adaptador de despliegue real
 quedan para H7. `ops-monitor.yml` solo puede ejecutarse desde `main` (primera ejecución real tras el
 merge). El backup PostgreSQL sigue bloqueado y se informa `NOT_CONFIGURED`, nunca en verde. La telemetría
-del navegador es informativa: un cliente autenticado podría enviar agregados falsos (sin identidad,
-vocabulario cerrado y lotes acotados); no alimenta ninguna decisión sobre datos laborales y su límite de
-tasa dedicado queda para H7.
+del navegador es no confiable y tiene cuotas en servidor (SEC-OPS-01): no alimenta ninguna decisión.
 
 ### HITO 6 — UX/UI + PWA sobre H1-H5, con KIO-H6-01 resuelto
 
