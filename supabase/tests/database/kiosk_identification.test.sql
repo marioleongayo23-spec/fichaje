@@ -129,8 +129,8 @@ select throws_ok($$select private.kiosk_record('82000000-0000-0000-0000-00000000
  (select (r->'challenges'->0->>'request_id')::uuid from kio6 where label='pausedgrant'),repeat('5',64))$$,'42501','FORBIDDEN','expired challenge rejected');
 select throws_ok($$select private.kiosk_record('82000000-0000-0000-0000-000000000001','85000000-0000-0000-0000-000000000001','CLOCK_OUT',2,
  gen_random_uuid(),repeat('9',64))$$,'42501','FORBIDDEN','unknown challenge rejected');
-select throws_ok($$insert into private.kiosk_challenges(organization_id,device_id,employee_id,action,expected_version,request_id,token_hash,credential_version,grant_id)
- select organization_id,device_id,employee_id,action,expected_version,gen_random_uuid(),repeat('7',64),credential_version,grant_id from private.kiosk_challenges where token_hash=repeat('6',64)$$,
+select throws_ok($$insert into private.kiosk_challenges(organization_id,device_id,employee_id,action,expected_version,request_id,token_hash,credential_version,grant_id,created_at,expires_at)
+ select organization_id,device_id,employee_id,action,expected_version,gen_random_uuid(),repeat('7',64),credential_version,grant_id,created_at,expires_at from private.kiosk_challenges where token_hash=repeat('6',64)$$,
  '23505',null,'a grant holds at most one challenge per action');
 select throws_ok($$insert into private.kiosk_challenges(organization_id,device_id,employee_id,action,expected_version,request_id,token_hash,credential_version)
  values('82000000-0000-0000-0000-000000000001','85000000-0000-0000-0000-000000000001','84000000-0000-0000-0000-000000000001','CLOCK_OUT',2,gen_random_uuid(),repeat('8',64),1)$$,
