@@ -59,7 +59,8 @@ La promoción de release será CI → staging → pruebas sintéticas → canary
 - Salud: `/health/live` y `/health/ready` (cacheado 5 s, acotado a 2 s) en gateway y firmador; `health.py`
   agrega app, API, Auth, PostgreSQL (`private.ops_db_health()`), gateway y firmador en UP/DEGRADED/DOWN.
 - Canary `canary.py`, invariantes `invariants.py`, reconstrucción `rebuild_projection.py`, jobs
-  `jobs.py`, backups `backup_monitor.py`, alertas `alerts.py` (sink de prueba local; rutas reales en H7) y
+  `jobs.py`, backups `backup_monitor.py`, alertas `alerts.py` (outbox: cada notificación sigue pendiente hasta
+  que su ruta la acepta y se reintenta con el mismo `notification_id`; sink de prueba local; rutas reales en H7) y
   gate de release `release_gate.promote()` con `LocalDeployer` (releases inmutables en loopback).
 - Base de datos (`20260926000100_ops_observability.sql`): roles de definidor `fichaje_ops`,
   `fichaje_ops_repair`, `fichaje_ops_ingest` y de entrada `fichaje_ops_monitor` (agregados),

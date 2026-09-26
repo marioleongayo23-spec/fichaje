@@ -10,7 +10,8 @@ runbook). Revisado el 2026-09-26. Son decisiones técnicas de operación, no req
   Una incidencia de jornada se resuelve solo con el flujo H3 (solicitud + decisión independiente).
 - **Self-healing permitido**, siempre acotado, observable y repetible: reintento idempotente con la misma
   clave (`scripts/ops/retry.py`), reinicio de un componente, redeploy o rollback a una release previamente
-  sana (`scripts/ops/release_gate.py`), reintento de job idempotente (`scripts/ops/jobs.py`) y reconstrucción
+  sana (`scripts/ops/release_gate.py`), reintento de job con idempotencia garantizada en servidor
+  (`scripts/ops/jobs.py`: exportación y journal; la purga operativa se ejecuta una vez) y reconstrucción
   de `private.employee_state` (única proyección autorizada) con `scripts/ops/rebuild_projection.py`.
 - IA/automatización: puede diagnosticar, resumir, citar checks fallidos y logs saneados, proponer runbook,
   issue o PR revisable. No recibe credenciales de producción, datos laborales completos ni SQL mutante.
@@ -78,7 +79,8 @@ Comandos (entorno de operación con login técnico que solo hereda el rol de ent
 - **Detección**: `jobs.py export` falla (Storage, verificación, caducidad); invariante `EXPORT_JOB_STATE`
   (PENDING > 1 h o caducado > 48 h); firmador `/health/ready` DOWN.
 - **Impacto**: exportaciones no disponibles; ningún READY sin objeto verificado (H5).
-- **Automático permitido**: reintento del job (idempotente por `job_id`, objeto con ruta fija y upsert).
+- **Automático permitido**: reintento del job con clave de servidor (`PENDING→READY` una sola vez por `job_id`,
+  objeto con ruta fija y upsert).
 - **Prohibido**: marcar READY a mano, regenerar el snapshot con otro corte, enlaces públicos permanentes.
 - **Escalar**: ticket; pager si la entrega es a Inspección o representantes con plazo.
 - **Evidencia**: eventos `job.export`, clase de error, número de intentos.
@@ -88,7 +90,9 @@ Comandos (entorno de operación con login técnico que solo hereda el rol de ent
 ## Fallo del worker de retención — `JOB_FAILED{job=retention}`, `RETENTION_OVERDUE`
 - **Detección**: `jobs.py retention` falla (`LEGAL_HOLD`, Storage) o invariante `RETENTION_OVERDUE`.
 - **Impacto**: datos operativos caducados (challenges, buckets, exportaciones) retenidos más de lo previsto.
-- **Automático permitido**: reintento del job operativo (`purge_operational` es idempotente).
+- **Automático permitido**: ninguno dentro de la misma ejecución: `purge_operational` no tiene clave de
+  idempotencia en servidor (cada llamada añade un manifiesto `retention_runs`), así que se ejecuta una vez;
+  la siguiente ejecución programada o el operador la repite tras revisar la causa.
 - **Prohibido**: purga laboral automática, saltar holds, borrar evidencia fuera de `purge_labour`.
 - **Escalar**: ticket; DPO si el retraso supera la política de `docs/COMPLIANCE.md`.
 - **Evidencia**: manifiesto `retention_runs`, eventos `job.retention`.

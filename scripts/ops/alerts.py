@@ -173,7 +173,10 @@ def notifiers_from_env() -> dict[str, list[Notifier]]:
 
 
 class AlertEngine:
-    """Keeps FIRING alerts in a state file and emits transitions only."""
+    """Keeps FIRING alerts and an outbox of undelivered notifications in a state
+    file. Transitions are emitted once; a notification stays in the outbox until
+    every route accepted it and is retried with its original notification_id on
+    every evaluation, so an unavailable pager never silences an alert."""
 
     def __init__(self, state_path: Path, notifiers: dict[str, list[Notifier]] | None = None, environment: str = 'ci'):
         if environment not in enum('environments'):
@@ -181,16 +184,20 @@ class AlertEngine:
         self.state_path = Path(state_path)
         self.notifiers = notifiers if notifiers is not None else notifiers_from_env()
         self.environment = environment
+        if environment == 'production' and any(not self.notifiers.get(route) for routes in CONTRACT['routes'].values() for route in routes):
+            raise ValueError('ALERT_ROUTE_MISSING')   # production never evaluates alerts it cannot deliver
 
     def _load(self) -> dict:
         if self.state_path.exists():
-            return json.loads(self.state_path.read_text(encoding='utf-8'))
-        return {'firing': {}}
+            state = json.loads(self.state_path.read_text(encoding='utf-8'))
+            state.setdefault('outbox', [])
+            return state
+        return {'firing': {}, 'outbox': []}
 
     def process(self, signals: dict) -> list[dict]:
         sources, active = evaluate(signals)
         state = self._load()
-        firing = state['firing']
+        firing, outbox = state['firing'], state['outbox']
         release, commit = release_info()
         sent = []
         current = {fingerprint(item): item for item in active}
@@ -199,12 +206,14 @@ class AlertEngine:
                 continue
             firing[fp] = {'alert': item['alert'], 'labels': item['labels'], 'context': item['context'],
                           'started_at': now_iso(), 'source': ALERTS[item['alert']]['source']}
-            sent.append(self._notify('FIRING', fp, firing[fp], release, commit))
+            sent.append(self._queue(outbox, 'FIRING', fp, firing[fp], release, commit))
         for fp in sorted(list(firing)):
             entry = firing[fp]
             if entry['source'] in sources and fp not in current:
-                sent.append(self._notify('RESOLVED', fp, entry, release, commit, resolved=True))
+                sent.append(self._queue(outbox, 'RESOLVED', fp, entry, release, commit, resolved=True))
                 del firing[fp]
+        # New and previously failed notifications, in order (a FIRING always precedes its RESOLVED).
+        state['outbox'] = [item for item in outbox if self._deliver(item)]
         write_private(self.state_path, json.dumps(state, sort_keys=True))
         LOG.emit('alerts', 'alert.evaluate', 'success', count=len(sent))
         return sent
@@ -213,7 +222,40 @@ class AlertEngine:
         return [{'alert': e['alert'], 'severity': severity(e['alert'], self.environment), 'labels': e['labels']}
                 for e in self._load()['firing'].values()]
 
-    def _notify(self, status: str, fp: str, entry: dict, release: str, commit: str, resolved: bool = False) -> dict:
+    def pending(self) -> int:
+        """Notifications not yet accepted by every route."""
+        return len(self._load()['outbox'])
+
+    def _queue(self, outbox: list, status: str, fp: str, entry: dict, release: str, commit: str, resolved: bool = False) -> dict:
+        payload = self._payload(status, fp, entry, release, commit, resolved)
+        outbox.append({'payload': payload, 'pending': list(payload['routes'])})
+        return payload
+
+    def _deliver(self, item: dict) -> bool:
+        """Tries every pending route; returns True while something is still undelivered."""
+        payload = item['payload']
+        for route in list(item['pending']):
+            targets = self.notifiers.get(route) or []
+            if not targets:
+                # Only outside production (enforced in __init__): nothing to deliver to.
+                LOG.emit('alerts', 'alert.notify', 'skipped', alert=payload['alert'], severity=payload['severity'],
+                         state=payload['status'], error_class='CONFIG')
+                item['pending'].remove(route)
+                continue
+            delivered = True
+            for notifier in targets:
+                try:
+                    notifier.send(payload)
+                    LOG.emit('alerts', 'alert.notify', 'success', alert=payload['alert'], severity=payload['severity'], state=payload['status'])
+                except OpsError as error:
+                    delivered = False
+                    LOG.emit('alerts', 'alert.notify', 'failure', alert=payload['alert'], severity=payload['severity'],
+                             state=payload['status'], error_class=error.error_class)
+            if delivered:
+                item['pending'].remove(route)
+        return bool(item['pending'])
+
+    def _payload(self, status: str, fp: str, entry: dict, release: str, commit: str, resolved: bool = False) -> dict:
         level = severity(entry['alert'], self.environment)
         payload = {
             'schema': 'fichaje.alert.v1', 'status': status, 'alert': entry['alert'], 'severity': level,
@@ -224,16 +266,7 @@ class AlertEngine:
             'started_at': entry['started_at'], 'resolved_at': now_iso() if resolved else None, 'sent_at': now_iso(),
         }
         validate_payload(payload)
-        routes = CONTRACT['routes'][level] if level in CONTRACT['routes'] else []
-        payload['routes'] = routes
-        for route in routes:
-            for notifier in self.notifiers.get(route, []):
-                try:
-                    notifier.send(payload)
-                    LOG.emit('alerts', 'alert.notify', 'success', alert=entry['alert'], severity=level, state=status)
-                except OpsError as error:
-                    LOG.emit('alerts', 'alert.notify', 'failure', alert=entry['alert'], severity=level, state=status,
-                             error_class=error.error_class)
+        payload['routes'] = list(CONTRACT['routes'][level]) if level in CONTRACT['routes'] else []
         return payload
 
 

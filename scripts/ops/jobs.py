@@ -1,10 +1,13 @@
 """OPS-02 job runner (OBS-02 JOBS, RES-01) and recovery-journal monitor.
 
-Jobs are retried only because each one is idempotent by construction: the
-export worker publishes READY only after a verified upload of a fixed object
-path, purge_operational removes expired operational rows (never labour data)
-and journal reconciliation only appends COMMITTED/ABORTED for finished
-transactions. Nothing is retried with different input.
+Every job is a mutation. It is retried automatically only when the server
+itself enforces idempotency (SERVER_KEYS): the export worker moves a job
+PENDING→READY once, guarded by its status, after a verified upload to a fixed
+object path; journal reconciliation appends COMMITTED/ABORTED with ON CONFLICT
+DO NOTHING. purge_operational has no server-side key (each call appends a
+retention_runs manifest), so it runs exactly once per invocation: a failure
+alerts and the next scheduled run or an operator repeats it. Nothing is ever
+retried with different input.
 """
 from __future__ import annotations
 
@@ -23,13 +26,17 @@ from opslib import CONTRACT, ERROR_CLASSES, LOG, OpsError, Timer, classify_excep
 from retry import Operation, RetryPolicy, execute, NotRetryable, RetryExhausted  # noqa: E402
 
 
+# Server-enforced idempotency per job (the value is a technical key, never a request id).
+SERVER_KEYS = {'export': 'job:export', 'recovery_journal': 'job:recovery_journal'}
+
+
 def classify_job_error(error: BaseException) -> str:
     message = str(error)
     if isinstance(error, RuntimeError) and message in ERROR_CLASSES:
         return message
     if isinstance(error, urllib.error.HTTPError):
         return 'STORAGE_ERROR' if error.code < 500 else 'UPSTREAM_5XX'
-    return classify_exception(error)
+    return classify_exception(error, sent=True)   # a job may have committed before the error
 
 
 def run_job(job: str, work, policy: RetryPolicy | None = None, sleep=None) -> dict:
@@ -43,7 +50,7 @@ def run_job(job: str, work, policy: RetryPolicy | None = None, sleep=None) -> di
         return work()
     timer = Timer()
     op = Operation(f'{"export-worker" if job == "export" else "retention-worker" if job == "retention" else "recovery-journal"}',
-                   f'job.{job}', idempotent=True, mutation=False)
+                   f'job.{job}', idempotent=job in SERVER_KEYS, mutation=True, key=SERVER_KEYS.get(job))
     kwargs = {'classify': classify_job_error}
     if sleep is not None:
         kwargs['sleep'] = sleep

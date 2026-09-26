@@ -23,6 +23,7 @@ import alerts  # noqa: E402
 import backup_monitor  # noqa: E402
 import faults  # noqa: E402
 import health  # noqa: E402
+import jobs  # noqa: E402
 import release_gate  # noqa: E402
 from opslib import OpsError  # noqa: E402
 
@@ -218,6 +219,86 @@ class Obs03ApplicationProbe(unittest.TestCase):
             self.assertEqual((report['status'], report['checks']['app']['status']), ('DOWN', 'DOWN'))
         finally:
             SpaHost.files['/'] = ('text/html', SpaHost.files['/'][1].replace(b'index-missing.js', b'index-a.js'))
+
+
+class FlakyNotifier:
+    """Route endpoint that can be down; records what it accepted."""
+
+    def __init__(self):
+        self.down, self.accepted = True, []
+
+    def send(self, payload):
+        if self.down:
+            raise OpsError('NETWORK', 'notify')
+        self.accepted.append((payload['status'], payload['alert'], payload['notification_id']))
+
+
+class Obs06Delivery(unittest.TestCase):
+    DOWN = {'status': 'DOWN', 'checks': {'postgres': {'status': 'DOWN', 'latency_ms': 1.0, 'error_class': 'DB_UNAVAILABLE'}}}
+    UP = {'status': 'UP', 'checks': {'postgres': {'status': 'UP', 'latency_ms': 1.0, 'error_class': 'NONE'}}}
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.pager, self.ticket = FlakyNotifier(), FlakyNotifier()
+        self.engine = alerts.AlertEngine(Path(self.tmp.name) / 'alerts.json', {'pager': [self.pager], 'ticket': [self.ticket]}, 'ci')
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_undelivered_alert_is_retried_until_the_route_accepts_it(self):
+        first = self.engine.process({'health': self.DOWN})
+        self.assertEqual([(n['status'], n['alert']) for n in first], [('FIRING', 'POSTGRES_DOWN')])
+        self.assertEqual((self.pager.accepted, self.engine.pending()), ([], 1))
+        self.assertEqual(self.engine.process({'health': self.DOWN}), [])   # no new transition, still pending
+        self.assertEqual(self.engine.pending(), 1)
+        self.pager.down = False
+        self.engine.process({'health': self.DOWN})
+        self.assertEqual(self.pager.accepted, [('FIRING', 'POSTGRES_DOWN', first[0]['notification_id'])])
+        self.assertEqual(self.engine.pending(), 0)
+        self.engine.process({'health': self.UP})
+        self.assertEqual([a[0] for a in self.pager.accepted], ['FIRING', 'RESOLVED'])
+        self.assertEqual(self.engine.pending(), 0)
+
+    def test_firing_and_resolution_are_delivered_in_order_after_an_outage(self):
+        self.engine.process({'health': self.DOWN})
+        self.engine.process({'health': self.UP})          # resolved while the pager was still down
+        self.assertEqual(self.engine.pending(), 2)
+        self.pager.down = False
+        self.engine.process({'health': self.UP})
+        self.assertEqual([a[0] for a in self.pager.accepted], ['FIRING', 'RESOLVED'])
+        self.assertEqual(self.engine.pending(), 0)
+
+    def test_production_requires_every_route(self):
+        with self.assertRaises(ValueError):
+            alerts.AlertEngine(Path(self.tmp.name) / 'prod.json', {'pager': [self.pager]}, 'production')
+        alerts.AlertEngine(Path(self.tmp.name) / 'prod.json', {'pager': [self.pager], 'ticket': [self.ticket]}, 'production')
+
+
+class Res01Jobs(unittest.TestCase):
+    def flaky(self, failures):
+        calls = []
+
+        def work():
+            calls.append(1)
+            if len(calls) <= failures:
+                raise OpsError('DB_UNAVAILABLE', 'job')
+            return 'done'
+        return work, calls
+
+    def test_server_idempotent_jobs_are_retried(self):
+        for job in ('export', 'recovery_journal'):
+            work, calls = self.flaky(1)
+            result = jobs.run_job(job, work, sleep=lambda _s: None)
+            self.assertEqual((result['outcome'], result['attempts'], len(calls)), ('success', 2, 2), job)
+
+    def test_retention_without_server_key_runs_exactly_once(self):
+        work, calls = self.flaky(1)
+        result = jobs.run_job('retention', work, sleep=lambda _s: None)
+        self.assertEqual((result['outcome'], result['attempts'], result['error_class'], len(calls)), ('failure', 1, 'DB_UNAVAILABLE', 1))
+
+    def test_a_lost_response_is_an_unknown_outcome(self):
+        import socket
+        self.assertEqual(jobs.classify_job_error(socket.timeout()), 'UNKNOWN_OUTCOME')
 
 
 class FaultInjectionGuards(unittest.TestCase):
