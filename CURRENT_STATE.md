@@ -3,9 +3,9 @@
 
 ### OPS-02 — observabilidad, canaries, invariantes, alertas y self-healing seguro
 
-**ESTADO: implementado y validado en local;
-[PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12) abierto contra `main`, pendiente de CI y
-de aprobación. Sin merge. H7 no autorizado.** Rama `astra/ops-02-observabilidad-resiliencia` creada desde
+**ESTADO: implementado, validado en local y con CI completa en verde sobre el código final `8e54371`;
+[PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12) abierto contra `main`, pendiente de la
+aprobación del usuario. Sin merge. H7 no autorizado.** Rama `astra/ops-02-observabilidad-resiliencia` creada desde
 `main` `754c7f184fb14db151303c7ab7db72bb2629e7aa` (la rama de trabajo
 `claude/ops-02-observabilidad-resiliencia-kzk0z9` contiene los mismos commits).
 
@@ -78,7 +78,16 @@ CI del PR sobre `1e36d23` (código previo a la revisión automática): PASS en
 [OPS-02](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36224038021) (139 comprobaciones reales
 con fallos inducidos en GitHub Actions).
 
-Revisión automática del PR (Codex), hallazgos verificados y corregidos con tests:
+CI del PR sobre el código final `8e54371377a45aa54faedaf2507dacc6f5426e0e` (tras la revisión automática): PASS en
+[CI general](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36224508387),
+[Database](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36224508381) (506 comprobaciones reales
+H1-H5 + KIO-H6-01),
+[E2E](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36224508379) (46/46; escáner 0 hallazgos) y
+[OPS-02](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36224508377) (421 pgTAP y 139
+comprobaciones reales con fallos inducidos). El commit posterior solo registra esta evidencia; sus Checks
+repiten automáticamente toda la validación.
+
+Revisión automática del PR (Codex), 5 hilos verificados, respondidos y resueltos; corregidos con tests:
 - Una alerta cuya entrega fallaba quedaba FIRING sin reintento: ahora hay outbox persistente y cada
   notificación se reintenta con el mismo `notification_id` hasta que su ruta la acepta (FIRING antes que
   RESOLVED); en producción el motor exige las rutas pager y ticket configuradas.
