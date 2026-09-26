@@ -4,9 +4,9 @@
 ### OPS-02 — observabilidad, canaries, invariantes, alertas y self-healing seguro
 
 **ESTADO: implementado y en revisión en [PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12)
-contra `main`, con la corrección SEC-OPS-01 de la auditoría independiente añadida al mismo PR y validada en
-local; la evidencia de CI de SEC-OPS-01 se registra al terminar. OPS-02 no está aprobado ni integrado en
-`main`. Sin merge. H7 no autorizado.**
+contra `main`, con la corrección SEC-OPS-01 de la auditoría independiente añadida al mismo PR, validada en
+local y con CI completa en verde sobre `7113dde`. OPS-02 no está aprobado ni integrado en `main`. Sin merge.
+H7 no autorizado.**
 Rama `astra/ops-02-observabilidad-resiliencia` creada desde `main` `754c7f184fb14db151303c7ab7db72bb2629e7aa`
 (la rama de trabajo `claude/ops-02-observabilidad-resiliencia-kzk0z9` contiene los mismos commits).
 
@@ -76,6 +76,15 @@ del frontend salvo el E2E):
   decisiones de alertas, ni la leen gate, reparaciones o jobs, e identidad del artefacto por `<meta>`); Deno
   `ops_test.ts` 5 y `network_test.ts` 2 PASS; `deno check` de kiosk y export-link, `bash -n scripts/*.sh`,
   `py_compile` y `git diff --check` PASS.
+
+CI del PR sobre `7113ddeebb204c2dc5f4411ef429a60df3a14253` (SEC-OPS-01): PASS en
+[CI general](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36241017083),
+[Database](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36241017071) (468 pgTAP y 506
+comprobaciones reales H1-H5 + KIO-H6-01),
+[E2E](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36241017066) (46/46; escáner 0 hallazgos) y
+[OPS-02](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36241017088) (468 pgTAP y 155
+comprobaciones reales, las 16 de SEC-OPS-01 incluidas). El commit posterior solo registra esta evidencia; sus
+Checks repiten automáticamente toda la validación.
 
 Riesgo residual: una identidad autenticada todavía puede sesgar agregados informativos dentro de su cuota
 (por diseño no deciden nada). Las llamadas inválidas no escriben ni consumen cuota; limitar la inundación
