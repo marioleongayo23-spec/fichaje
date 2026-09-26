@@ -42,8 +42,8 @@ Entregado:
 
 Evidencia local ejecutada el 2026-09-26 (Docker; Supabase CLI 2.117.0, PostgreSQL 17, GoTrue, PostgREST y
 Storage locales, Deno 2.9.6, Node 24.19.0, Python 3.12), sobre el código de este PR:
-- `supabase db reset --local --no-seed` + `journal_init.py` + `supabase test db`: **411 aserciones pgTAP
-  PASS** (352 previas + 59 de `ops_observability.test.sql`).
+- `supabase db reset --local --no-seed` + `journal_init.py` + `supabase test db`: **421 aserciones pgTAP
+  PASS** (352 previas + 69 de `ops_observability.test.sql`).
 - `python3 tests/integration/ops02.py` tras el mismo reset: **139 comprobaciones reales PASS**. Releases
   construidas desde el commit con el gateway y el firmador reales; tenants sintéticos. Fallos inducidos de
   verdad y detectados por el código operativo sin modificar: API 5xx, Auth rechazando, latencia, PostgreSQL
@@ -59,7 +59,7 @@ Storage locales, Deno 2.9.6, Node 24.19.0, Python 3.12), sobre el código de est
   escáner final sin secretos, PIN, emails, nombres, códigos, motivos ni identificadores de registro.
   Si falla, la suite solo imprime la etiqueta del check, el tipo o clase de error, ubicaciones de código
   y eventos por campos enumerados (mismo criterio que H4): nunca valores, SQL ni cuerpos HTTP.
-- `python3 -m unittest discover -s tests/ops`: **41 tests PASS**; Deno `ops_test.ts`: **5 PASS**;
+- `python3 -m unittest discover -s tests/ops`: **47 tests PASS**; Deno `ops_test.ts`: **5 PASS**;
   `deno check` de kiosk y export-link PASS.
 - `npm run check`: typecheck, lint, **109 tests unitarios**, build y escáner de `dist`: PASS.
   `bash -n scripts/*.sh`, `py_compile` y `git diff --check`: PASS.
@@ -67,6 +67,31 @@ Storage locales, Deno 2.9.6, Node 24.19.0, Python 3.12), sobre el código de est
   PostgreSQL, gateway y firmador reales: **46/46 PASS** (45 de H6 sin cambios + `telemetry.e2e.ts`: el
   navegador solo envía agregados acotados, sin tenant, persona, registro, request_id, email ni token).
   `node scripts/scan_secrets.mjs dist test-results`: 0 hallazgos.
+
+- Regresión completa tras reset desde vacío: `h5_render.py` (4 tests) y `h5.py` **506 comprobaciones PASS**
+  (H1 102 + H2 70 + H3 80 + H4 181 con KIO-H6-01 63 + H5 73), sin cambios respecto a H6.
+
+CI del PR sobre `1e36d23` (código previo a la revisión automática): PASS en
+[CI general](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36224038022),
+[Database](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36224038009) (506 comprobaciones reales),
+[E2E](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36224038062) y
+[OPS-02](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36224038021) (139 comprobaciones reales
+con fallos inducidos en GitHub Actions).
+
+Revisión automática del PR (Codex), hallazgos verificados y corregidos con tests:
+- Una alerta cuya entrega fallaba quedaba FIRING sin reintento: ahora hay outbox persistente y cada
+  notificación se reintenta con el mismo `notification_id` hasta que su ruta la acepta (FIRING antes que
+  RESOLVED); en producción el motor exige las rutas pager y ticket configuradas.
+- Las líneas base de originales podían avanzar con una guarda append-only deshabilitada (hallazgo
+  estructural sin tenant): cualquier hallazgo estructural CRITICAL congela todas las líneas base de la
+  ejecución (`baselines_frozen`).
+- Una purga reproducida tras restore (evidencia solo de tenant) marcaba a todo el tenant como purgado:
+  ahora solo cuenta un empleado cuya historia tiene la forma de una purga legal (falta la secuencia 1, resto
+  contiguo que empieza en CLOCK_IN) y un recibo huérfano solo es INFO si es anterior al corte de una purga
+  laboral registrada. Sobre el dataset real de H1-H5 esto devuelve a comprobación completa a un empleado no
+  purgado y hace aflorar `SEQUENCE_CONTIGUOUS` en el fixture histórico privilegiado de H5 (ya incoherente).
+- Los jobs se modelan como mutaciones: solo se reintentan con idempotencia garantizada en servidor
+  (exportación y journal); `purge_operational` añade un manifiesto por llamada y se ejecuta una sola vez.
 
 Hallazgos corregidos durante la validación:
 - `record_time_event` responde VERSION_CONFLICT con HTTP 500 (SQLSTATE 40001): la clasificación operativa lo
