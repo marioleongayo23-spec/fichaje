@@ -33,7 +33,9 @@ jobs:
         run: npm run build
       - name: Secret scan of build output
         run: npm run scan:secrets
+      - name: OPS-02 operational contract unit tests
+        run: python3 -m unittest discover -s tests/ops
       - name: Shell syntax and whitespace
         run: |
-          bash -n scripts/backup_repo.sh scripts/backup_database.sh
+          bash -n scripts/*.sh
           git diff --check

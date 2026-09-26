@@ -1,6 +1,6 @@
 // OPS-02 Deno tests: allowlisted events, contract consistency, readiness and
 // health responses of the server-only functions.
-// deno test --allow-read --allow-env=FICHAJE_RELEASE,FICHAJE_COMMIT supabase/functions/_shared/ops_test.ts
+// deno test --allow-env=FICHAJE_RELEASE,FICHAJE_COMMIT --allow-read=ops/contract.json supabase/functions/_shared/ops_test.ts
 import { buildEvent, classifySql, COMPONENTS, ERROR_CLASSES, healthHandler, OPERATIONS, readiness } from './ops.ts';
 
 function assert(condition: unknown, message: string): asserts condition {
