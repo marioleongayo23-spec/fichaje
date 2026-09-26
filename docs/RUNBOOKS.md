@@ -25,7 +25,8 @@ Comandos (entorno de operación con login técnico que solo hereda el rol de ent
 `health.py` (monitor), `canary.py run`, `invariants.py summary|record` (`fichaje_ops_monitor`),
 `invariants.py findings --org` y `rebuild_projection.py --check` (`fichaje_ops_reviewer`),
 `rebuild_projection.py --apply` (`fichaje_ops_repairer`, requiere `--authorization-ref`),
-`backup_monitor.py`, `jobs.py`, `release_gate.py`, `metrics.py`, `alerts.py` (todos en `scripts/ops/`).
+`backup_monitor.py`, `jobs.py`, `metrics.py`, `alerts.py` (todos en `scripts/ops/`); el gate de release es
+`release_gate.promote()`, invocado por el pipeline de despliegue.
 
 <a id="api-down"></a>
 ## API down (PostgREST o aplicación web) — `API_DOWN`, `APP_DOWN`, `ERROR_RATE_HIGH`, `LATENCY_HIGH`, `SLOW_OPERATIONS`, `RETRY_REPEATED`
@@ -34,7 +35,7 @@ Comandos (entorno de operación con login técnico que solo hereda el rol de ent
   p95 o reintentos por encima de `thresholds`.
 - **Impacto**: no se puede fichar por web ni consultar; el kiosco sigue si su gateway y PostgreSQL están UP.
 - **Automático permitido**: reintento idempotente de sondas; redeploy/rollback de la última release sana si
-  coincide con un despliegue (`release_gate.py rollback`).
+  coincide con un despliegue (`release_gate.promote()` lo hace dentro del gate de despliegue).
 - **Prohibido**: reintentar mutaciones con un `request_id` nuevo; desactivar RLS o exponer esquemas.
 - **Escalar**: CRITICAL > 5 min o si Supabase/Cloudflare reportan incidente.
 - **Evidencia**: informe de health, eventos de `probe.api`/`probe.app`, release/commit.
@@ -145,7 +146,8 @@ Comandos (entorno de operación con login técnico que solo hereda el rol de ent
 
 <a id="release-degraded"></a>
 ## Release degradada — `RELEASE_DEGRADED`, `RELEASE_DEGRADED_NO_ROLLBACK`
-- **Detección**: `release_gate.py promote` (health → pruebas sintéticas → canary → gate) en rojo.
+- **Detección**: `release_gate.promote()` (health → pruebas sintéticas → canary → gate) en rojo. En OPS-02 se
+  ejerce con `LocalDeployer` en la puerta CI; H7 solo sustituye el adaptador de despliegue (Pages/Edge).
 - **Impacto**: la promoción se detiene; sin rollback exitoso, usuarios afectados (CRITICAL).
 - **Automático permitido**: detener promoción, redeploy de la release previamente sana y repetir health +
   canary. Migraciones de base de datos solo compatibles hacia atrás (expand/contract); el rollback es de código.

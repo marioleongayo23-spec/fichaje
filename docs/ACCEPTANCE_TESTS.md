@@ -72,3 +72,24 @@ sintéticos por prueba; los efectos se comprueban en PostgreSQL. Detalle en `doc
 | Empleado | `employee.e2e.ts`: login, ciclo completo, salida desde pausa, doble clic, ACK perdido, error servidor, rechazos, revocación, evidencia, corrección con revisión y aprobación independiente, exportación propia |
 | OWNER/ADMIN | `manager.e2e.ts`: tenant correcto, denegación cross-tenant con sesión real, cambio de tenant, empleados sin email, roles, invitación, bandeja con independencia/obsolescencia/negativa del servidor, clasificación, exportación y entrega controlada, horarios |
 | Kiosco | `kiosk.e2e.ts` (navegador real + gateway Deno + PostgreSQL): preparación y PIN desde la gestión, empleado sin email ficha OUT→WORKING→PAUSED→OUT con solo las acciones legales, confirmación solo tras ACK, PIN erróneo/código inexistente genéricos, ACK perdido y timeout con recuperación de un único evento, doble toque, challenge reutilizado/caducado, dispositivo revocado, limpieza del recibo (10 s) y de la pantalla identificada (< 15 s, medida en la página), sin PIN/código/credencial/JWT/challenges en almacenamiento, cachés, consola, logs ni artefactos; axe en todos los pasos del terminal. Backend: `kiosk_identification.test.sql` y `kio_h6.py` (KIO-H6-01) |
+
+## OPS-02 — asignación de evidencia
+Stack real efímero (Supabase local: Auth, PostgREST, Storage, PostgreSQL 17), releases construidas desde
+el commit bajo prueba con el gateway H4/KIO-H6-01 y el firmador H5 reales, y tenants exclusivamente
+sintéticos. Los fallos se inducen de verdad (saltos HTTP/TCP en loopback, contenedores detenidos o
+pausados, artefactos de release defectuosos, deriva privilegiada en la base efímera) y los detecta el
+código operativo sin modificar (`tests/integration/ops02.py`, puerta `.github/workflows/ops02.yml`).
+
+| Criterio | Evidencia |
+|---|---|
+| OBS-01 | `test_core.py` (allowlist, campos obligatorios, correlación, mapeo de excepciones sin texto) + `ops02.py`: todos los eventos de scripts y gateways cumplen `ops/contract.json`, llevan release/commit y sus `request_id` casan uno a uno con el audit; escáner final sin secretos, PIN, emails, nombres, códigos, motivos ni ids de registro en logs, métricas, alertas e informes |
+| OBS-02 | `test_core.py` + `ops02.py`: contadores iguales a un recuento independiente, histograma de latencia, fallos/`UNKNOWN_OUTCOME`/`VERSION_CONFLICT` por acción, fallos de PIN y bloqueo del kiosco, jobs y backups; telemetría del navegador agregada vía RPC de solo escritura (identificadores rechazados); etiquetas solo de enumeraciones acotadas |
+| OBS-03 | `ops02.py`: app, API, Auth, PostgreSQL, gateway y firmador UP; API 5xx, Auth rechazando, latencia, PostgreSQL rechazando, contenedor Auth detenido y PostgreSQL pausado → DOWN/DEGRADED y recuperación; sin URLs, hosts, claves ni datos; no crea fichajes |
+| OBS-04 | `ops02.py`: canary web y kiosco OUT→…→OUT con respuesta, estado, versión, `server_at`, RLS, audit e idempotencia y reintento seguro de la operación confirmada; repetible; ciclo interrumpido → rotación sin cerrar la sesión; empleado desactivado → FAIL |
+| OBS-05 | `ops_observability.test.sql` + `ops02.py`: deriva de proyección, originales borrados/alterados, audit cross-tenant, ajuste de decisión rechazada, guarda deshabilitada, sesión abierta antigua y exportación atrasada detectados; el comprobador nunca modifica historia |
+| OBS-06 | `test_core.py` + `ops02.py`: catálogo con runbook, CRITICAL→pager y WARNING→ticket en un sink real, formato `fichaje.alert.v1` validado y RESOLVED al recuperarse |
+| OBS-07 | `ops_observability.test.sql` + `ops02.py`: roles técnicos NOLOGIN/NOINHERIT/NOBYPASSRLS, logins sin privilegios de tabla, monitor solo agregados, revisión por tenant, OWNER/ADMIN/EMPLOYEE/anon sin acceso a funciones ni tablas OPS |
+| RES-01 | `test_core.py` + `ops02.py`: ACK perdido tras commit → mismo payload y clave, una mutación/audit/recibo; error permanente un intento; 5xx con backoff acotado; circuito abierto; operación sin clave nunca reintentada |
+| RES-02 | `test_resilience.py` + `ops02.py`: release sana promovida; candidata con defecto real (gateway que no registra; app sin asset) detenida, alertada, rollback a la sana, health y canary en verde y alertas resueltas. Arnés CI aislado y efímero; la repetición en staging es puerta de H7 |
+| RES-03 | `ops_observability.test.sql` + `ops02.py`: solo `private.employee_state`; `--check` en transacción READ ONLY no escribe; reconstrucción exacta, segunda ejecución no-op, historia byte a byte igual, evidencia y audit; fuente alterada → BLOCKED |
+| RES-04 | `test_resilience.py` + `ops02.py`: artefacto real de `backup_repo.sh` con checksums, bundle y restore de ensayo; fallido/antiguo/ausente/sin artefacto/corrupto/sin checksums alertados; backup DB `NOT_CONFIGURED` nunca verde; `ops-monitor.yml` vigila el backup real a diario |

@@ -61,6 +61,15 @@ Recuperaciones automáticas admitidas: retry idempotente con la misma clave, rei
 
 En staging se inducirá al menos una release degradada/fallo controlado para demostrar: detección, alerta, preservación de evidencia, rollback y retorno del canary a verde. Una deriva de invariantes bloquea auto-reparaciones no expresamente autorizadas y escala a revisión humana.
 
+Implementado en OPS-02 (2026-09-26), probado en un arnés CI aislado y efímero: gate de release con
+rollback automático a la última release sana (`scripts/ops/release_gate.py`), reintentos idempotentes y
+circuito (`retry.py`, `jobs.py`), reconstrucción autorizada de `employee_state` (`rebuild_projection.py`,
+`--check` de solo lectura, `--apply` con referencia de autorización, BLOCKED si la fuente es incoherente)
+y monitor de backups (`backup_monitor.py`, diario en `.github/workflows/ops-monitor.yml`): último run,
+conclusión, artefacto, `SHA256SUMS`, `git bundle verify`, restore de ensayo del bundle y frescura ≤ 26 h.
+PostgreSQL permanece `NOT_CONFIGURED` y nunca en verde hasta el ensayo cifrado de H7. Procedimientos por
+alerta en `docs/RUNBOOKS.md`. El ensayo en staging sigue siendo puerta de H7.
+
 ## Restore DB futuro / puerta H7
 1. Contener incidente, parar escrituras, preservar evidencia y seleccionar punto consistente.
 2. Verificar checksum; descifrar en stream hacia pg_restore en entorno aislado compatible, sin acceso público.

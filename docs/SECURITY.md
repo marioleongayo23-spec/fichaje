@@ -73,6 +73,18 @@ La observabilidad no crea un canal de soporte global que eluda RLS. Las sondas f
 
 Un agente automático o IA puede diagnosticar, proponer tests/fixes y abrir cambios revisables, pero no obtiene autoridad para editar historia laboral en producción. Rollback/restart/retry solo bajo reglas previamente probadas; cualquier reparación de proyección se deriva de fuente inmutable y deja evidencia operativa.
 
+Implementado en OPS-02 (2026-09-26): eventos construidos por allowlist (claves y valores de
+`ops/contract.json`; lo desconocido se descarta, las excepciones se reducen a una clase estable sin texto
+SQL, parámetros ni trazas). Métricas solo con etiquetas enumeradas: nunca `employee_id`, `event_id`,
+`request_id`, tenant ni email. `request_id` es la única correlación y solo aparece en eventos. Los logins
+técnicos heredan un único rol de entrada sin privilegio de tabla; el monitor ve recuentos agregados sin
+tenant; la revisión humana exige un tenant; la reparación solo reconstruye `employee_state`. Ningún rol
+OWNER/ADMIN/EMPLOYEE/anon alcanza funciones o tablas OPS; la única RPC pública OPS es la ingesta de
+agregados del navegador. Los canaries usan tenants sintéticos y RLS los limita a su empleado. La inyección
+de fallos exige `OPS_FAULT_INJECTION=1` y destinos loopback. `scripts/ops/leakscan.py` y
+`scripts/scan_secrets.mjs` (reglas ampliadas: claves age, tokens GitHub, URLs firmadas, nombres de DSN
+técnicos) escanean logs, métricas, alertas, informes y artefactos.
+
 ## Amenazas y respuesta
 - Tenant spoofing, referencias cruzadas, invitaciones y roles: RLS + FK + pruebas con dos tenants.
 - Doble clic/replay/carreras: clave persistente + locks + versión + transacción.
