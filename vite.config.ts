@@ -61,10 +61,16 @@ function gatewayProxy(): Record<string, ProxyOptions> {
   return proxy;
 }
 
+// OPS-02 release metadata for client telemetry correlation (public, bounded).
+export function releaseId(value = process.env.FICHAJE_RELEASE): string {
+  return value && /^[0-9A-Za-z.+_-]{1,64}$/.test(value) ? value : 'dev';
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   return {
     plugins: [react(), serviceWorker(), csp(env)],
+    define: { __FICHAJE_RELEASE__: JSON.stringify(releaseId()) },
     build: {
       rolldownOptions: {
         input: { index: 'index.html', sw: 'src/pwa/sw.ts' },

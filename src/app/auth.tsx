@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
+import { ApiError } from '../lib/errors';
 import { clearStoredSession, HUMAN_STORAGE_KEY } from '../lib/storage';
+import { recordRequest } from '../lib/telemetry';
 import { useServices } from './services';
 
 interface AuthValue {
@@ -29,8 +31,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!navigator.onLine) return 'Sin conexión. No se puede iniciar sesión sin conexión.';
+    const started = performance.now();
     try {
       const { error } = await client.auth.signInWithPassword({ email: email.trim(), password });
+      recordRequest('auth.sign_in', !error ? null : error.status === 429 ? new ApiError('validation', 'RATE_LIMITED', 429)
+        : error.status ? new ApiError('unauthenticated', 'UNAUTHENTICATED', error.status) : new ApiError('network', 'NETWORK'),
+      false, performance.now() - started);
       if (!error) { setNotice(null); return null; }
       if (error.status === 429) return 'Demasiados intentos. Espera unos minutos antes de volver a intentarlo.';
       if (!error.status) return 'No hay conexión con el servicio. Inténtalo de nuevo.';

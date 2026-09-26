@@ -66,5 +66,5 @@ export async function gateway<T>(client: SupabaseClient, baseUrl: string, route:
   const { data } = await client.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new ApiError('unauthenticated', 'UNAUTHENTICATED');
-  return postJson<T>(`${baseUrl}/${route}`, token, body);
+  return postJson<T>(`${baseUrl}/${route}`, token, body, `kiosk.${route}`, true);
 }
