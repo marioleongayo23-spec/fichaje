@@ -1,4 +1,4 @@
-# CURRENT_STATE — 2026-09-26
+# CURRENT_STATE — 2026-09-27
 ## Hito autorizado
 
 ### OPS-02 — observabilidad, canaries, invariantes, alertas y self-healing seguro
@@ -8,7 +8,11 @@ contra `main`, con la corrección SEC-OPS-01 de la auditoría independiente aña
 local y con CI completa en verde sobre `7113dde`. OPS-02 no está aprobado ni integrado en `main`. Sin merge.
 H7 no autorizado.**
 Rama `astra/ops-02-observabilidad-resiliencia` creada desde `main` `754c7f184fb14db151303c7ab7db72bb2629e7aa`
-(la rama de trabajo `claude/ops-02-observabilidad-resiliencia-kzk0z9` contiene los mismos commits).
+(la rama de trabajo `claude/ops-02-observabilidad-resiliencia-kzk0z9` contiene los mismos commits) y
+sincronizada el 2026-09-27 con `main` `b64a16a6a21c965b0e01dce6ade7abd3296dca9e` (merge de PR #13, solo
+documentación: cronología corregida de HITO 6, estado de OPS-02 y regla de merge explícito en `AGENTS.md`)
+mediante un commit de merge, sin reescribir historia. La validación completa se repite sobre el commit
+combinado y su evidencia se registra en PR #12.
 
 Regla absoluta, verificada por la suite: ninguna automatización, script, agente o IA modifica
 `time_events`, fichajes originales, decisiones o ajustes de corrección, horas efectivas ni historia
@@ -200,9 +204,16 @@ del navegador es no confiable y tiene cuotas en servidor (SEC-OPS-01): no alimen
 
 ### HITO 6 — UX/UI + PWA sobre H1-H5, con KIO-H6-01 resuelto
 
-**ESTADO: PASS — HITO 6 aprobado por el usuario e integrado en `main` mediante
-[PR #10](https://github.com/marioleongayo23-spec/fichaje/pull/10) el 2026-09-26.** Rama de origen
-`astra/hito-6-ux-pwa`. Merge: `3c374358e1c17853c62cb29047642bee37a4efe5`. Código probado:
+**ESTADO: PASS — HITO 6 aprobado técnicamente por autorización expresa del usuario el 2026-09-26, después
+de una auditoría independiente posterior al merge.** Cronología (corrección documental del 2026-09-26):
+1. [PR #10](https://github.com/marioleongayo23-spec/fichaje/pull/10) se integró en `main` el 2026-09-26
+   (commit de merge `3c374358e1c17853c62cb29047642bee37a4efe5`, fechado a las 03:47 UTC) antes de la
+   aprobación formal y sin autorización expresa de merge del usuario: el merge fue prematuro.
+2. Después, HITO 6 se auditó de forma independiente; la revisión confirma que el contenido integrado supera
+   la puerta técnica H6, por lo que el código no se revierte.
+3. HITO 6 queda aprobado ahora por autorización expresa del usuario. La aprobación no fue anterior al merge.
+
+Rama de origen `astra/hito-6-ux-pwa`. Merge: `3c374358e1c17853c62cb29047642bee37a4efe5`. Código probado:
 `80a5ccd4874d53e79162169b0f675d998f1fb353`; commit final revisado:
 `49d74ea6731d62e5d2374a8aba573fecfb36c28c` (solo documentación, Checks repetidos en verde).
 CI en `main` sobre el merge `3c37435`: PASS en
@@ -305,10 +316,15 @@ Rama de origen: `astra/hito-4-kiosco`. Merge: `76922f352a64f3bbf0d1d7ece2c7ae155
 
 HITO 5 aprobado por el usuario e integrado en `main` mediante PR #9 el 2026-09-25.
 Rama de origen: `astra/hito-5-informes-retencion`. Merge: `748186125194cf4819357d57a4d8567a8cdf3bab`.
-HITO 6 aprobado por el usuario e integrado en `main` mediante PR #10 el 2026-09-26.
+HITO 6: PR #10 integrado en `main` el 2026-09-26 antes de la aprobación formal (merge prematuro, sin
+autorización expresa); auditado después de forma independiente y aprobado técnicamente ahora por
+autorización expresa del usuario, sin revertir el código.
 Rama de origen: `astra/hito-6-ux-pwa`. Merge: `3c374358e1c17853c62cb29047642bee37a4efe5`.
-OPS-02 implementado en [PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12), pendiente de
-CI y de aprobación (ver la sección OPS-02 al inicio). Puerta obligatoria antes de H7.
+Estado actual: HITO 6 aprobado y cerrado según la cronología corregida arriba. OPS-02 implementado en la
+rama `astra/ops-02-observabilidad-resiliencia` mediante
+[PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12), con SEC-OPS-01 corregido, y en revisión
+técnica; todavía NO aprobado ni integrado en `main` (ver la sección OPS-02 al inicio). H7 sigue sin iniciar
+y bloqueado hasta la aprobación de OPS-02.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -470,12 +486,10 @@ Serialización conservadora por tenant, documentada. No H3, kiosco, informes H5,
 producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 
 ## OPS-02 — observabilidad y resiliencia (especificación original)
-Implementado en PR #12 (ver la sección OPS-02 al inicio de este documento). Texto original:
-Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. OPS-02 está solo especificado; no implementado ni autorizado para ejecución todavía.
+Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. Estado actual: OPS-02 implementado y en revisión técnica mediante PR #12 (rama `astra/ops-02-observabilidad-resiliencia`; ver la sección OPS-02 al inicio de este documento), con SEC-OPS-01 corregido; todavía NO aprobado ni integrado en `main`.
 
 ## Siguiente paso
-Revisión de OPS-02 en PR #12 con CI completa en verde y aprobación expresa del usuario antes del merge.
-H7 sigue sin autorizar: no iniciarlo hasta que OPS-02 esté aprobado e integrado y el usuario lo autorice.
+HITO 6 aprobado y cerrado. OPS-02 (bloque obligatorio después de H6 y antes de H7) está implementado, con SEC-OPS-01 corregido, y en revisión técnica mediante PR #12, sin aprobar ni integrar en `main`: queda pendiente la auditoría independiente de PR #12 sobre el commit sincronizado con `main`, y el merge requiere una orden explícita y posterior del usuario. H7 sigue sin iniciar y bloqueado hasta que OPS-02 esté aprobado e integrado y el usuario lo autorice.
 
 ## HITO 3 — correcciones append-only
 ESTADO: PASS — HITO 3 aprobado por el usuario y PR #7 integrado en `main`.
