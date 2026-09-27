@@ -3,6 +3,7 @@ Repositorio único: marioleongayo23-spec/fichaje. GitHub es la fuente técnica d
 Astra implementa. Leer este archivo y CURRENT_STATE.md al iniciar cada sesión.
 
 - Un hito autorizado por vez; rama propia y PR contra main. No hacer merge ni avanzar sin aprobación.
+- NUNCA hacer merge de un PR basándose en que los tests están verdes, en un PASS técnico o en una instrucción anterior de implementación. El merge requiere una orden explícita y posterior del usuario del tipo “apruebo HITO X, haz merge”. Si esa orden no existe, detenerse con el PR abierto aunque todo esté PASS.
 - Prioridad: correctitud, seguridad, cumplimiento, fiabilidad, simplicidad, coste, UX/UI.
 - Stack fijo: React, TypeScript, Vite, PWA, Supabase Auth, PostgreSQL, RLS/RPC, Cloudflare Pages, GitHub Actions.
 - No diseñar UI sin autorización expresa. No desplegar producción en H0.
