@@ -118,12 +118,20 @@ def web_employee(api: Api, recorder: Recorder, tenant: str, worker: dict, replay
     worker['version'] = version
 
 
-def kiosk_employee(edge: str, recorder: Recorder, tenant: str, device: dict, person: dict) -> None:
+def kiosk_employee(edge: str, recorder: Recorder, tenant: str, device: dict, person: dict,
+                   pace: tuple[float, float] | None = None) -> None:
+    """One kiosk visit per action. pace=(typing_s, choosing_s) adds the human time a person
+    needs at a physical kiosk (code + PIN before identifying, choosing the action before
+    recording); without it the kiosk is driven back-to-back (saturation)."""
     for action in CYCLE:
+        if pace:
+            time.sleep(pace[0])
         body = {'organization_id': tenant, 'device_id': device['id'], 'code': person['code'], 'pin': person['pin']}
         offer = recorder.timed('kiosk.authenticate', lambda: http_json('POST', edge + '/gateway/kiosk/authenticate',
                                {'Authorization': 'Bearer ' + device['token']}, json.dumps(body).encode(), 30)[1])
         challenge = next(c for c in offer['challenges'] if c['action'] == action)
+        if pace:
+            time.sleep(pace[1])
         record = {'organization_id': tenant, 'device_id': device['id'], 'request_id': challenge['request_id'], 'challenge': challenge['challenge'],
                   'action': action, 'expected_version': offer['version']}
         recorder.timed(f'kiosk.clock.{action}', lambda: http_json('POST', edge + '/gateway/kiosk/record',
