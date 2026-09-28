@@ -1,15 +1,29 @@
 # STAGING real — procedimiento del operador (HITO 7)
 
 Revisado el 2026-09-28. **Estado: staging remoto parcial; BLOCKED — no READY FOR PILOT.**
-Supabase `fichaje-staging` ya existe en `eu-west-1`, con 15 migraciones aplicadas,
-Auth sin registro público y las dos Edge Functions desplegadas. Aún faltan sus secretos
-server-side y la URL real de Pages para configurar Auth. Una llamada directa sin firma
-a cada función devuelve 500 por configuración incompleta, por lo que el rechazo 403
-todavía no está verificado. Cloud Browser recibe una verificación de seguridad
-persistente de Cloudflare Dashboard y no pudo crear Pages. La CI prueba la forma local
-de staging, no sustituye la verificación remota. Este documento es el procedimiento
-para completar y comprobar el entorno con datos exclusivamente sintéticos. No autoriza
-producción, piloto real, DNS público definitivo ni compromisos comerciales de SLA/RPO/RTO.
+Supabase `fichaje-staging` existe en `eu-west-1`, con 15 migraciones, Auth
+sin registro público y las dos Edge Functions desplegadas. Cloudflare Pages
+`fichaje-staging` existe por Direct Upload: el formulario estático responde en
+`https://fichaje-staging.pages.dev/`. Auth Site URL y la redirección exacta ya
+apuntan a ese origen. Aún faltan secretos server-side en Supabase y Pages,
+upstreams y verificaciones remotas. Una llamada directa sin firma a cada
+función respondió 500 por configuración incompleta; no demuestra el 403
+requerido. La CI prueba la forma local, no sustituye staging remoto.
+
+El primer bundle del proyecto Pages (`37aa36c`, ZIP SHA-256
+`79278ff732fac64d8b5fc1d7f163c3a4003918abd581a143fe76120b06a30e4f`)
+se construyó con `npm ci`, `VITE_SUPABASE_URL`, clave pública
+`VITE_SUPABASE_PUBLISHABLE_KEY` y `FICHAJE_RELEASE=37aa36c npm run build`.
+Para la subida mediante Dashboard se añadió al `dist/` un `_worker.js`
+compilado en modo avanzado que enruta `/gateway/*` a `handleGateway`
+(`edge/gateway.ts`) y el resto a `env.ASSETS.fetch`. Cloudflare no compila
+`functions/` en la subida por drag-and-drop; para despliegues siguientes
+preferir el `PlatformDeployer` con Wrangler, que sí compila el directorio
+`functions/`. Verificar antes de llamar PASS que la función avanzada y
+`_routes.json` actúan en el dominio remoto. El bundle local respondió 503
+sin secreto y firmó un upstream simulado con secreto de prueba; queda pendiente
+el ensayo remoto. Este documento no autoriza producción, piloto real, DNS
+público definitivo ni compromisos comerciales de SLA/RPO/RTO.
 
 ## 1. Topología
 ```
