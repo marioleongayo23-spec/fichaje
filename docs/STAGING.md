@@ -5,8 +5,16 @@ Supabase `fichaje-staging` existe en `eu-west-1`, con 15 migraciones, Auth
 sin registro público y las dos Edge Functions desplegadas. Cloudflare Pages
 `fichaje-staging` existe por Direct Upload: el formulario estático responde en
 `https://fichaje-staging.pages.dev/`. Auth Site URL y la redirección exacta ya
-apuntan a ese origen. Aún faltan secretos server-side en Supabase y Pages,
-upstreams y verificaciones remotas. Una llamada directa sin firma a cada
+apuntan a ese origen. Pages ya tiene upstreams, variables VITE públicas y un secreto de ingreso como `secret_text`,
+y se desplegó la Pages Function original con Wrangler (última URL de despliegue
+`https://cc923976.fichaje-staging.pages.dev`). El HTML devuelve 200 con CSP,
+HSTS y noindex; una ruta gateway inválida devuelve 404. La ruta real
+`/gateway/kiosk/health/live` devuelve 500 de Supabase retransmitido: faltan
+secretos custom en Supabase, incluido el mismo secreto de ingreso. Como la
+sesión de Dashboard caducó y la solicitud de login seguro fue cancelada,
+no se ha completado la configuración ni las verificaciones remotas. Al
+reanudar se debe rotar el secreto de ingreso de Pages y cargar la nueva pareja
+en Supabase antes de probar el 403 directo. Una llamada directa sin firma a cada
 función respondió 500 por configuración incompleta; no demuestra el 403
 requerido. La CI prueba la forma local, no sustituye staging remoto.
 
