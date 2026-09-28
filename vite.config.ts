@@ -57,14 +57,29 @@ function gatewayProxy(): Record<string, ProxyOptions> {
   const kiosk = process.env.FICHAJE_KIOSK_GATEWAY_TARGET;
   const exportLink = process.env.FICHAJE_EXPORT_LINK_TARGET;
   if (kiosk) proxy['/gateway/kiosk'] = { target: kiosk, rewrite: (path) => path.replace(/^\/gateway\/kiosk/, '') };
-  if (exportLink) proxy['/gateway/export-link'] = { target: exportLink, rewrite: () => '/' };
+  // The signer answers at its root; OPS-02 health paths stay reachable same-origin.
+  if (exportLink) proxy['/gateway/export-link'] = { target: exportLink, rewrite: (path) => path.replace(/^\/gateway\/export-link/, '') || '/' };
   return proxy;
+}
+
+// OPS-02 release identity of the built artifact (public, bounded). It is only
+// written into index.html for the release gate: the browser never sends it.
+export function releaseId(value = process.env.FICHAJE_RELEASE): string {
+  return value && /^[0-9A-Za-z.+_-]{1,64}$/.test(value) ? value : 'dev';
+}
+
+export function withReleaseMeta(html: string, release = releaseId()): string {
+  return html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n    <meta name="fichaje-release" content="${releaseId(release)}" />`);
+}
+
+function releaseMeta(): Plugin {
+  return { name: 'fichaje-release', apply: 'build', transformIndexHtml: (html) => withReleaseMeta(html) };
 }
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   return {
-    plugins: [react(), serviceWorker(), csp(env)],
+    plugins: [react(), serviceWorker(), csp(env), releaseMeta()],
     build: {
       rolldownOptions: {
         input: { index: 'index.html', sw: 'src/pwa/sw.ts' },

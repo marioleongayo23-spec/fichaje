@@ -73,6 +73,38 @@ La observabilidad no crea un canal de soporte global que eluda RLS. Las sondas f
 
 Un agente automático o IA puede diagnosticar, proponer tests/fixes y abrir cambios revisables, pero no obtiene autoridad para editar historia laboral en producción. Rollback/restart/retry solo bajo reglas previamente probadas; cualquier reparación de proyección se deriva de fuente inmutable y deja evidencia operativa.
 
+Implementado en OPS-02 (2026-09-26): eventos construidos por allowlist (claves y valores de
+`ops/contract.json`; lo desconocido se descarta, las excepciones se reducen a una clase estable sin texto
+SQL, parámetros ni trazas). Métricas solo con etiquetas enumeradas: nunca `employee_id`, `event_id`,
+`request_id`, tenant ni email. `request_id` es la única correlación y solo aparece en eventos. Los logins
+técnicos heredan un único rol de entrada sin privilegio de tabla; el monitor ve recuentos agregados sin
+tenant; la revisión humana exige un tenant; la reparación solo reconstruye `employee_state`. Ningún rol
+OWNER/ADMIN/EMPLOYEE/anon alcanza funciones o tablas OPS; la única RPC pública OPS es la ingesta de
+agregados del navegador. Los canaries usan tenants sintéticos y RLS los limita a su empleado. La inyección
+de fallos exige `OPS_FAULT_INJECTION=1` y destinos loopback. `scripts/ops/leakscan.py` y
+`scripts/scan_secrets.mjs` (reglas ampliadas: claves age, tokens GitHub, URLs firmadas, nombres de DSN
+técnicos) escanean logs, métricas, alertas, informes y artefactos.
+
+SEC-OPS-01 (auditoría independiente, 2026-09-26). Causa: la ingesta del navegador solo validaba forma y
+vocabulario; cualquier identidad `authenticated` podía repetir llamadas sin límite con hasta 100 series y
+9.999 eventos por serie y elegir `p_release`, creando combinaciones nuevas sin cota (contaminación de
+métricas, cardinalidad y crecimiento no acotados). Corrección en servidor (los límites de
+`src/lib/telemetry.ts` no son una defensa): la RPC solo acepta `p_batch` y el almacén no tiene columna de
+release; claves exactas, vocabulario cerrado, ≤100 series distintas, 1..1000 eventos por serie y suma de
+duraciones dentro de los límites de sus cubos (+Inf ≤ 120 s); cuotas persistentes y concurrency-safe por
+identidad y ventana de 5 min (30 llamadas contando las rechazadas, 2.000 eventos, 200 series) y límites
+globales intencionados por ventana (5.000 identidades, 200.000 eventos, 1.000 filas por cubo), ajustables
+solo por el propietario de la base en `private.ops_ingest_limits`. Un rechazo por cuota confirma el intento y
+responde `{"accepted":0,"limited":true}`; el navegador descarta ese lote. El emisor se representa con
+`sha256(sal de la ventana ‖ uid)`: sin uid, email, membresía, empleado, nombre ni código; solo se conservan la
+ventana actual y la anterior (la primera llamada de cada ventana purga el resto; sin actividad persisten
+hasta la siguiente llamada) y la sal desaparece con su ventana. Nunca aparece en métricas, logs, alertas ni
+respuestas y no es una dimensión. Los cubos del navegador se retienen 7 días. Esta telemetría es no
+confiable por diseño: no alimenta alertas, gate de release, rollback ni reparaciones; las señales críticas
+proceden de eventos de servidor, health, canary, invariantes y backups. Riesgo residual: una identidad
+autenticada puede sesgar, dentro de su cuota, agregados informativos; la inundación HTTP de llamadas
+inválidas (rechazadas sin escribir) corresponde a la capa de plataforma de H7.
+
 ## Amenazas y respuesta
 - Tenant spoofing, referencias cruzadas, invitaciones y roles: RLS + FK + pruebas con dos tenants.
 - Doble clic/replay/carreras: clave persistente + locks + versión + transacción.

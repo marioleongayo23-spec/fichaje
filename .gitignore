@@ -19,3 +19,7 @@ __pycache__/
 test-results/
 playwright-report/
 blob-report/
+
+# OPS-02 harness state (synthetic credentials, alert state, releases) and Deno lockfiles
+.ops-state/
+supabase/functions/**/deno.lock

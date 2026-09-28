@@ -62,7 +62,7 @@ export function ExportPanel({ employees, ownEmployeeId }: { employees: Employee[
       const { data } = await client.auth.getSession();
       const token = data.session?.access_token;
       if (!token) throw new ApiError('unauthenticated', 'UNAUTHENTICATED');
-      const link = await postJson<{ url: string; expires_in: number }>(config.exportLinkUrl, token, { organization_id: org, job_id: job.id });
+      const link = await postJson<{ url: string; expires_in: number }>(config.exportLinkUrl, token, { organization_id: org, job_id: job.id }, 'export.link', false);
       if (typeof link.url !== 'string' || !/^https?:\/\//.test(link.url)) throw new ApiError('server', 'SERVER');
       const anchor = document.createElement('a');
       anchor.href = link.url;

@@ -57,3 +57,33 @@ it('runs pgTAP and the full real H1-H5 chain, including KIO-H6-01, on every pull
   expect(readFileSync('tests/integration/h4.py', 'utf8')).toMatch(/import kio_h6\n\s+kio_h6\.run\(/);
   expect(readFileSync('supabase/tests/database/kiosk_identification.test.sql', 'utf8')).toContain('KIO-H6-01');
 });
+
+it('gates OPS-02 on every pull request with real fault injection, without secrets or uploaded artefacts', () => {
+  const text = readFileSync('.github/workflows/ops02.yml', 'utf8');
+  const ops = parse(text);
+  expect(ops.on.pull_request.branches).toEqual(['main']);
+  expect(ops.permissions).toEqual({ contents: 'read' });
+  expect(text).not.toMatch(/\bsecrets\.|github\.token|upload-artifact/);
+  const run = JSON.stringify(ops.jobs.ops02.steps);
+  for (const step of ['python3 -m unittest discover -s tests/ops', 'deno test --allow-env=FICHAJE_RELEASE,FICHAJE_COMMIT --allow-read=ops/contract.json supabase/functions/_shared/ops_test.ts',
+    'supabase db reset --local --no-seed', 'tests/integration/journal_init.py', 'supabase test db', 'python3 tests/integration/ops02.py',
+    'supabase stop --no-backup']) {
+    expect(run).toContain(step);
+  }
+  const suite = ops.jobs.ops02.steps.find((s: { run?: string }) => s.run === 'python3 tests/integration/ops02.py');
+  expect(suite.env).toEqual({ OPS_FAULT_INJECTION: '1' });
+  expect(JSON.stringify(parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs.validate.steps)).toContain('python3 -m unittest discover -s tests/ops');
+});
+
+it('monitors backups on a schedule with a read-only token and never enables the database backup', () => {
+  const text = readFileSync('.github/workflows/ops-monitor.yml', 'utf8');
+  const monitor = parse(text);
+  expect(Object.keys(monitor.on).sort()).toEqual(['schedule', 'workflow_dispatch']);
+  expect(monitor.permissions).toEqual({ contents: 'read', actions: 'read' });
+  expect(monitor.jobs.backups.if).toBe("github.ref == 'refs/heads/main'");
+  expect(text).not.toMatch(/\bsecrets\.|upload-artifact|backup_database|pg_dump|RCLONE/);
+  const run = JSON.stringify(monitor.jobs.backups.steps);
+  expect(run).toContain('scripts/ops/backup_monitor.py');
+  expect(run).toContain('scripts/ops/leakscan.py');
+  expect(run).toContain('"GITHUB_TOKEN":"${{ github.token }}"');
+});

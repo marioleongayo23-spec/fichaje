@@ -51,4 +51,26 @@ describe('artefact secret scanner', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('flags OPS-02 secret shapes (built at runtime) without flagging the signer path itself', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'scan-ops-'));
+    const scan = () => execFileSync('node', ['scripts/scan_secrets.mjs', dir], { stdio: 'pipe' });
+    try {
+      writeFileSync(join(dir, 'clean.js'), "if (!url.startsWith('/object/sign/')) deny();");
+      expect(scan).not.toThrow();
+      const shapes = [
+        'AGE-SECRET-KEY-1' + 'Q'.repeat(58),
+        'gh' + 'p_' + 'a1B2'.repeat(9),
+        '/object/sign/fichaje-evidence/org/job.zip?' + 'token=' + 'x'.repeat(40),
+        'OPS_REPAIR' + '_DSN',
+      ];
+      for (const [index, shape] of shapes.entries()) {
+        writeFileSync(join(dir, `leak-${index}.txt`), shape);
+        expect(scan).toThrow();
+        rmSync(join(dir, `leak-${index}.txt`));
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

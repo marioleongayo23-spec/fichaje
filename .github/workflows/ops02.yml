@@ -1,0 +1,76 @@
+name: OPS-02 observability and resilience gate
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ops02-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ops02:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          npm ci
+          python -m pip install cryptography==46.0.3 reportlab==4.4.9 pypdf==6.1.0 'psycopg[binary]==3.2.10'
+      - name: Operational contract unit tests (events, metrics, retries, alerts, leak scanner, gateway telemetry)
+        run: |
+          python3 -m unittest discover -s tests/ops -v
+          deno check --config supabase/functions/kiosk/deno.json supabase/functions/kiosk/index.ts
+          deno check supabase/functions/export-link/index.ts
+          deno test --allow-env=FICHAJE_RELEASE,FICHAJE_COMMIT --allow-read=ops/contract.json supabase/functions/_shared/ops_test.ts
+      - name: Start isolated local Supabase
+        run: |
+          for attempt in 1 2 3; do
+            if supabase start -x realtime,imgproxy,edge-runtime,logflare,vector,supavisor > /dev/null; then
+              exit 0
+            fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            if [ "$attempt" = 1 ]; then
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=public.ecr.aws
+            else
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io
+            fi
+            printf 'SUPABASE_INTERNAL_IMAGE_REGISTRY=%s\n' "$SUPABASE_INTERNAL_IMAGE_REGISTRY" >> "$GITHUB_ENV"
+            sleep 5
+          done
+      - name: Rebuild from empty database and provision the H5 recovery journal
+        run: |
+          supabase db reset --local --no-seed
+          python3 tests/integration/journal_init.py
+      - name: SQL privileges, invariants and projection rebuild (pgTAP, OPS-02 included)
+        run: supabase test db
+      # Real Auth/PostgREST/Storage/PostgreSQL, releases built from this commit,
+      # the real kiosk gateway and export-link signer on loopback, synthetic
+      # tenants only. Faults are injected for real (HTTP/TCP hops, stopped and
+      # paused containers, broken release artefacts, privileged drift in this
+      # ephemeral database) and must be detected by the unchanged operational
+      # code. No secret is used and no artefact is uploaded.
+      - name: OPS-02 real suite (health, canary, invariants, rebuild, alerts, retries, release gate and rollback, backups)
+        env:
+          OPS_FAULT_INJECTION: '1'
+        run: python3 tests/integration/ops02.py
+      - name: Stop local containers
+        if: always()
+        run: supabase stop --no-backup

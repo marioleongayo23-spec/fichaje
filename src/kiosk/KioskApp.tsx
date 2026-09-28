@@ -6,6 +6,7 @@ import { isUuid, parseDeviceSetup } from '../lib/codes';
 import { useOnline } from '../lib/online';
 import { clearStoredSession, KIOSK_DEVICE_KEY, KIOSK_STORAGE_KEY } from '../lib/storage';
 import { createSessionClient } from '../lib/supabase';
+import { startTelemetry } from '../lib/telemetry';
 import { formatDate, formatTime } from '../lib/time';
 import { Field, LiveRegion, Loading, Notice } from '../ui/components';
 import { HttpKioskGateway, type KioskGateway, type KioskIdentity } from './gateway';
@@ -32,6 +33,7 @@ export function KioskApp({ config }: { config: AppConfig }) {
   const now = useNow();
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   useEffect(() => { document.title = `Kiosco · ${BRAND}`; }, []);
+  useEffect(() => startTelemetry(client), [client]);
   useEffect(() => {
     let active = true;
     client.auth.getSession().then(({ data }) => { if (active) setSession(data.session); }).catch(() => { if (active) setSession(null); });

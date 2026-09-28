@@ -22,6 +22,7 @@ import { KioskApp } from './kiosk/KioskApp';
 import { useOnline } from './lib/online';
 import { HUMAN_STORAGE_KEY } from './lib/storage';
 import { createSessionClient } from './lib/supabase';
+import { startTelemetry } from './lib/telemetry';
 import { Loading, Notice, PageHeader } from './ui/components';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 
@@ -49,6 +50,7 @@ export function App({ env = import.meta.env as AppEnvironment }: { env?: AppEnvi
 
 function HumanApp({ config }: { config: AppConfig }) {
   const services = useMemo(() => ({ config, client: createSessionClient(config.supabase, HUMAN_STORAGE_KEY, window.localStorage) }), [config]);
+  useEffect(() => startTelemetry(services.client), [services.client]);
   return (
     <ServicesContext.Provider value={services}>
       <RouterProvider>

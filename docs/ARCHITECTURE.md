@@ -48,6 +48,41 @@ Self-healing permitido: retry con la misma clave idempotente y backoff, reinicio
 
 La promoción de release será CI → staging → pruebas sintéticas → canary → health gate → producción. H7 no puede aprobarse sin OPS-02 PASS y un fallo inducido en staging que demuestre detección, alerta y rollback seguro.
 
+### Implementación OPS-02 (2026-09-26)
+- Contrato único `ops/contract.json`: componentes, operaciones, resultados, clases de error, campos de
+  evento, métricas y etiquetas (solo enumeraciones), alertas con severidad/ruta/runbook, umbrales y política
+  de reintentos. Lo aplican `scripts/ops/opslib.py`, `supabase/functions/_shared/ops.ts`,
+  `src/lib/telemetry.ts` y el vocabulario de `private.ops_telemetry_vocabulary`.
+- Telemetría: una línea JSON por operación (scripts, gateway, firmador) y agregados del navegador enviados
+  por la RPC de solo escritura `public.ops_ingest_client_metrics` (cubos de 5 min sin identidad ni
+  release). Las métricas se derivan de eventos e informes (`metrics.py`, formato Prometheus); sin servicios
+  nuevos.
+- SEC-OPS-01: la telemetría del navegador es una señal no confiable (`trust: untrusted` en el contrato):
+  solo dashboards, nunca alertas, gate, rollback ni reparaciones. El servidor impone vocabulario cerrado,
+  ≤100 series distintas por llamada, 1..1000 eventos por serie, duración coherente con su cubo (+Inf ≤
+  120 s) y cuotas persistentes por identidad y ventana de 5 min más límites globales por ventana
+  (`private.ops_ingest_limits`, `ops_ingest_windows`, `ops_ingest_subjects`), con orden de bloqueo fijo
+  (ventana nueva → identidad → ventana → métricas). La identidad es un seudónimo por ventana
+  (`sha256(sal ‖ uid)`, sal aleatoria que se purga con su ventana); retención de 7 días de los cubos. La
+  identidad de la release va solo en `<meta name="fichaje-release">` de `index.html` (gate RES-02).
+- Salud: `/health/live` y `/health/ready` (cacheado 5 s, acotado a 2 s) en gateway y firmador; `health.py`
+  agrega app, API, Auth, PostgreSQL (`private.ops_db_health()`), gateway y firmador en UP/DEGRADED/DOWN.
+- Canary `canary.py`, invariantes `invariants.py`, reconstrucción `rebuild_projection.py`, jobs
+  `jobs.py`, backups `backup_monitor.py`, alertas `alerts.py` (outbox: cada notificación sigue pendiente hasta
+  que su ruta la acepta y se reintenta con el mismo `notification_id`; sink de prueba local; rutas reales en H7) y
+  gate de release `release_gate.promote()` con `LocalDeployer` (releases inmutables en loopback).
+- Base de datos (`20260926000100_ops_observability.sql`): roles de definidor `fichaje_ops`,
+  `fichaje_ops_repair`, `fichaje_ops_ingest` y de entrada `fichaje_ops_monitor` (agregados),
+  `fichaje_ops_reviewer` (detalle de un tenant, solo lectura) y `fichaje_ops_repairer` (reconstrucción
+  autorizada); todos NOLOGIN, NOINHERIT y NOBYPASSRLS. Evidencia operativa append-only
+  (`ops_invariant_runs/_findings`, `ops_original_baselines`, `ops_projection_repairs`).
+- RES-03, proyecciones: la única proyección derivable es `private.employee_state`. Fuente de verdad:
+  `time_events` + ajustes de decisiones APPROVE; `version` = nº de originales + nº de aprobaciones,
+  `last_sequence` = máximo de secuencia, estado/sesión abierta/último evento = `private.validate_timeline`
+  sobre el timeline efectivo. No es derivable tras una purga laboral H5 (marcas de agua conservadas):
+  `PURGED`, nunca se rebajan versiones ni secuencias. Las demás tablas mutables (credenciales y buckets del
+  kiosco, challenges, `export_jobs`, identidad) no son proyecciones y no se reconstruyen.
+
 ## Estado H0
 Cliente Supabase lazy, validación de configuración y página de texto sin diseño. No tablas de negocio,
 RPC, RLS, Auth real, worker PWA ni gateway operativos. Directorio supabase reservado para H1.

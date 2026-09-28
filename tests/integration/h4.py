@@ -407,8 +407,14 @@ if __name__=='__main__':
         kind,_,tb=sys.exc_info()
         import re
         if (root/'gateway.log').exists():
-            for stage,code in re.findall(r'KIOSK_FAILURE ([a-z_]+) ([A-Z0-9]+)',(root/'gateway.log').read_text()):
-                print('Gateway failure stage/code:',stage,code)
+            # OPS-02 structured events: only stage and stable class are printed.
+            for line in (root/'gateway.log').read_text().splitlines():
+                try:
+                    event = json.loads(line) if line.startswith('{') else {}
+                except ValueError:
+                    continue
+                if event.get('outcome') in ('failure','unknown'):
+                    print('Gateway failure stage/class:',event.get('stage'),event.get('error_class'))
         print('H4 suite failed:',kind.__name__)
         for frame in traceback.extract_tb(tb):print(f'{frame.filename}:{frame.lineno} in {frame.name}')
         raise SystemExit(1)

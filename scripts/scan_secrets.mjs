@@ -12,6 +12,11 @@ const RULES = [
   ['pepper', /\bpepper\b/i],
   ['postgres-credential', /postgres(?:ql)?:\/\/[^\s:@/'"`]+:[^\s@/'"`]+@/],
   ['private-key', /-----BEGIN [A-Z ]*PRIVATE KEY-----/],
+  // OPS-02: backup keys, CI/API tokens, signed Storage URLs and operator DSN names.
+  ['age-secret-key', /AGE-SECRET-KEY-1[0-9A-Z]{20,}/],
+  ['github-token', /\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/],
+  ['signed-url', /\/object\/sign\/[^\s"'`]+[?&]token=[A-Za-z0-9._-]{16,}/],
+  ['ops-env-name', /OPS_(MONITOR|REVIEWER|REPAIR|OPERATOR)_DSN|OPS_ALERT_ROUTE_(PAGER|TICKET)/],
 ];
 
 function files(path) {

@@ -1,6 +1,7 @@
 import type { ClockReceipt, ClockState, TimeAction } from '../domain/types';
 import { postJson } from '../lib/api';
 import { ApiError } from '../lib/errors';
+import type { ClientOperation } from '../lib/telemetry';
 
 export interface KioskIdentity { organizationId: string; deviceId: string }
 export interface KioskChallenge { action: TimeAction; challenge: string; requestId: string }
@@ -47,7 +48,7 @@ export class HttpKioskGateway implements KioskGateway {
   constructor(private readonly baseUrl: string, private readonly identity: KioskIdentity, private readonly token: () => Promise<string | null>) {}
 
   async identify(code: string, pin: string): Promise<Identification> {
-    return parseIdentification(await this.post<unknown>('authenticate', { device_id: this.identity.deviceId, code, pin }));
+    return parseIdentification(await this.post<unknown>('authenticate', { device_id: this.identity.deviceId, code, pin }, 'kiosk.authenticate', false));
   }
 
   // Receipt only after COMMIT. Retrying the same tuple recovers the same receipt;
@@ -56,12 +57,12 @@ export class HttpKioskGateway implements KioskGateway {
     return this.post<ClockReceipt>('record', {
       device_id: this.identity.deviceId, request_id: challenge.requestId, challenge: challenge.challenge,
       action: challenge.action, expected_version: expectedVersion,
-    });
+    }, `kiosk.clock.${challenge.action}`, true);
   }
 
-  private async post<T>(route: string, body: Record<string, unknown>): Promise<T> {
+  private async post<T>(route: string, body: Record<string, unknown>, operation: ClientOperation, mutation: boolean): Promise<T> {
     const token = await this.token();
     if (!token) throw new ApiError('unauthenticated', 'UNAUTHENTICATED');
-    return postJson<T>(`${this.baseUrl}/${route}`, token, { organization_id: this.identity.organizationId, ...body });
+    return postJson<T>(`${this.baseUrl}/${route}`, token, { organization_id: this.identity.organizationId, ...body }, operation, mutation);
   }
 }

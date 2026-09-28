@@ -1,0 +1,38 @@
+name: OPS-02 backup monitor
+on:
+  workflow_dispatch:
+  schedule:
+    # After the 01:30 UTC repository backup. A red run is the alert until H7 routes exist.
+    - cron: '17 3 * * *'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: ops-backup-monitor
+  cancel-in-progress: false
+jobs:
+  backups:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # Read-only: lists backup.yml runs, downloads the latest artifact into a
+      # temporary directory, verifies SHA256SUMS, the bundle and a restore
+      # rehearsal. The PostgreSQL backup stays NOT_CONFIGURED (never green).
+      # Only statuses are written to the summary; nothing is uploaded.
+      - name: Verify repository backup freshness, integrity and restorability
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OPS_EVENT_LOG: ${{ runner.temp }}/ops-events.jsonl
+        run: |
+          status=0
+          python3 scripts/ops/backup_monitor.py --repo "$GITHUB_REPOSITORY" --out "$RUNNER_TEMP/backup-report.json" \
+            --summary "$GITHUB_STEP_SUMMARY" > /dev/null || status=$?
+          python3 scripts/ops/leakscan.py "$RUNNER_TEMP/backup-report.json" "$RUNNER_TEMP/ops-events.jsonl"
+          exit "$status"
