@@ -1,4 +1,29 @@
 # CURRENT_STATE — 2026-09-28
+## Avance remoto posterior — 2026-09-28 (PR #15)
+
+**HITO 7: BLOCKED — no READY FOR PILOT.** En el mismo proyecto Cloudflare Pages
+`fichaje-staging` (no se creó otro Supabase) se configuraron en producción las
+variables de los dos upstreams Supabase, las dos `VITE_*` públicas y
+`FICHAJE_INGRESS_SECRET` como `secret_text`. Se desplegó desde el bundle de
+`37aa36c` con Wrangler la Pages Function original `functions/gateway/[[path]].ts`
+(y se retiró un diagnóstico temporal). La última URL de despliegue fue
+`https://cc923976.fichaje-staging.pages.dev`; `https://fichaje-staging.pages.dev/`
+responde 200, `/gateway/invalid` responde 404 y `/gateway/kiosk/health/live`
+responde **500**. El cuerpo `WORKER_ERROR / Function exited due to an error`
+es el 500 de la función Supabase retransmitido por el gateway, no un PASS del
+borde. Las cabeceras del HTML remoto incluyen CSP, HSTS y `X-Robots-Tag:
+noindex, nofollow`; el gateway tiene `no-store` y no anunció CORS abierto.
+
+**Bloqueador:** no se han configurado los secretos custom de Supabase; la sesión
+del Dashboard caducó y se canceló la solicitud de inicio de sesión seguro.
+El secreto de ingreso configurado en Pages queda sin pareja en Supabase y debe
+rotarse al reanudar antes del ensayo firmado. No se imprimió ni se guardó en
+GitHub. En Supabase, la petición directa sin `x-fichaje-edge` sigue dando 500,
+no el 403 obligatorio. No se ejecutaron ni se declaran PASS `verify_staging.py`
+remoto, SEC-H4-01 real, canary/alertas, fallo/rollback, carga, incidente ni
+REC-01..03 remoto. Sin organizaciones, empleados o fichajes reales; sin
+producción ni merge. Esta sección prevalece sobre las notas históricas debajo.
+
 ## Avance Pages/Auth remoto — 2026-09-28 (PR #15; bundle de 37aa36c)
 
 **HITO 7: BLOCKED — aún no READY FOR PILOT.** Se creó el proyecto Cloudflare Pages
