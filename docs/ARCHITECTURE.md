@@ -114,3 +114,26 @@ H1-H5 sin cambios y confirmación solo tras ACK. Service worker de shell públic
 Gateway de kiosco y firmador de exportaciones por rutas del mismo origen (proxy inverso en despliegue,
 decisión H7). El kiosco identifica con código+PIN y el servidor devuelve estado, versión y un
 challenge por acción legal (KIO-H6-01, único cambio backend de H6). Ver `docs/UI_PWA.md`.
+
+## H7 — despliegue de piloto (preparado; staging remoto pendiente)
+```
+navegador/kiosco ─HTTPS─▶ Cloudflare Pages: dist/ + _headers + /gateway/* (Pages Function, edge/gateway.ts)
+                                   │ firma x-fichaje-edge (HMAC, 60 s)
+                                   ▼
+                  Supabase: Edge Functions kiosk/export-link · Auth · PostgREST · Storage privado · PostgreSQL 17
+                                   │ dblink TLS verify-full
+                                   ▼
+                  PostgreSQL independiente del journal de recuperación
+host de operación: health, canary, invariantes, alertas (PagerDuty/GitHub Issues), backup cifrado (age), restore
+```
+- **Mismo origen sin CORS**: la decisión pendiente de H6 se resuelve con una Pages Function en el mismo proyecto
+  que sirve la app; las funciones solo aceptan peticiones firmadas por ella (contrato en `SECURITY.md` H7).
+- **Despliegue**: `scripts/ops/deployers.py` (`PlatformDeployer`: wrangler desde la copia de la release y
+  `supabase functions deploy --no-verify-jwt`), gobernado por `release_gate.promote()` con rollback a la
+  última release sana; ninguna credencial de plataforma pasa por GitHub Actions. Procedimiento en `STAGING.md`.
+- **Alertas reales**: `alerts.py` con adaptadores PagerDuty Events v2 (CRITICAL → página, `dedup_key` =
+  huella) y GitHub Issues (WARNING → ticket), rutas por variables de entorno del host y sin PII.
+- **Backup**: `scripts/backup_database.sh` (pg_dump 17 custom | age, verify-full, fallo cerrado) y
+  `scripts/restore_database.sh` (restore aislado en una transacción); journal en instancia separada.
+- **Carga**: la latencia del kiosco la domina Argon2id (19 MiB, t=2) serializado en cada instancia del gateway;
+  el modelo de concurrencia real de Supabase Edge decide la cifra de staging.

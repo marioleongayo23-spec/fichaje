@@ -31,3 +31,10 @@ enable_signup = true
 enable_confirmations = true
 [analytics]
 enabled = false
+# H7: both functions validate every JWT against Auth themselves and refuse any request
+# not signed by the same-origin edge (x-fichaje-edge) before parsing it, validating a JWT
+# or touching SQL; their health probes carry no JWT. Same as PlatformDeployer (--no-verify-jwt).
+[functions.kiosk]
+verify_jwt = false
+[functions.export-link]
+verify_jwt = false

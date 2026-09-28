@@ -4,7 +4,8 @@ El repositorio genera un backup privado automáticamente cada día a las 01:30 U
 ejecución manual. GitHub Actions conserva el artefacto 14 días. El workflow no conoce credenciales
 de Google Drive ni ejecuta backup PostgreSQL. Una automatización externa de ChatGPT copia el último
 artefacto válido al Drive privado del proyecto después de la ejecución nocturna.
-`backup_database.sh` termina 2 incondicionalmente, incluso con variables; activarlo exige PR aprobado.
+`backup_database.sh` terminaba 2 incondicionalmente en OPS-01. **H7** lo implementa (ver la sección H7): sigue
+terminando 2 (`BLOCKED`) mientras falte cualquier condición y no está programado en ningún workflow ni host.
 
 ## Repositorio
 En clon limpio completo: `git fetch origin --prune --tags '+refs/heads/*:refs/remotes/origin/*'`,
@@ -110,3 +111,34 @@ aleatoria que no se imprime. `tests/integration/h5.py` captura en memoria public
 pg_dump, ejecuta cambios posteriores, restaura realmente con pg_restore y reaplica el journal
 que quedó fuera del dump. No se suben dumps ni journal como artefactos. `backup_database.sh`
 sigue bloqueado; este ensayo no habilita backup ni restore de producción.
+
+## H7 — backup cifrado y restore implementados; activación BLOCKED (2026-09-28)
+- **Backup** (`scripts/backup_database.sh`): `pg_dump` 17 custom de datos (`public`, `private` salvo las tablas
+  de contexto ligadas a la transacción, `auth.users`, `auth.identities`) en un único stream con `pipefail` hacia
+  `age` (destinatario x25519); conexión `sslmode=verify-full` con CA explícita, servicio y `PGPASSFILE` 0600;
+  fichero `.partial` → cabecera age comprobada → SHA-256 → copia al destino privado (0700 o rclone con config
+  0600) → re-hash → manifiesto `fichaje.db-backup.v1` al final. Sale 2 (`BLOCKED`) si falta una condición: clave
+  privada age presente en el entorno o en el destino, destino dentro del repositorio, contraseña en el service
+  file, CA con clave privada, herramientas ausentes o espacio insuficiente. Un fallo de cifrado o de `pg_dump`
+  invalida el backup y no deja texto plano (`tests/backup.test.ts`, 10 pruebas).
+- **Restore** (`scripts/restore_database.sh`): verifica manifiesto y SHA-256 antes de descifrar; exige entorno
+  vacío con las mismas migraciones y confirmación explícita del nombre de la base; descifra en stream hacia
+  `pg_restore` y una sola transacción `psql` (`session_replication_role=replica`, comprobación de FK colgantes);
+  COMMIT solo si todo terminó bien. No reabre nada: el journal se reaplica aparte y la reapertura es manual.
+- **REC-01..03 ejecutados de verdad en local** (`tests/integration/rec.py`, CI `h7.yml`): TLS verify-full desde una
+  CA de ensayo, login de backup de solo lectura, journal en una instancia PostgreSQL separada por dblink TLS,
+  actividad sintética en dos empresas, backup, cambios posteriores (fichajes no journalizados = pérdida medida;
+  bajas, revocaciones, holds y purga journalizados), destrucción del entorno fuente, repositorio restaurado
+  desde bundle, restore en un Supabase vacío, replay idempotente del journal y validación (datos exactos, RLS y
+  cross-tenant, Auth y sesiones antiguas, Storage, inmutabilidad, idempotencia, kiosco, exportaciones,
+  invariantes y canary). Negativos: clave equivocada o ausente, ciphertext alterado o truncado → nada
+  restaurado. PREPARED sin resolver con la instancia perdida → recuperación BLOCKED y alerta CRITICAL
+  `RECOVERY_JOURNAL_BLOCKED`; nunca se deduce un commit perdido.
+- **Medición REC-02 (local, sintética)**: backup 2,3 s; pérdida medida 3,5 s de fichajes posteriores al backup
+  (1 fichaje, el esperado); RTO del ensayo 61,3 s (entorno + restore 46,2 s, replay 0,4 s, validación 12,1 s).
+  No son compromisos: RPO ≤ 24 h y RTO ≤ 8 h siguen siendo objetivos propuestos, no garantías comerciales.
+- **Monitor**: `backup_monitor.py --db-manifest … --db-restore …` solo informa OK si el restore de ensayo de ese
+  mismo backup terminó bien; el checksum del ciphertext no basta.
+- **BLOCKED para activar**: destino privado definitivo, custodia offline de la identidad age separada del
+  destino, host de operación con conexión verify-full a staging, instancia independiente del journal con CA
+  utilizable desde la base gestionada (`STAGING.md` §3.4) y ensayo en staging con un segundo proyecto vacío.

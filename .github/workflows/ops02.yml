@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm ci
-          python -m pip install cryptography==46.0.3 reportlab==4.4.9 pypdf==6.1.0 'psycopg[binary]==3.2.10'
+          python -m pip install cryptography==50.0.1 reportlab==4.4.9 pypdf==6.19.0 'psycopg[binary]==3.2.10'
       - name: Operational contract unit tests (events, metrics, retries, alerts, leak scanner, gateway telemetry)
         run: |
           python3 -m unittest discover -s tests/ops -v

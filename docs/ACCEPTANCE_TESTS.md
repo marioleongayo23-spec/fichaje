@@ -94,3 +94,24 @@ código operativo sin modificar (`tests/integration/ops02.py`, puerta `.github/w
 | RES-02 | `test_resilience.py` + `ops02.py`: release sana promovida; candidata con defecto real (gateway que no registra; app sin asset) detenida, alertada, rollback a la sana, health y canary en verde y alertas resueltas. Arnés CI aislado y efímero; la repetición en staging es puerta de H7 |
 | RES-03 | `ops_observability.test.sql` + `ops02.py`: solo `private.employee_state`; `--check` en transacción READ ONLY no escribe; reconstrucción exacta, segunda ejecución no-op, historia byte a byte igual, evidencia y audit; fuente alterada → BLOCKED |
 | RES-04 | `test_resilience.py` + `ops02.py`: artefacto real de `backup_repo.sh` con checksums, bundle y restore de ensayo; fallido/antiguo/ausente/sin artefacto/corrupto/sin checksums alertados; backup DB `NOT_CONFIGURED` nunca verde; `ops-monitor.yml` vigila el backup real a diario |
+
+## H7 — asignación de evidencia (piloto comercial; 2026-09-28)
+Forma de staging en local: Supabase local efímero, funciones Deno reales con firma de ingreso, runtime real
+de Cloudflare Pages (workerd vía wrangler 4.142.0) sirviendo la app compilada y `/gateway/*`, tenants
+exclusivamente sintéticos y secretos aleatorios por ejecución. Puerta CI: `.github/workflows/h7.yml`.
+**El staging remoto, las rutas de alerta reales, la custodia real de claves, la revisión independiente y la
+aceptación de empresas piloto no existen todavía: esos criterios quedan BLOCKED.**
+
+| Criterio | Evidencia | Estado |
+|---|---|---|
+| Borde mismo origen | `h7_edge.py`: rutas/métodos cerrados, sin CORS, origen y fetch-metadata, límites 8 KiB/1 KiB (también chunked), `no-store`, cabeceras estáticas, CSP, HSTS, sin source maps; `edge-gateway.test.ts` | PASS local |
+| Sin bypass directo | `h7_edge.py`: 7 firmas inválidas + health y firmador directos → 403 antes de JSON/JWT/SQL, sin contadores consumidos; `ingress_test.ts` | PASS local |
+| SEC-H4-01 real | `h7_edge.py`: peer = proxy, cabeceras ignoradas, 1 bucket por tenant, bloqueo de tenant medido (60 fallos), otro tenant intacto | PASS local; peer de Supabase Edge **BLOCKED** |
+| Verificador de staging | `scripts/staging/verify_staging.py` ejecutado dentro de `h7_edge.py`: 30 comprobaciones PASS + 3 de TLS omitidas solo en local | PASS local; remoto **BLOCKED** |
+| Fallo inducido OPS-02 | `h7_release.py`: release con firma rota promovida con el deployer del borde → detección 3,7 s, página y ticket, rollback, RESOLVED, sin tocar historia laboral | PASS local; staging **BLOCKED** |
+| Rutas de alerta reales | `test_alert_routes.py` (PagerDuty Events v2 / GitHub Issues contra receptores locales con el formato real, sin PII) | Adaptadores PASS; entrega real **BLOCKED** (sin proveedor/credenciales) |
+| Backup cifrado y restore (REC-01..03) | `rec.py`: pg_dump 17 \| age con verify-full, destrucción de la fuente, restore en entorno vacío, journal independiente, validación completa, negativos de clave/ciphertext, PREPARED sin resolver → BLOCKED; `backup.test.ts` | PASS local; destino/custodia reales **BLOCKED** |
+| Carga del piloto | `h7_load.py`: 2 empresas × 100 empleados, 20 concurrentes web (p95 ≤ 254 ms), kiosco 1 persona/kiosco (p95 ≤ 949 ms), estrés 20 autenticaciones simultáneas (p95 1,8 s, límite conocido), sin errores, duplicados ni deadlocks | PASS local; staging **BLOCKED** |
+| Respuesta a incidentes | `h7_incident.py` y `docs/drills/IR-2026-09-28.md` | PASS local (tiempos humanos pendientes) |
+| Documentación legal | `docs/legal/` (17 plantillas) y revisión en `COMPLIANCE.md` | Plantillas; verificación con fuentes primarias **BLOCKED** |
+| Runbook del piloto | `docs/PILOT_RUNBOOK.md` | No ejecutado con empresa real |

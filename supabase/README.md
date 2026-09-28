@@ -275,3 +275,22 @@ proxy se limita el proxy por tenant. Sin metadata TCP confiable falla cerrado.
 Ver SECURITY.md antes de cualquier adaptación de ingress. CI usa secretos efímeros
 y conexiones loopback sintéticas; `deno test supabase/functions/kiosk/network_test.ts`
 verifica canonicalización/HMAC y la integración H4 prueba el limiter y fugas reales.
+
+## H7 — firma de ingreso, despliegue y ensayos de piloto
+Las funciones `kiosk` y `export-link` comparten `functions/_shared/ingress.ts`: con `FICHAJE_INGRESS_SECRET`
+(base64 ≥ 32 bytes; `FICHAJE_INGRESS_SECRET_PREVIOUS` durante la rotación) solo aceptan peticiones firmadas por
+el borde del mismo origen (`x-fichaje-edge`, 60 s, ligada a método, función, ruta y bytes). Sin `KIOSK_PORT` /
+`EXPORT_LINK_PORT` (plataforma) o con `FICHAJE_ENV=staging|production`, el secreto es obligatorio y la función
+no arranca sin él. `config.toml` declara `verify_jwt = false` para ambas: validan cada JWT contra Auth.
+`deno test supabase/functions/_shared/ingress_test.ts` prueba el contrato; `tests/integration/h7_edge.py`
+lo prueba con el runtime real de Pages y comprueba que la URL directa de las funciones no es una entrada.
+
+Ensayos H7 (Supabase local, datos sintéticos; `.github/workflows/h7.yml`):
+- `h7_edge.py`: borde, bypass, SEC-H4-01 tras proxy y `scripts/staging/verify_staging.py` en modo local.
+- `h7_release.py`: fallo inducido con el deployer del borde, alertas, rollback y recuperación.
+- `h7_incident.py`: respuesta a incidentes IR-01 y rotación del secreto de ingreso.
+- `h7_load.py`: perfil de carga del piloto (requiere `npm ci --prefix edge`).
+- `rec.py`: backup cifrado con `age`, pérdida, restore aislado y journal independiente (requiere `age` y Docker).
+
+Despliegue en staging: `docs/STAGING.md` (secretos solo en los stores de Supabase/Cloudflare o custodia del
+operador; nunca en GitHub). No hay proyecto remoto configurado en este repositorio.

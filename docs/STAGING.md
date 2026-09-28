@@ -27,7 +27,8 @@ host de operación (custodia del operador): health, canary, invariantes, alertas
   por entorno**. Staging nunca reutiliza la base de producción ni sus secretos, y solo contiene datos sintéticos.
 - **Por qué `verify_jwt=false`**: los health checks no llevan JWT y las funciones ya validan cada JWT contra Auth
   (`/auth/v1/user`, que además detecta sesiones revocadas). Sin la firma del borde, las funciones responden 403
-  antes de leer el cuerpo, validar JWT o tocar SQL (probado: `tests/integration/h7_edge.py`).
+  antes de interpretar el cuerpo (solo leen sus bytes acotados, 8 KiB/1 KiB, para comprobar la huella firmada),
+  validar JWT o tocar SQL (probado: `tests/integration/h7_edge.py`).
 
 ## 2. Secretos: dónde viven (nunca en Git, GitHub, `VITE_*`, artefactos ni logs)
 | Secreto | Store | Rotación |
@@ -64,7 +65,8 @@ GitHub Actions **no** recibe ningún secreto persistente: la CI sigue trabajando
    gestionado solo `sslrootcert=system` es utilizable: el journal necesita un certificado de CA pública, o
    documentar la limitación antes del piloto) y *user mapping* para `fichaje_journal`.
 5. **Funciones**: `supabase secrets set --env-file <(gestor de secretos)` con la tabla del punto 2 y despliegue
-   mediante `scripts/ops/deployers.py` (`PlatformDeployer`, `--no-verify-jwt --use-api`).
+   mediante `scripts/ops/deployers.py` (`PlatformDeployer`, `--no-verify-jwt --use-api`; `supabase/config.toml`
+   declara también `verify_jwt = false` para ambas funciones).
 6. **Cloudflare Pages**: proyecto Direct Upload `[[fichaje-staging]]`, variables/secretos del punto 2,
    `NODE_VERSION=24`; despliegue con `PlatformDeployer` (wrangler desde la copia de la release). Dominio: el
    `*.pages.dev` del proyecto; un subdominio propio (necesario para reglas WAF de zona) requiere autorización de
@@ -88,6 +90,8 @@ GitHub Actions **no** recibe ningún secreto persistente: la CI sigue trabajando
 | Backup cifrado + restore | `backup_database.sh` contra staging y `restore_database.sh` en un **segundo proyecto vacío** con las mismas migraciones, journal reaplicado y validación de REC-01 |
 | Incidente | Mismo guion que `tests/integration/h7_incident.py`, con tiempos reales anotados |
 
+El verificador se ejecuta de verdad en cada CI contra la forma de staging en local (`h7_edge.py`, modo `--local`
+con las URL directas de las funciones): 30 comprobaciones PASS y solo las 3 de TLS omitidas por ser loopback.
 Registrar cada ejecución (fecha, commit, resultado, tiempos) en `CURRENT_STATE.md`. Un solo FAIL o SKIPPED
 mantiene H7 BLOCKED.
 

@@ -245,3 +245,66 @@ pública salen de él y los secretos entregados se muestran una vez. Guardas de 
 `scripts/scan_secrets.mjs` fallan la CI ante service_role, claves secretas, JWT, pepper o credenciales
 PostgreSQL en el build o en artefactos de prueba. Contrato de identificación del kiosco (KIO-H6-01)
 en `docs/UI_PWA.md` y `supabase/README.md`.
+
+### H7 — borde del mismo origen, firma de ingreso y plataforma (2026-09-28)
+**Borde** (`edge/gateway.ts`, Pages Function `functions/gateway/[[path]].ts`): única entrada del navegador a las
+funciones de servidor. Tabla cerrada de rutas y métodos (`/gateway/kiosk/{provision,revoke,reset,authenticate,
+record}` POST, `/gateway/export-link` POST, `health/{live,ready}` GET; resto 404, método ajeno 405 con `Allow`,
+`OPTIONS` 405 sin cabeceras CORS); `Sec-Fetch-Site` distinto de `same-origin` u `Origin` ajeno → 403; solo JSON;
+cuerpo ≤ 8 KiB (kiosco) / 1 KiB (firmador), leído en streaming aunque falte o mienta `Content-Length`; respuesta
+≤ 64 KiB, solo JSON 2xx/4xx/5xx del upstream (redirecciones y otros tipos → 502). Hacia arriba solo viajan
+`Authorization`, `Content-Type` y la firma: nunca cabeceras de IP o reenvío, cookies ni `Origin`. Sin reintentos
+(una respuesta perdida sigue siendo «desconocida» y el cliente reintenta con el mismo `request_id`), timeout de
+15 s, `Cache-Control: no-store`, sin logs de cuerpos, tokens ni IP. Upstream solo HTTPS sin credenciales ni query
+(HTTP únicamente en loopback para ensayos); sin configuración válida → 503 `EDGE_NOT_CONFIGURED`.
+
+**Firma de ingreso** (`supabase/functions/_shared/ingress.ts`, compartido por borde y funciones):
+`x-fichaje-edge: v1.<ts>.<HMAC-SHA256>` sobre dominio, instante, método, función, ruta y SHA-256 del cuerpo;
+ventana ±60 s; secreto base64 ≥ 32 bytes distinto del pepper y del secreto de red (arranque rechazado si
+coinciden). En plataforma (sin puerto local) o con `FICHAJE_ENV=staging|production` la firma es obligatoria: sin
+secreto la función no arranca. Una petición sin firma válida recibe 403 tras leer solo sus bytes acotados y
+antes de interpretar JSON, validar JWT o tocar SQL: la URL pública `*.supabase.co/functions/v1/*` no es una
+entrada alternativa (en `h7_edge.py`: sin firma, caducada, futura, de otra ruta, de otros bytes, de otro secreto
+y malformada, más health y firmador directos; ningún contador de PIN ni de red consumido). Rotación sin corte con `FICHAJE_INGRESS_SECRET_PREVIOUS` (ensayada en `h7_incident.py`).
+`verify_jwt=false` (`supabase/config.toml`, `PlatformDeployer`) porque los health checks no llevan JWT y cada
+función valida el JWT contra Auth (`/auth/v1/user`, que también detecta sesiones revocadas).
+
+**SEC-H4-01 tras el borde** (medido en local con workerd real; peer real de Supabase Edge sin verificar):
+el gateway ve un único peer TCP (el proxy) ⇒ un bucket de red por tenant; `X-Forwarded-For`, `X-Real-IP`,
+`CF-Connecting-IP`, `True-Client-IP` y `Forwarded` nunca eligen el bucket; 60 fallos en 15 min bloquean la
+identificación en kiosco de **toda la empresa** (efecto conservador aceptado, no se debilita); otra empresa tras
+el mismo proxy no se ve afectada. Detección: `KIOSK_AUTH_ABUSE`. Si en staging `info.remoteAddr` no fuera
+fiable, el gateway ya falla cerrado (403) y el piloto queda BLOCKED.
+
+**Cabeceras estáticas** (`_headers` generado en el build): CSP (`default-src 'self'`, `script-src 'self'`,
+`connect-src 'self' <origen Supabase>`, `object-src 'none'`, `frame-ancestors 'none'`), HSTS 1 año (sin
+`includeSubDomains`/`preload` hasta decidir el dominio), `X-Frame-Options: DENY`, `nosniff`, `no-referrer`,
+`Permissions-Policy` restrictiva, COOP/CORP `same-origin`, `X-Robots-Tag: noindex`; se elimina el
+`Access-Control-Allow-Origin: *` por defecto de Pages. HTML y service worker `no-cache`; `/assets/*` inmutables;
+sin source maps ni secretos en el bundle (`scan_secrets.mjs`). Verificable desde fuera con
+`scripts/staging/verify_staging.py` (33 comprobaciones; 30 PASS en local y 3 de TLS que solo aplican en remoto).
+
+**Límites de tasa**: el código no lee cabeceras de IP. La limitación por IP en el borde solo puede ser una regla
+WAF de zona de Cloudflare (requiere un subdominio propio: decisión de DNS pendiente, BLOCKED). Propuesta:
+`/gateway/*` 60 peticiones/10 s y `/gateway/kiosk/authenticate` 20/10 s por IP, sin reglas que reintenten,
+reescriban o cacheen (la idempotencia es del servidor y un reintento con el mismo `request_id` es legítimo).
+Floods directos contra `*.supabase.co` (PostgREST/Auth) no pueden pasar por el borde propio: los absorbe la
+plataforma; medido en local, 574 llamadas inválidas de telemetría (435/s) rechazadas sin escribir y sin errores
+en los fichajes concurrentes (`h7_load.py`).
+
+**Secretos y mínimo privilegio**: tabla de secretos, stores y rotación en `docs/STAGING.md` §2; ninguno en Git,
+GitHub Actions/Secrets, `VITE_*`, artefactos ni logs; distintos por entorno. Escáneres ampliados (nombres de
+variables H7, tokens de plataforma). Login del gateway solo con `fichaje_gateway`; login de backup de solo
+lectura (`pg_read_all_data`, `BYPASSRLS`, `default_transaction_read_only`, TLS obligatorio en `pg_hba`);
+token de Cloudflare limitado a Pages Edit de una cuenta; token de tickets fine-grained (Issues de un repositorio
+privado). Storage privado, enlaces firmados ≤ 300 s y sin listado anónimo (comprobado por el verificador).
+
+**Revisión de dependencias (2026-09-28)**: `npm audit` sin vulnerabilidades en la raíz (230 paquetes) ni en
+`edge/` (91, wrangler 4.142.0); imports npm de las funciones Deno (`postgres@3.4.8`, `hash-wasm@4.12.0`) sin
+avisos. `pip-audit` detectó avisos en los pines de Python usados por CI y por las herramientas de operación:
+`cryptography 46.0.3` (13, incluido el OpenSSL empaquetado; lo usa el canary en el host de operación) y
+`pypdf 6.1.0` (75, DoS con PDF manipulados; solo pruebas). Actualizados a `cryptography 50.0.1` y `pypdf 6.19.0`
+(sin avisos) en todos los workflows; regresión completa ejecutada con esas versiones.
+
+**Pendiente en staging (BLOCKED)**: peer TCP real, WAF/DNS, TLS y HSTS reales, pruebas cross-tenant contra el
+proyecto remoto (verificador + canary sintético) y revisión de seguridad independiente.

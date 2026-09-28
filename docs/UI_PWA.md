@@ -77,12 +77,14 @@ Nada se confirma hasta el ACK de `record_time_event` o de `kiosk/record` (recibo
 - **Independencia**: la bandeja explica cuándo quien mira es solicitante o afectado; el resto de
   negativas (p. ej. haber fichado en nombre del empleado) las decide el servidor y se muestran tal cual.
 
-## Despliegue (pendiente H7)
+## Despliegue (decidido en H7)
 El gateway de kiosco y el firmador de exportaciones no aceptan CORS abierto. La UI los llama por rutas
 del mismo origen (`VITE_KIOSK_GATEWAY_URL`, `VITE_EXPORT_LINK_URL`, por defecto `/gateway/...`). En
-pruebas las sirve el proxy de `vite preview`. En producción hará falta un proxy inverso del mismo
-origen o una lista de orígenes explícita en esas funciones (cambio backend que requiere aprobación).
-Tras un proxy, SEC-H4-01 agrupa los intentos por la dirección del proxy: revisar antes del piloto.
+pruebas E2E las sirve el proxy de `vite preview`. **H7**: en Cloudflare Pages las sirve una Pages Function
+del mismo proyecto (`functions/gateway/[[path]].ts` → `edge/gateway.ts`), que firma cada petición para las
+funciones de Supabase; no hay lista de orígenes ni CORS. El build genera `_headers` (CSP, HSTS, cabeceras de
+seguridad, caché) y `_routes.json` (solo `/gateway/*` invoca la función). Tras el borde, SEC-H4-01 agrupa los
+intentos por la dirección del proxy: efecto medido y aceptado (ver `SECURITY.md`, H7). La UI no cambia.
 
 ## KIO-H6-01 — identificación de kiosco (resuelto en H6)
 **Problema** (detectado al iniciar H6): `/authenticate` exigía `action` y `expected_version` antes de
