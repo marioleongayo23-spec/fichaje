@@ -1,4 +1,31 @@
 # CURRENT_STATE — 2026-09-28
+## Actualización de staging — 2026-09-28 (head previo: 2b85bc6)
+
+**HITO 7 sigue BLOCKED — no READY FOR PILOT.** Con autorización del usuario se creó un proyecto nuevo
+Supabase `fichaje-staging` en `eu-west-1` (ref `pvfjffeszsedslmwdvgh`), separado del
+proyecto preexistente `Fichaje APP` (que no se modificó). Se aplicaron en orden los 15 SQL exactos del
+head del PR #15; el conector les asignó versiones temporales y se alineó su historial con los 15
+timestamps del repositorio. `list_migrations` muestra las 15 versiones esperadas. No se afirma cero
+drift hasta ejecutar una comparación de esquema mediante CLI. Tablas de `public` y `private`:
+0 sin RLS/FORCE RLS; `fichaje-evidence` es privado; 0 organizaciones, 0 empleados y 0 fichajes.
+El asesor de seguridad señala 18 RPC públicas SECURITY DEFINER invocables por `authenticated`,
+previstas por el diseño; requieren revisión independiente del código y pruebas de autorización, no
+revocación indiscriminada.
+
+La CI del head `2b85bc6` quedó PASS en CI, Database, E2E, OPS-02 y H7. Los logs de Database
+confirman 468 pgTAP y 506 comprobaciones de integración. Esta CI es local/efímera y no valida el staging
+remoto. `docs/COMPLIANCE.md` se actualizó con fuentes primarias BOE, EUR-Lex y AEPD consultadas en
+la fecha; distingue el borrador ministerial de la obligación vigente.
+
+**Bloqueos actuales concretos:** Cloudflare Dashboard mantiene una verificación anti-bot en el navegador de
+Work; no se ha creado Pages ni desplegado el frontend. Supabase Dashboard solicita login; la petición segura
+de autenticación terminó con control manual del usuario, sin señal visible de sesión iniciada. El conector
+Supabase no expone configuración de Auth, secret store ni logins de PostgreSQL. No se han configurado Auth,
+secretos, funciones, ingress, journal independiente, backup/restore, alertas, WAF, canary, carga ni incident
+drill remotos. `verify_staging.py` sin `--local` no se ha ejecutado: 0 SKIPPED remoto es objetivo pendiente.
+El proyecto remoto es aún un esquema vacío sin datos reales, no un entorno listo para el piloto.
+No se ha hecho merge ni se ha tocado producción.
+
 ## Hito autorizado
 
 ### HITO 7 — piloto comercial (preparación técnica)
