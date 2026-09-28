@@ -1,4 +1,31 @@
 # CURRENT_STATE — 2026-09-28
+## Avance Pages/Auth remoto — 2026-09-28 (PR #15; bundle de 37aa36c)
+
+**HITO 7: BLOCKED — aún no READY FOR PILOT.** Se creó el proyecto Cloudflare Pages
+`fichaje-staging` por Direct Upload con datos exclusivamente sintéticos. El ZIP
+precompilado del head `37aa36c6333e69e2da538ad02754db2b4bd438dd`
+(SHA-256 `79278ff732fac64d8b5fc1d7f163c3a4003918abd581a143fe76120b06a30e4f`)
+contenía 12 archivos finales de `dist/`: frontend, `_headers`, `_routes.json`
+y `_worker.js` avanzado que delega `/gateway/*` al mismo
+`handleGateway` de `edge/gateway.ts` y sirve el resto con `env.ASSETS.fetch`.
+Cloudflare Dashboard mostró `12/12 files uploaded`; el navegador remoto abrió
+`https://fichaje-staging.pages.dev/` y mostró el formulario de inicio de sesión.
+La publicación es una verificación de estáticos, **no** un PASS del gateway:
+no están cargados `FICHAJE_INGRESS_SECRET` ni los upstreams, y Cloud Browser
+bloqueó una navegación directa a `/gateway/kiosk/health/live` con
+`ERR_BLOCKED_BY_CLIENT`. El bundle local respondió 503 `EDGE_NOT_CONFIGURED`
+sin secreto y, con un secreto de prueba, firmó el upstream, devolvió `no-store`
+y no emitió CORS; esto no sustituye la prueba remota.
+
+En Supabase Auth se guardaron `Site URL` y una redirección exacta como
+`https://fichaje-staging.pages.dev` (panel confirmado; 1 URL). El registro
+público sigue desactivado. Edge Functions `kiosk` y `export-link` siguen
+sin secretos custom y el 403 directo sin firma continúa pendiente. Tampoco
+se han ejecutado `verify_staging.py` remoto, SEC-H4-01, canary/alertas,
+fallo/rollback, carga, incidente ni REC-01..03 remoto. Sin datos laborales
+reales, producción ni merge. La nota de avance anterior debajo es histórica;
+esta sección prevalece para el estado remoto actual.
+
 ## Avance remoto verificado — 2026-09-28 (PR #15; head de partida 4f99d76)
 
 **HITO 7: BLOCKED — aún no READY FOR PILOT.** En el proyecto existente de Supabase
