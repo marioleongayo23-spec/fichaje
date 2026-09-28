@@ -1,4 +1,37 @@
 # CURRENT_STATE — 2026-09-28
+## Avance remoto verificado — 2026-09-28 (PR #15; head de partida 4f99d76)
+
+**HITO 7: BLOCKED — aún no READY FOR PILOT.** En el proyecto existente de Supabase
+`fichaje-staging` (ref `pvfjffeszsedslmwdvgh`, `eu-west-1`) se desactivó
+`Allow new users to sign up` en Auth; `Confirm email` permanece activo,
+Email habilitado, alta anónima y proveedores sociales deshabilitados.
+El panel mostró la configuración guardada. Los límites visibles son 150
+refresh/5 min, 30 verificaciones/5 min y 30 altas/inicios de sesión/5 min por IP.
+`site_url` sigue en `http://localhost:3000` y la lista de redirecciones
+vacía: depende de la URL real de Pages, todavía no creada.
+
+Se desplegaron desde el head `4f99d76b534bdebaeaf6185e75fa0c4f05a19426`
+las Edge Functions `kiosk` (versión 1, id
+`03308b6f-cf1d-4f3c-bbad-e40e3a5f8723`) y `export-link`
+(versión 1, id `a090ef8c-f617-4004-9385-bef06b2476b5`).
+El conector confirma ambas `ACTIVE` y `verify_jwt=false`, según el contrato
+de ingreso firmado. **Una petición GET directa sin firma a `/health/live`
+respondió HTTP 500 en ambas**; no se cuenta como rechazo seguro de ingreso:
+faltan secretos y configuración server-side obligatorios para el arranque.
+El runtime falla cerrado por `CONFIG_REQUIRED` según el código, pero el 403
+remoto exigido queda pendiente de comprobar tras la configuración.
+
+El conector de Supabase no ofrece cambios de Auth ni escritura de secretos; Auth
+se configuró desde el panel una vez iniciada sesión de forma segura. Cloudflare
+Dashboard sigue sirviendo `Performing security verification` en Cloud Browser
+tras un único reintento; no se pudo crear Pages. Por tanto, no se ejecutaron
+`verify_staging.py` remoto, SEC-H4-01 real, canary, health, invariants,
+alertas, fallo inducido y rollback, carga, incidente ni backup/restore remoto.
+La CI previa permanece verde, pero solo cubre su entorno efímero. 0 datos
+laborales reales, 0 producción, 0 merge. El resto de esta sección H7 conserva
+evidencia histórica y descripciones anteriores a este avance; esta nota prevalece
+para el estado remoto actual.
+
 ## Actualización de staging — 2026-09-28 (head previo: 2b85bc6)
 
 **HITO 7 sigue BLOCKED — no READY FOR PILOT.** Con autorización del usuario se creó un proyecto nuevo
