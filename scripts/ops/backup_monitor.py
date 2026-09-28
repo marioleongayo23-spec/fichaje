@@ -5,9 +5,11 @@ conclusion, artifact present and not expired, SHA256SUMS, `git bundle verify`
 and a restore rehearsal of the bundle (mirror clone + fsck + refs + manifest
 commit), and freshness. "Upload succeeded" is never accepted as "restorable".
 
-PostgreSQL backup: still blocked until H7 (scripts/backup_database.sh exits 2
-unconditionally). Its monitor contract is implemented (evaluate_db_manifest)
-but the live status is NOT_CONFIGURED and is never reported as green.
+PostgreSQL backup (H7): scripts/backup_database.sh fails closed (exit 2) until
+every precondition holds. With a manifest (--db-manifest) the backup is OK only
+when fresh, encrypted, checksummed AND restored afterwards by
+scripts/restore_database.sh (--db-restore result for that same backup).
+Without a manifest the status is NOT_CONFIGURED and never green.
 """
 from __future__ import annotations
 
@@ -150,6 +152,20 @@ def evaluate_db_manifest(manifest: dict | None, now: datetime, max_age_hours: fl
     return {'status': 'OK', 'age_seconds': round(age), 'verified': True, 'restore_tested': True}
 
 
+def load_db_manifest(manifest_path: str | None, restore_path: str | None) -> dict | None:
+    """Manifest written by backup_database.sh plus the restore result of that same backup."""
+    if not manifest_path:
+        return None
+    manifest = json.loads(Path(manifest_path).read_text(encoding='utf-8'))
+    if manifest.get('schema') != 'fichaje.db-backup.v1':
+        return {'result': 'invalid'}
+    if restore_path and Path(restore_path).exists():
+        restore = json.loads(Path(restore_path).read_text(encoding='utf-8'))
+        if restore.get('schema') == 'fichaje.db-restore.v1' and restore.get('backup') == manifest.get('name'):
+            manifest['restore_test'] = {'result': restore.get('result'), 'completed_at': restore.get('completed_at')}
+    return manifest
+
+
 def database_backup_blocked() -> bool:
     """The hard gate of H0 must still be in place while the DB monitor is NOT_CONFIGURED."""
     result = subprocess.run(['bash', str(ROOT / 'scripts' / 'backup_database.sh')], capture_output=True,
@@ -195,7 +211,7 @@ def markdown(report: dict) -> str:
         age = item.get('age_seconds')
         lines.append(f"| {kind} | {item['status']} | {item.get('reason', '')} | {'' if age is None else round(age / 3600, 1)} "
                      f"| {bool(item.get('verified'))} | {bool(item.get('restore_tested'))} |")
-    return '\n'.join(lines) + '\n\nUna subida correcta no equivale a un backup restaurable; PostgreSQL sigue NOT_CONFIGURED hasta H7.\n'
+    return '\n'.join(lines) + '\n\nUna subida correcta no equivale a un backup restaurable: PostgreSQL solo es OK con restore probado de ese backup.\n'
 
 
 if __name__ == '__main__':
@@ -207,8 +223,11 @@ if __name__ == '__main__':
     parser.add_argument('--no-verify', action='store_true')
     parser.add_argument('--out')
     parser.add_argument('--summary', help='append a Markdown status table (statuses only) to this file')
+    parser.add_argument('--db-manifest', help='manifest of the latest encrypted PostgreSQL backup (H7)')
+    parser.add_argument('--db-restore', help='restore_database.sh result for that backup (H7)')
     args = parser.parse_args()
-    result = monitor(GitHub(args.api, args.repo, os.environ.get(args.token_env)), args.workflow, not args.no_verify)
+    result = monitor(GitHub(args.api, args.repo, os.environ.get(args.token_env)), args.workflow, not args.no_verify,
+                     db_manifest=load_db_manifest(args.db_manifest, args.db_restore))
     text = json.dumps(result, indent=2, sort_keys=True)
     if args.out:
         Path(args.out).write_text(text + '\n', encoding='utf-8')
