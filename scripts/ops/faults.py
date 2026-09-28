@@ -225,6 +225,14 @@ def break_release(release_dir: Path, kind: str) -> None:
     elif kind == 'gateway-crash':
         path = release_dir / 'functions' / 'kiosk' / 'index.ts'
         path.write_text("throw new Error('INJECTED_RELEASE_DEFECT');\n" + path.read_text(encoding='utf-8'), encoding='utf-8')
+    elif kind == 'edge-signature-broken':
+        # H7: an edge release that signs the wrong route; every function refuses it.
+        path = release_dir / 'pages' / 'edge' / 'gateway.ts'
+        text = path.read_text(encoding='utf-8')
+        needle = 'route.method, route.component, route.route, body)'
+        if text.count(needle) != 1:
+            raise OpsError('CONFIG', 'faults')
+        path.write_text(text.replace(needle, "route.method, route.component, 'broken', body)"), encoding='utf-8')
     elif kind == 'app-missing-asset':
         entries = list((release_dir / 'dist' / 'assets').glob('index-*.js'))
         if len(entries) != 1:

@@ -26,6 +26,9 @@ GENERIC = [
     ('sql-text', re.compile(rb'\b(select\s[^"\n]{0,200}\sfrom\s|insert\s+into\s|update\s+\S+\s+set\s|delete\s+from\s)', re.I)),
     ('traceback', re.compile(rb'Traceback \(most recent call last\)|\n\s+at [^\n]+:\d+:\d+')),
     ('pepper-env', re.compile(rb'KIOSK_PEPPER|KIOSK_NETWORK_SECRET|SUPABASE_SERVICE_ROLE_KEY|KIOSK_AUTH_PROVISION_KEY')),
+    # H7: edge ingress secret, alert route credentials and platform tokens.
+    ('h7-secret-env', re.compile(rb'FICHAJE_INGRESS_SECRET|OPS_PAGERDUTY_ROUTING_KEY|OPS_GITHUB_TOKEN|CLOUDFLARE_API_TOKEN|SUPABASE_ACCESS_TOKEN')),
+    ('platform-token', re.compile(rb'\bsbp_[A-Za-z0-9]{30,}')),
 ]
 
 

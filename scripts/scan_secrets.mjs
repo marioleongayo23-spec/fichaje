@@ -17,6 +17,9 @@ const RULES = [
   ['github-token', /\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/],
   ['signed-url', /\/object\/sign\/[^\s"'`]+[?&]token=[A-Za-z0-9._-]{16,}/],
   ['ops-env-name', /OPS_(MONITOR|REVIEWER|REPAIR|OPERATOR)_DSN|OPS_ALERT_ROUTE_(PAGER|TICKET)/],
+  // H7: edge ingress secret, alert route credentials, platform tokens and backup configuration names.
+  ['h7-env-name', /FICHAJE_INGRESS_SECRET|OPS_PAGERDUTY_ROUTING_KEY|OPS_GITHUB_TOKEN|CLOUDFLARE_API_TOKEN|SUPABASE_ACCESS_TOKEN|FICHAJE_BACKUP_(PGSERVICE|AGE_RECIPIENT|DEST|CA)/],
+  ['supabase-access-token', /\bsbp_[A-Za-z0-9]{30,}/],
 ];
 
 function files(path) {
