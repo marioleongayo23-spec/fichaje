@@ -188,6 +188,23 @@ def flows_through_edge(edge: str) -> dict:
     return state
 
 
+def platform_mode_fails_closed(gateway_dsn: str) -> None:
+    """Without a local port the functions run in platform mode: no ingress secret, no start (fail closed)."""
+    env = {k: v for k, v in functions_env(S, gateway_dsn, secret_b64(), secret_b64(), None, 'h7-edge').items()
+           if k not in ('KIOSK_PORT', 'EXPORT_LINK_PORT', 'FICHAJE_INGRESS_SECRET', 'FICHAJE_INGRESS_SECRET_PREVIOUS')}
+    source = ROOT / 'supabase' / 'functions'
+    commands = [['deno', 'run', '--allow-env', '--allow-net', '--config', str(source / 'kiosk' / 'deno.json'), str(source / 'kiosk' / 'index.ts')],
+                ['deno', 'run', '--allow-env', '--allow-net', str(source / 'export-link' / 'index.ts')]]
+    refused = []
+    for command in commands:
+        try:
+            result = subprocess.run(command, env=env, cwd=ROOT, capture_output=True, timeout=60)
+            refused.append(result.returncode != 0 and b'CONFIG_REQUIRED' in result.stderr)
+        except subprocess.TimeoutExpired:   # it started serving: the regression this check exists for
+            refused.append(False)
+    check(refused == [True, True], 'PLATFORM mode (no local port) without the ingress secret: gateway and signer refuse to start')
+
+
 def staging_verifier(edge: str, state: dict) -> None:
     """The operator's staging verifier, run for real against the local staging shape (TLS checks skipped)."""
     canary_file = suite.scratch / 'canary-state.json'
@@ -279,6 +296,7 @@ def main() -> None:
         gateway_contract(edge, device['token'])
         bypass(ingress, {'org': state['tenant']['org']}, device, worker)
         staging_verifier(edge, state)
+        platform_mode_fails_closed(gateway_dsn)
         report['sec_h4_01'] = sec_h4_01(edge, network)
         check(history_digest() != history_before, 'H7 synthetic activity recorded (history only grows through the real RPC/gateway paths)')
     finally:

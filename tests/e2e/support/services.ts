@@ -44,7 +44,9 @@ export async function startServices() {
     stdio: ['ignore', openSync(LOG_FILES[0], 'w'), openSync(LOG_FILES[0], 'a')], detached: true,
   });
   const signer = spawn('deno', ['run', '--allow-env', '--allow-net', 'supabase/functions/export-link/index.ts'], {
-    env: { ...process.env, SUPABASE_URL: url, SUPABASE_ANON_KEY: anon, SUPABASE_SERVICE_ROLE_KEY: service },
+    // H7: explicit loopback port; without one the signer runs in platform mode and requires the edge signature.
+    env: { ...process.env, SUPABASE_URL: url, SUPABASE_ANON_KEY: anon, SUPABASE_SERVICE_ROLE_KEY: service,
+      EXPORT_LINK_PORT: String(EXPORT_LINK_PORT) },
     stdio: ['ignore', openSync(LOG_FILES[1], 'w'), openSync(LOG_FILES[1], 'a')], detached: true,
   });
   writeFileSync(STATE_FILE, JSON.stringify({ role, pids: [kiosk.pid, signer.pid] }));
