@@ -1,18 +1,44 @@
-# CURRENT_STATE — 2026-09-27
+# CURRENT_STATE — 2026-09-28
 ## Hito autorizado
 
 ### OPS-02 — observabilidad, canaries, invariantes, alertas y self-healing seguro
 
-**ESTADO: implementado y en revisión en [PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12)
-contra `main`, con la corrección SEC-OPS-01 de la auditoría independiente añadida al mismo PR, validada en
-local y con CI completa en verde sobre `7113dde`. OPS-02 no está aprobado ni integrado en `main`. Sin merge.
-H7 no autorizado.**
-Rama `astra/ops-02-observabilidad-resiliencia` creada desde `main` `754c7f184fb14db151303c7ab7db72bb2629e7aa`
+**ESTADO: PASS — OPS-02 aprobado expresamente por el usuario e integrado en `main` mediante
+[PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12) el 2026-09-28, con SEC-OPS-01 resuelto.
+HITO 7 sigue SIN iniciar: ya no está bloqueado por OPS-02, pero requiere una autorización expresa y posterior
+del usuario para comenzar.** Merge: `f43af0d72a1e88cf14cc71a228e1677252dfe16f` (2026-09-28 06:22 UTC; padres
+`b64a16a` de `main` y `158de0a` de la rama). Código validado antes del merge:
+`158de0a4c61cd62e086634fd3d1aa101a381f05a`; el árbol de `main` en `f43af0d` es idéntico al de `158de0a`.
+Rama de origen `astra/ops-02-observabilidad-resiliencia`, creada desde `main` `754c7f184fb14db151303c7ab7db72bb2629e7aa`
 (la rama de trabajo `claude/ops-02-observabilidad-resiliencia-kzk0z9` contiene los mismos commits) y
 sincronizada el 2026-09-27 con `main` `b64a16a6a21c965b0e01dce6ade7abd3296dca9e` (merge de PR #13, solo
 documentación: cronología corregida de HITO 6, estado de OPS-02 y regla de merge explícito en `AGENTS.md`)
-mediante un commit de merge, sin reescribir historia. La validación completa se repite sobre el commit
-combinado y su evidencia se registra en PR #12.
+mediante un commit de merge, sin reescribir historia.
+
+Validación final previa al merge sobre `158de0a4c61cd62e086634fd3d1aa101a381f05a` (CI del PR y ejecución
+local tras reset desde vacío en el mismo orden que CI, registrada en PR #12):
+- **468 aserciones pgTAP PASS** (bloques Database y OPS-02).
+- **155 comprobaciones reales OPS-02 PASS** (16 de SEC-OPS-01), con fallos inducidos (`OPS_FAULT_INJECTION=1`).
+- **506 comprobaciones reales H1-H5 + KIO-H6-01 PASS** (H1 102 + H2 70 + H3 80 + H4 181 con KIO-H6-01 63 +
+  H5 73).
+- Playwright **46/46 PASS**.
+- **111 tests unitarios PASS** y **52 tests Python OPS PASS**.
+- Escáner de secretos (`scan_secrets.mjs` sobre `dist` y `test-results`): **0 hallazgos**.
+- typecheck, lint, build, Deno (`deno check` de gateway y firmador, `network_test.ts` y `ops_test.ts`),
+  `bash -n scripts/*.sh` y `git diff --check`: PASS.
+
+CI del PR sobre `158de0a`: PASS en
+[CI general](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36351126479),
+[Database](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36351126544),
+[E2E](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36351126543) y
+[OPS-02](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36351126585).
+CI en `main` sobre el merge `f43af0d`: PASS en
+[CI general](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36386134399),
+[Database](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36386134383),
+[E2E](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36386134389),
+[OPS-02](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36386134451) y
+[Repository backup](https://github.com/marioleongayo23-spec/fichaje/actions/runs/36386134387).
+Esta sección solo registra evidencia ya ejecutada.
 
 Regla absoluta, verificada por la suite: ninguna automatización, script, agente o IA modifica
 `time_events`, fichajes originales, decisiones o ajustes de corrección, horas efectivas ni historia
@@ -20,14 +46,14 @@ laboral; no hay cierre automático de jornadas ni fichajes inventados. El único
 es `private.employee_state`, solo desde fuentes inmutables, con referencia de autorización, idempotente,
 auditado y BLOCKED si la fuente es incoherente.
 
-#### SEC-OPS-01 — ingesta de telemetría del navegador (auditoría independiente, 2026-09-26)
+#### SEC-OPS-01 — ingesta de telemetría del navegador (auditoría independiente, 2026-09-26) — RESUELTO
 **Causa.** `public.ops_ingest_client_metrics(p_release, p_batch)` solo validaba forma y vocabulario. Cualquier
 identidad `authenticated` podía invocarla directamente, sin límite de llamadas, con hasta 100 series y 9.999
 eventos por serie, y elegir `p_release`, creando combinaciones nuevas en `private.ops_client_metrics`. Los
 límites de `src/lib/telemetry.ts` no eran una defensa. Impacto: métricas contaminables (tasas y latencias),
 cardinalidad y crecimiento no acotados y posible degradación de la propia observabilidad.
 
-**Solución** (en la migración de OPS-02 aún no integrada; sin cambios en H1-H6 ni en la UI):
+**Solución** (en la migración de OPS-02, integrada en `main` con PR #12; sin cambios en H1-H6 ni en la UI):
 - `release` deja de ser una dimensión de la ingesta: la RPC es `ops_ingest_client_metrics(p_batch)`, ni
   `ops_client_metrics` ni `ops_client_metrics_snapshot` tienen columna de release y el navegador ya no la envía.
   La identidad del artefacto que comprueba el gate RES-02 pasa a `<meta name="fichaje-release">` de
@@ -198,8 +224,9 @@ Límites: sin producción, staging, DNS, dominio, Cloudflare/Supabase remotos, s
 reales. RES-02 se ha probado en un arnés CI aislado y efímero (`LocalDeployer`); su repetición en staging
 sigue siendo puerta de H7. Rutas reales de alerta (pager/ticket), dashboards, retención de la evidencia OPS,
 canary e invariantes programados contra producción y el adaptador de despliegue real
-quedan para H7. `ops-monitor.yml` solo puede ejecutarse desde `main` (primera ejecución real tras el
-merge). El backup PostgreSQL sigue bloqueado y se informa `NOT_CONFIGURED`, nunca en verde. La telemetría
+quedan para H7. `ops-monitor.yml` solo se ejecuta desde `main`: ya está integrado (diario, 03:17 UTC), pero
+a 2026-09-28 no tiene ninguna ejecución registrada; su primera ejecución real sigue pendiente. El backup
+PostgreSQL real sigue bloqueado hasta H7 y se informa `NOT_CONFIGURED`, nunca en verde. La telemetría
 del navegador es no confiable y tiene cuotas en servidor (SEC-OPS-01): no alimenta ninguna decisión.
 
 ### HITO 6 — UX/UI + PWA sobre H1-H5, con KIO-H6-01 resuelto
@@ -320,11 +347,12 @@ HITO 6: PR #10 integrado en `main` el 2026-09-26 antes de la aprobación formal 
 autorización expresa); auditado después de forma independiente y aprobado técnicamente ahora por
 autorización expresa del usuario, sin revertir el código.
 Rama de origen: `astra/hito-6-ux-pwa`. Merge: `3c374358e1c17853c62cb29047642bee37a4efe5`.
-Estado actual: HITO 6 aprobado y cerrado según la cronología corregida arriba. OPS-02 implementado en la
-rama `astra/ops-02-observabilidad-resiliencia` mediante
-[PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12), con SEC-OPS-01 corregido, y en revisión
-técnica; todavía NO aprobado ni integrado en `main` (ver la sección OPS-02 al inicio). H7 sigue sin iniciar
-y bloqueado hasta la aprobación de OPS-02.
+OPS-02 aprobado expresamente por el usuario, con SEC-OPS-01 resuelto, e integrado en `main` mediante
+[PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12) el 2026-09-28.
+Rama de origen: `astra/ops-02-observabilidad-resiliencia`. Merge: `f43af0d72a1e88cf14cc71a228e1677252dfe16f`.
+Estado actual: HITO 6 aprobado y cerrado según la cronología corregida arriba. OPS-02 PASS, aprobado y
+cerrado (ver la sección OPS-02 al inicio). HITO 7 sigue SIN iniciar: ya no está bloqueado por OPS-02, pero
+requiere una autorización expresa y posterior del usuario para comenzar.
 
 ## Entregado en H0
 - Diez documentos de gobierno y diseño coherentes: arquitectura, modelo, roles/RLS, máquina de
@@ -486,10 +514,10 @@ Serialización conservadora por tenant, documentada. No H3, kiosco, informes H5,
 producción, datos reales ni configuración remota. Backup DB sigue bloqueado.
 
 ## OPS-02 — observabilidad y resiliencia (especificación original)
-Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. Estado actual: OPS-02 implementado y en revisión técnica mediante PR #12 (rama `astra/ops-02-observabilidad-resiliencia`; ver la sección OPS-02 al inicio de este documento), con SEC-OPS-01 corregido; todavía NO aprobado ni integrado en `main`.
+Requisito aprobado por el usuario para ejecutar después de H6 y antes de H7. Queda incorporado al roadmap como puerta obligatoria de producción: telemetría segura, health checks, canaries sintéticos, invariantes read-only, alertas, retries idempotentes, rollback de release y reconstrucción limitada de proyecciones reconstruibles. Regla absoluta: ninguna automatización o IA modifica `time_events`, correcciones aprobadas ni historia laboral. Estado actual: OPS-02 PASS, aprobado expresamente por el usuario e integrado en `main` mediante PR #12 (rama `astra/ops-02-observabilidad-resiliencia`, merge `f43af0d72a1e88cf14cc71a228e1677252dfe16f`; ver la sección OPS-02 al inicio de este documento), con SEC-OPS-01 resuelto.
 
 ## Siguiente paso
-HITO 6 aprobado y cerrado. OPS-02 (bloque obligatorio después de H6 y antes de H7) está implementado, con SEC-OPS-01 corregido, y en revisión técnica mediante PR #12, sin aprobar ni integrar en `main`: queda pendiente la auditoría independiente de PR #12 sobre el commit sincronizado con `main`, y el merge requiere una orden explícita y posterior del usuario. H7 sigue sin iniciar y bloqueado hasta que OPS-02 esté aprobado e integrado y el usuario lo autorice.
+HITO 6 y OPS-02 aprobados y cerrados. OPS-02 (bloque obligatorio después de H6 y antes de H7) está integrado en `main` mediante PR #12 (merge `f43af0d72a1e88cf14cc71a228e1677252dfe16f`), con SEC-OPS-01 resuelto. HITO 7 sigue SIN iniciar: ya no está bloqueado por OPS-02, pero no se inicia sin una autorización expresa y posterior del usuario. Hasta entonces no hay producción, staging, DNS, secretos ni datos reales configurados, y el backup PostgreSQL real sigue `NOT_CONFIGURED` y bloqueado hasta H7.
 
 ## HITO 3 — correcciones append-only
 ESTADO: PASS — HITO 3 aprobado por el usuario y PR #7 integrado en `main`.
