@@ -1,11 +1,15 @@
 # STAGING real — procedimiento del operador (HITO 7)
 
-Revisado el 2026-09-28. **Estado: preparado y ensayado en la forma de staging en local; el staging remoto
-NO existe todavía (BLOCKED).** El entorno de ejecución de H7 no tiene cuentas ni credenciales de Cloudflare o
-Supabase (correcto: deben quedar bajo custodia del operador) y su política de red deniega
-`api.cloudflare.com`, `api.supabase.com` y `*.pages.dev`. Este documento es el procedimiento exacto para que el
-operador lo cree y lo verifique con **datos exclusivamente sintéticos**. No autoriza producción, piloto real,
-DNS público definitivo ni compromisos comerciales de SLA/RPO/RTO.
+Revisado el 2026-09-28. **Estado: staging remoto parcial; BLOCKED — no READY FOR PILOT.**
+Supabase `fichaje-staging` ya existe en `eu-west-1`, con 15 migraciones aplicadas,
+Auth sin registro público y las dos Edge Functions desplegadas. Aún faltan sus secretos
+server-side y la URL real de Pages para configurar Auth. Una llamada directa sin firma
+a cada función devuelve 500 por configuración incompleta, por lo que el rechazo 403
+todavía no está verificado. Cloud Browser recibe una verificación de seguridad
+persistente de Cloudflare Dashboard y no pudo crear Pages. La CI prueba la forma local
+de staging, no sustituye la verificación remota. Este documento es el procedimiento
+para completar y comprobar el entorno con datos exclusivamente sintéticos. No autoriza
+producción, piloto real, DNS público definitivo ni compromisos comerciales de SLA/RPO/RTO.
 
 ## 1. Topología
 ```
