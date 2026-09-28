@@ -289,7 +289,7 @@ WAF de zona de Cloudflare (requiere un subdominio propio: decisión de DNS pendi
 `/gateway/*` 60 peticiones/10 s y `/gateway/kiosk/authenticate` 20/10 s por IP, sin reglas que reintenten,
 reescriban o cacheen (la idempotencia es del servidor y un reintento con el mismo `request_id` es legítimo).
 Floods directos contra `*.supabase.co` (PostgREST/Auth) no pueden pasar por el borde propio: los absorbe la
-plataforma; medido en local, 574 llamadas inválidas de telemetría (435/s) rechazadas sin escribir y sin errores
+plataforma; medido en local, 504–574 llamadas inválidas de telemetría (310–435/s) rechazadas sin escribir y sin errores
 en los fichajes concurrentes (`h7_load.py`).
 
 **Secretos y mínimo privilegio**: tabla de secretos, stores y rotación en `docs/STAGING.md` §2; ninguno en Git,

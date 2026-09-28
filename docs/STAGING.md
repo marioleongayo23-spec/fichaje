@@ -98,11 +98,14 @@ mantiene H7 BLOCKED.
 ## 5. Límites conocidos que staging debe confirmar
 - Peer TCP de `Deno.serve` en Supabase Edge Runtime (SEC-H4-01): desconocido hasta medirlo.
 - Latencia del kiosco: Argon2id (19 MiB, t=2) cuesta ~100–200 ms de CPU por verificación y se serializa en cada
-  instancia del gateway; en local, p95 887 ms con un usuario por kiosco (8 kioscos) y 1,8–2,4 s con 20
-  autenticaciones simultáneas. El modelo de concurrencia de Supabase decide la cifra real.
+  instancia del gateway. En local (`h7_load.py`): pico de piloto con 8 kioscos ocupados y cadencia humana
+  (3 s código + PIN, 1 s para elegir) p95 607 ms identificación y ≤ 399 ms registro con 4 CPU (744/523 ms con
+  2 CPU); los mismos kioscos sin pausas (saturación) 0,82–1,22 s según CPU y ejecución (una ejecución dio
+  1053,7 ms en el registro), y 20 autenticaciones simultáneas 1,8–2,9 s. El modelo de concurrencia de Supabase
+  decide la cifra real.
 - `SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` inyectadas en Edge Functions: confirmar compatibilidad con las
   claves nuevas del proyecto.
 - Journal por dblink con TLS verify-full desde la base gestionada (ver 3.4).
 - Floods HTTP directos contra `*.supabase.co` (PostgREST/Auth): no se pueden poner detrás del borde propio; los
-  absorbe la plataforma. Medido en local: 574 llamadas inválidas de telemetría (435/s) rechazadas sin escribir y
-  sin errores en los fichajes concurrentes.
+  absorbe la plataforma. Medido en local: 504–574 llamadas inválidas de telemetría (310–435/s) rechazadas sin
+  escribir y sin errores en los fichajes concurrentes.

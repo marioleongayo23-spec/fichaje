@@ -1,6 +1,103 @@
 # CURRENT_STATE — 2026-09-28
 ## Hito autorizado
 
+### HITO 7 — piloto comercial (preparación técnica)
+
+**ESTADO: BLOCKED — no READY FOR PILOT.** HITO 7 fue autorizado expresamente el 2026-09-28 con STAGING
+limitado a datos sintéticos. Todo lo que puede construirse y probarse sin acceso a las plataformas está hecho y
+probado de verdad en la **forma de staging en local** (Supabase local efímero, funciones Deno reales, runtime real
+de Cloudflare Pages vía workerd), pero el **staging remoto no existe**: este entorno no tiene cuentas ni
+credenciales de Cloudflare/Supabase (deben quedar bajo custodia del operador) y su política de red deniega
+`api.cloudflare.com`, `api.supabase.com` y `*.pages.dev`. Por eso quedan sin ejecutar las comprobaciones que
+exigen la plataforma real, y ninguna se declara PASS. No autorizado y no hecho: producción, empresa piloto real,
+datos laborales reales, DNS público definitivo, SLA/RPO/RTO comerciales y merge del PR.
+
+Rama `astra/hito-7-piloto-comercial` desde `main` `bef348de21c920b6a213813266be34c29176cf77` (PR #14);
+la rama de trabajo `claude/serene-archimedes-gbd3r9` contiene los mismos commits. PR abierto contra `main`, sin
+merge: [PR #15](https://github.com/marioleongayo23-spec/fichaje/pull/15).
+
+#### Entregado (probado en local; CI `.github/workflows/h7.yml`)
+- **Borde del mismo origen** (`edge/gateway.ts`, Pages Function `/gateway/*`): rutas y métodos cerrados, sin
+  CORS, política de origen y fetch-metadata, cuerpos acotados (8 KiB/1 KiB, también chunked), `no-store`, sin
+  reintentos (idempotencia intacta), sin cabeceras de IP hacia arriba. `_headers` con CSP, HSTS y cabeceras de
+  seguridad; `_routes.json`.
+- **Firma de ingreso** (`supabase/functions/_shared/ingress.ts`): HMAC ligada a método, función, ruta y bytes,
+  60 s, rotación sin corte; obligatoria en plataforma. Cambio mínimo en el gateway H4 y el firmador H5 motivado
+  por H7 (sin él, la URL pública de las funciones sería una entrada que evita el borde): solo añade la
+  verificación antes de interpretar la petición; RLS, idempotencia, inmutabilidad y auditoría no cambian y toda
+  la regresión H1-H6 pasa. `verify_jwt=false` declarado en `supabase/config.toml`.
+- **SEC-H4-01 tras el borde**: medido con el runtime real: un bucket de red por tenant (peer = proxy), cabeceras
+  de IP ignoradas, bloqueo de tenant a los 60 fallos (efecto conservador aceptado), otro tenant intacto.
+- **OPS-02 con el borde**: `EdgeLocalDeployer`/`PlatformDeployer`, fallo inducido `edge-signature-broken`
+  detectado, alertado, bloqueado y revertido; adaptadores reales PagerDuty Events v2 y GitHub Issues sin PII;
+  nueva alerta `KIOSK_AUTH_ABUSE` (hallazgo del ensayo de incidentes).
+- **Backup cifrado y restore**: `backup_database.sh` (pg_dump 17 | age, verify-full, fallo cerrado) y
+  `restore_database.sh` (restore aislado en una transacción); REC-01..03 ejecutados de verdad con journal en
+  instancia independiente por TLS verify-full. **No activado** (sin destino ni custodia reales).
+- **Carga, incidente, runbooks**: `h7_load.py`, `h7_incident.py` + `docs/drills/IR-2026-09-28.md`,
+  `docs/STAGING.md` (procedimiento del operador), `docs/PILOT_RUNBOOK.md`,
+  `scripts/staging/verify_staging.py` (verificador externo, ejecutado en local en cada CI).
+- **Documentación legal** (`docs/legal/`, 17 plantillas con marcadores) y revisión normativa parcial en
+  `docs/COMPLIANCE.md` (fuentes primarias no accesibles desde este entorno).
+- **Revisión de dependencias**: npm raíz/edge y dependencias Deno sin avisos; pines de Python con avisos
+  actualizados (`cryptography` 46.0.3 → 50.0.1, `pypdf` 6.1.0 → 6.19.0).
+
+#### Evidencia (ejecución local completa el 2026-09-28, reset desde vacío por bloque)
+Suites de la regresión final ejecutadas sobre los commits `2a2debb` (H1-H6, OPS-02, borde, fallo inducido, incidente
+y REC) y `fa2982c` (perfil de carga corregido); en cada bloque, `supabase db reset --local --no-seed` + journal:
+- **468 aserciones pgTAP PASS**; `h5_render.py` 4 PASS.
+- **506 comprobaciones reales H1-H5 + KIO-H6-01 PASS** (H1 102 + H2 70 + H3 80 + H4 181 con KIO-H6-01 63 + H5 73).
+- **155 comprobaciones reales OPS-02 PASS** (16 de SEC-OPS-01) con fallos inducidos (`OPS_FAULT_INJECTION=1`).
+- Playwright **46/46 PASS**; `scan_secrets.mjs dist test-results`: **0 hallazgos**.
+- `h7_edge.py` **66 PASS** (verificador de staging: 30 PASS + 3 TLS omitidas en loopback; arranque en modo
+  plataforma sin secreto rechazado); `h7_release.py` **18 PASS**; `h7_incident.py` **19 PASS**; `rec.py` **49 PASS**;
+  `h7_load.py` **24 PASS** con 4 CPU y **24 PASS** con todo fijado a 2 CPU (tamaño de runner de GitHub).
+- `npm run check` (typecheck app/SW/borde, lint, **122 tests unitarios**, build, escáner de `dist`), Deno
+  (`deno check` de gateway y firmador; `network_test.ts` 2, `ops_test.ts` 5, `ingress_test.ts` 3), **63 tests
+  Python OPS**, `bash -n scripts/*.sh` y `git diff --check`: PASS (repetidos sobre el árbol final del PR; después de `fa2982c` solo cambia documentación).
+- **Incidencias de la regresión, corregidas y documentadas**: (1) `h5.py` y el arnés E2E arrancaban el firmador sin
+  puerto y H7 lo trata como plataforma (exige la firma y no arranca): ahora pasan `EXPORT_LINK_PORT` explícito, sin
+  cambiar aserciones (`2a2debb`). (2) El perfil de kiosco «8 kioscos sin pausas» dio p95 **1053,7 ms > 1 s** en el
+  registro en una ejecución (887–996 ms la identificación): es saturación por Argon2id en el hilo único del
+  gateway, no el pico del piloto; se mantiene como límite medido (corrección afirmada, latencia informada) y se
+  añade el pico de piloto con cadencia humana explícita, con p95 < 1 s afirmado (`fa2982c`). Argon2 no se toca.
+- `pip-audit`: 0 avisos con los pines nuevos; `npm audit`: 0 en raíz, `edge/` y dependencias Deno.
+
+#### Mediciones
+- **Carga** (`h7_load.py`, local; no es SLA): web con 20 peticiones concurrentes p95 217–248 ms (4 CPU) y
+  308–377 ms (2 CPU); pico de kiosco (8 kioscos ocupados, 3 s para código + PIN y 1 s para elegir) identificación
+  p95 607 / 744 ms y registro ≤ 399 / 523 ms (4 / 2 CPU); límites medidos: 8 kioscos sin pausas 0,82–1,22 s y
+  20 autenticaciones simultáneas 1,8–2,9 s; 0 errores, duplicados, pérdidas o deadlocks; 32 de 100 conexiones;
+  504 llamadas inválidas de telemetría (310/s) rechazadas sin escribir y sin errores en los fichajes.
+- **Fallo inducido** (`h7_release.py`): detección y primera página 3,7 s; rollback y alertas resueltas 11,0 s.
+- **Incidente IR-01**: detección 11,0 s (incluye el ataque), contención 11,3–11,4 s, rotación del secreto de
+  ingreso 18,4–18,8 s, reapertura 25,4–25,8 s; 0 registros laborales afectados (`docs/drills/IR-2026-09-28.md`).
+- **REC-02**: backup 2,1–2,3 s; pérdida medida 3,4–3,5 s (1 fichaje posterior al backup, esperado); RTO del ensayo
+  56,2–61,3 s. Objetivos propuestos RPO ≤ 24 h / RTO ≤ 8 h: no son compromisos comerciales.
+- **SEC-H4-01 tras el borde**: 1 bucket por tenant; bloqueo del tenant a los 60 fallos en 18,6–18,7 s.
+
+#### BLOQUEADORES (intervención humana exacta)
+1. **Staging remoto**: el operador crea los proyectos de Cloudflare Pages y Supabase (UE) y carga los secretos en
+   sus stores según `docs/STAGING.md` §2-3; ningún secreto en GitHub. Después, `verify_staging.py` sin `--local`
+   debe dar PASS sin SKIPPED.
+2. **SEC-H4-01 en Supabase Edge**: medir el peer TCP real (`STAGING.md` §4). Si no es fiable, el gateway ya falla
+   cerrado y el piloto sigue BLOCKED.
+3. **Rutas de alerta reales**: elegir proveedor de guardia y repositorio privado de tickets; el operador guarda
+   `OPS_PAGERDUTY_ROUTING_KEY` y `OPS_GITHUB_TOKEN` en el host de operación; ensayar página y ticket en staging.
+4. **Backup**: destino privado, custodia offline de la identidad age, host de operación con verify-full y
+   restore de ensayo en un segundo proyecto vacío; instancia independiente del journal con CA utilizable desde la
+   base gestionada.
+5. **Borde**: decisión de subdominio/DNS para reglas WAF de zona y TLS/HSTS reales.
+6. **Fallo inducido, carga e incidente en staging** con tiempos humanos reales.
+7. **Legal**: verificación con fuentes primarias (BOE, EUR-Lex, AEPD; este entorno también deniega `www.boe.es`,
+   `eur-lex.europa.eu` y `www.aepd.es`) y revisión de asesoría; datos reales solo por la empresa y el proveedor.
+8. **Revisión independiente** de seguridad del PR, **aceptación de 1-2 empresas piloto** y **aprobación expresa de
+   producción**.
+
+#### Siguiente paso
+Revisión del PR por el usuario. Con autorización: crear el staging remoto con datos sintéticos según
+`docs/STAGING.md` y ejecutar allí los ensayos pendientes. No se continúa automáticamente.
+
 ### OPS-02 — observabilidad, canaries, invariantes, alertas y self-healing seguro
 
 **ESTADO: PASS — OPS-02 aprobado expresamente por el usuario e integrado en `main` mediante
