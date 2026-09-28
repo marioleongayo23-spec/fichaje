@@ -3,6 +3,7 @@ import postgres from 'postgres';
 import { networkIdentifier } from './network.ts';
 import { argon2id, argon2Verify } from 'hash-wasm';
 import { classifySql, healthHandler, opsEvent, type ErrorClass, type Operation, type Outcome } from '../_shared/ops.ts';
+import { INGRESS_HEADER, ingressPolicy, routeOf, verifyIngress } from '../_shared/ingress.ts';
 
 const env = (key: string) => { const value = Deno.env.get(key); if (!value) throw new Error('CONFIG_REQUIRED'); return value; };
 const authURL = env('KIOSK_AUTH_URL');
@@ -12,6 +13,14 @@ const pepper = Uint8Array.from(atob(env('KIOSK_PEPPER')), c => c.charCodeAt(0));
 const networkSecret = Uint8Array.from(atob(env('KIOSK_NETWORK_SECRET')), c => c.charCodeAt(0));
 if (networkSecret.length < 32 || btoa(String.fromCharCode(...networkSecret)) === btoa(String.fromCharCode(...pepper))) throw new Error('CONFIG_REQUIRED');
 if (pepper.length < 32) throw new Error('CONFIG_REQUIRED');
+// H7: without a local listener port this runs on the platform and only accepts
+// requests signed by the same-origin edge (no direct *.supabase.co entrance).
+const listenPort = Deno.env.get('KIOSK_PORT');
+const ingress = ingressPolicy(k => Deno.env.get(k), !listenPort);
+for (const secret of ingress.secrets) {
+  const value = btoa(String.fromCharCode(...secret));
+  if (value === btoa(String.fromCharCode(...pepper)) || value === btoa(String.fromCharCode(...networkSecret))) throw new Error('CONFIG_REQUIRED');
+}
 const db = postgres(env('KIOSK_DATABASE_URL'), { max: 8, prepare: false, onnotice: () => {}, debug: false,
   connection: { application_name: 'kiosk-gateway', statement_timeout: 10000, lock_timeout: 5000, idle_in_transaction_session_timeout: 10000 } });
 const enc = new TextEncoder();
@@ -58,7 +67,13 @@ const ACTIONS = ['CLOCK_IN','BREAK_START','BREAK_END','CLOCK_OUT'];
 // logging cannot create a timing difference between outcomes.
 export async function handler(req: Request, info: Deno.ServeHandlerInfo): Promise<Response> {
   if (req.method === 'GET') {
-    const probe = await health(new URL(req.url).pathname);
+    const path = new URL(req.url).pathname;
+    if (ingress.required && !await verifyIngress(ingress.secrets, req.headers.get(INGRESS_HEADER), 'GET', 'kiosk',
+      routeOf('kiosk', 'GET', path), new Uint8Array(0), Date.now() / 1000)) {
+      opsEvent('kiosk-gateway', 'request.rejected', 'rejected', { error_class: 'FORBIDDEN', stage: 'ingress', status: 403 });
+      return fail();
+    }
+    const probe = await health(path);
     if (probe) return probe;
   }
   const started = performance.now();
@@ -81,6 +96,14 @@ async function handle(req: Request, info: Deno.ServeHandlerInfo, trace: Trace): 
     const chunks: Uint8Array[] = []; let size = 0;
     while (true) { const { value, done } = await reader.read(); if (done) break; size += value.length; if (size > 8192) { await reader.cancel(); return fail(); } chunks.push(value); }
     const bytes = new Uint8Array(size); let offset = 0; for (const c of chunks) { bytes.set(c,offset); offset += c.length; }
+    if (ingress.required) {
+      // H7: exact bytes, route and method must carry a fresh edge signature before any parsing, JWT or SQL.
+      stage = 'ingress'; trace.stage = stage; trace.errorClass = 'FORBIDDEN';
+      const signed = await verifyIngress(ingress.secrets, req.headers.get(INGRESS_HEADER), 'POST', 'kiosk',
+        routeOf('kiosk', 'POST', new URL(req.url).pathname), bytes, Date.now() / 1000);
+      if (!signed) { bytes.fill(0); for (const c of chunks) c.fill(0); return fail(); }
+      stage = 'input'; trace.stage = stage; trace.errorClass = 'INVALID_INPUT';
+    }
     body = JSON.parse(new TextDecoder().decode(bytes)); bytes.fill(0); for (const c of chunks) c.fill(0);
     const route = new URL(req.url).pathname.split('/').pop();
     const permitted: Record<string, string[]> = {
@@ -202,4 +225,7 @@ async function handle(req: Request, info: Deno.ServeHandlerInfo, trace: Trace): 
     await new Promise(r => setTimeout(r,Math.max(0,300 - (performance.now()-started))));
   }
 }
-Deno.serve({ hostname: Deno.env.get('KIOSK_LISTEN_HOST') || '127.0.0.1', port: Number(Deno.env.get('KIOSK_PORT') || 8000), onListen: () => {} },handler);
+// Local/CI listener only with an explicit port; on the platform (Supabase Edge
+// Runtime) the runtime owns the listener and the edge signature is mandatory.
+if (listenPort) Deno.serve({ hostname: Deno.env.get('KIOSK_LISTEN_HOST') || '127.0.0.1', port: Number(listenPort), onListen: () => {} },handler);
+else Deno.serve(handler);

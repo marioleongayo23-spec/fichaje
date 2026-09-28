@@ -1,0 +1,12 @@
+{
+  "name": "fichaje-edge-tooling",
+  "version": "0.0.0",
+  "private": true,
+  "description": "H7 local/staging tooling for the Cloudflare Pages edge (workerd via wrangler). Not part of the app bundle.",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "devDependencies": {
+    "wrangler": "4.142.0"
+  }
+}

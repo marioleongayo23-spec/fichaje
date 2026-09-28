@@ -1,5 +1,6 @@
 // Server-only signer. The service key is used solely after JWT and RPC checks.
 import { healthHandler, opsEvent, type ErrorClass, type Outcome } from '../_shared/ops.ts';
+import { INGRESS_HEADER, ingressPolicy, readBounded, routeOf, verifyIngress } from '../_shared/ingress.ts';
 
 const required = (name: string) => {
   const value = Deno.env.get(name);
@@ -9,6 +10,12 @@ const required = (name: string) => {
 const endpoint = required('SUPABASE_URL');
 const anonKey = required('SUPABASE_ANON_KEY');
 const storageKey = required('SUPABASE_SERVICE_ROLE_KEY');
+// H7: on the platform (no local port) only edge-signed requests are served.
+const listenPort = Deno.env.get('EXPORT_LINK_PORT');
+const ingress = ingressPolicy(k => Deno.env.get(k), !listenPort);
+const signedByEdge = async (request: Request, body: Uint8Array<ArrayBuffer>) => !ingress.required || await verifyIngress(ingress.secrets,
+  request.headers.get(INGRESS_HEADER), request.method, 'export-link', routeOf('export-link', request.method, new URL(request.url).pathname),
+  body, Date.now() / 1000);
 const denied = () => new Response(JSON.stringify({ error: 'FORBIDDEN' }), {
   status: 403, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store',
     'Pragma': 'no-cache', 'Referrer-Policy': 'no-referrer' },
@@ -45,9 +52,10 @@ async function sign(request: Request, trace: Trace): Promise<Response> {
     if (Number(request.headers.get('content-length') || 0) > 1024) return denied();
     const authorization = request.headers.get('authorization') || '';
     if (!authorization.startsWith('Bearer ')) return denied();
-    const body = await request.text();
-    if (body.length > 1024) return denied();
-    const params: unknown = JSON.parse(body);
+    const bytes = await readBounded(request, 1024);
+    if (!bytes) return denied();
+    if (!await signedByEdge(request, bytes)) { trace.errorClass = 'FORBIDDEN'; return denied(); }
+    const params: unknown = JSON.parse(new TextDecoder().decode(bytes));
     if (typeof params !== 'object' || !params) return denied();
     const fields = params as Record<string, unknown>;
     if (Object.keys(fields).sort().join(',') !== 'job_id,organization_id' ||
@@ -98,6 +106,10 @@ async function sign(request: Request, trace: Trace): Promise<Response> {
 // One structured event per request (OBS-01): outcome and stable class only.
 export async function handler(request: Request): Promise<Response> {
   if (request.method === 'GET') {
+    if (!await signedByEdge(request, new Uint8Array(0))) {
+      opsEvent('export-link', 'request.rejected', 'rejected', { error_class: 'FORBIDDEN', stage: 'ingress', status: 403 });
+      return denied();
+    }
     const probe = await health(new URL(request.url).pathname);
     if (probe) return probe;
   }
@@ -110,7 +122,6 @@ export async function handler(request: Request): Promise<Response> {
 }
 
 if (import.meta.main) {
-  const port = Deno.env.get('EXPORT_LINK_PORT');
-  if (port) Deno.serve({ hostname: '127.0.0.1', port: Number(port), onListen: () => {} }, handler);
+  if (listenPort) Deno.serve({ hostname: '127.0.0.1', port: Number(listenPort), onListen: () => {} }, handler);
   else Deno.serve(handler);
 }
