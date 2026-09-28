@@ -134,8 +134,9 @@ sigue bloqueado; este ensayo no habilita backup ni restore de producción.
   invariantes y canary). Negativos: clave equivocada o ausente, ciphertext alterado o truncado → nada
   restaurado. PREPARED sin resolver con la instancia perdida → recuperación BLOCKED y alerta CRITICAL
   `RECOVERY_JOURNAL_BLOCKED`; nunca se deduce un commit perdido.
-- **Medición REC-02 (local, sintética)**: backup 2,3 s; pérdida medida 3,5 s de fichajes posteriores al backup
-  (1 fichaje, el esperado); RTO del ensayo 61,3 s (entorno + restore 46,2 s, replay 0,4 s, validación 12,1 s).
+- **Medición REC-02 (local, sintética, dos ejecuciones del 2026-09-28)**: backup 2,1–2,3 s; pérdida medida
+  3,4–3,5 s de fichajes posteriores al backup (1 fichaje, el esperado); RTO del ensayo 56,2–61,3 s (entorno +
+  restore 41,1–46,2 s, replay 0,4 s, validación 12,1–12,4 s).
   No son compromisos: RPO ≤ 24 h y RTO ≤ 8 h siguen siendo objetivos propuestos, no garantías comerciales.
 - **Monitor**: `backup_monitor.py --db-manifest … --db-restore …` solo informa OK si el restore de ensayo de ese
   mismo backup terminó bien; el checksum del ciphertext no basta.
