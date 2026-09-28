@@ -130,6 +130,8 @@ def evaluate(signals: dict) -> tuple[set[str], list[dict]]:
                 active.append(condition('CLOCK_REGRESSION', component=component))
             if stats['total'] >= THRESHOLDS['min_events_for_rates'] and stats['p95_ms'] >= THRESHOLDS['slow_p95_ms']:
                 active.append(condition('SLOW_OPERATIONS', component=component))
+            if stats.get('kiosk_rate_limited', 0) > 0 or stats.get('kiosk_auth_rejections', 0) >= THRESHOLDS['kiosk_auth_rejections_warning']:
+                active.append(condition('KIOSK_AUTH_ABUSE', component=component))
     return sources, active
 
 

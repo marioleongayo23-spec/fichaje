@@ -251,9 +251,21 @@ class Provisioner:
     """Creates synthetic tenants/identities. Loopback targets only."""
 
     def __init__(self, api: Api, service_key: str, operator_dsn: str, gateway: Gateway | None):
-        if not loopback(api.url) or '127.0.0.1' not in operator_dsn and 'localhost' not in operator_dsn:
+        if not self.allowed(api.url, operator_dsn):
             raise OpsError('CONFIG', 'provision')
         self.api, self.service, self.dsn, self.gateway = api, service_key, operator_dsn, gateway
+
+    @staticmethod
+    def allowed(api_url: str, operator_dsn: str) -> bool:
+        """Loopback (CI/local), or (H7) the explicitly pinned synthetic STAGING project over
+        HTTPS with a verify-full database connection. Production is never a target."""
+        if loopback(api_url):
+            return '127.0.0.1' in operator_dsn or 'localhost' in operator_dsn
+        import os
+        from urllib.parse import urlparse
+        host = urlparse(api_url).hostname or ''
+        return (os.environ.get('FICHAJE_ENV') == 'staging' and api_url.startswith('https://') and host != ''
+                and host == os.environ.get('FICHAJE_STAGING_API_HOST', '') and 'sslmode=verify-full' in operator_dsn)
 
     def account(self, label: str) -> dict:
         email = f'canary-{label}-{secrets.token_hex(6)}@example.invalid'

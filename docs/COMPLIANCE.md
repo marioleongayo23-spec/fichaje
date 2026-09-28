@@ -1,4 +1,4 @@
-# Cumplimiento — base de diseño revisada 2026-09-21
+# Cumplimiento — base de diseño revisada 2026-09-21; revisión H7 2026-09-28 (ver al final)
 No es certificación de producto ni validación jurídica del piloto. H0 no procesa datos reales.
 
 ## Base normativa consultada
@@ -45,3 +45,36 @@ información al empleado; procedimiento de representantes e Inspección; conting
 convenio y pausas documentados; valoración de riesgos/EIPD cuando proceda; bajas y ejercicio de derechos;
 pruebas de aislamiento/restore y revisión normativa vigente. No ofertar a sectores especiales sin evaluación.
 Tiempos de respuesta/recuperación y costes solo se comprometen después de medición real.
+
+## Revisión normativa HITO 7 — 2026-09-28
+**Estado: revisión PARCIAL. La verificación en fuente primaria sigue pendiente (bloqueo externo).** El entorno de
+ejecución de H7 no permite acceder a las fuentes primarias: la política de red denegó `www.boe.es`,
+`eur-lex.europa.eu` y `www.mites.gob.es` (también mediante la herramienta de lectura web). No se afirma haber
+releído ningún texto consolidado a esta fecha. Lo que sí se hizo:
+
+| Fuente | Tipo | Resultado |
+|---|---|---|
+| Estatuto de los Trabajadores, arts. 34.9, 12.4.c y 35.5 ([BOE-A-2015-11430](https://www.boe.es/buscar/act.php?id=BOE-A-2015-11430)) | Primaria | **No accesible** desde H7. Se mantiene la lectura de 2026-09-21. Verificar la versión consolidada vigente antes del piloto: `[[FECHA Y RESPONSABLE DE LA VERIFICACIÓN]]` |
+| RGPD, arts. 5, 6, 12–22, 28, 30, 32–35, 44–49 ([EUR-Lex](https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=es)) | Primaria | **No accesible** desde H7. Las plantillas citan artículos del texto de 2016 revisado el 2026-09-21 |
+| LOPDGDD ([BOE-A-2018-16673](https://www.boe.es/buscar/act.php?id=BOE-A-2018-16673)), en especial art. 32 (bloqueo) y arts. 87–91 | Primaria | **No accesible** desde H7 |
+| Proyecto de Real Decreto de registro de jornada digital | Secundaria (búsqueda web, 2026-09-28) | Según fuentes secundarias, a 9 de septiembre de 2026 **no** estaba aprobado por el Consejo de Ministros ni publicado en el BOE (dictamen desfavorable del Consejo de Estado de 23-03-2026 y aplazamiento). **No es obligación vigente**; es un punto de vigilancia. Si se publica, revisar: medios exclusivamente digitales, contenido mínimo, trazabilidad, acceso inmediato de trabajadores/representantes y acceso remoto de la Inspección, y el periodo de adaptación |
+
+Requisito legal (se mantiene de la base 2026-09-21, pendiente de verificación en fuente primaria):
+- Registro diario con hora concreta de inicio y fin de jornada, conservación cuatro años y disponibilidad para
+  personas trabajadoras, representación legal e Inspección (art. 34.9 ET); organización mediante negociación
+  colectiva, acuerdo de empresa o decisión empresarial previa consulta con la representación.
+- Tiempo parcial (art. 12.4.c ET) y horas extraordinarias (art. 35.5 ET): totalización y copia a la persona.
+- RGPD: obligación legal como base (6.1.c), información (13), encargo (28), seguridad (32), violaciones (33–34),
+  EIPD cuando proceda (35), transferencias (44 y ss.).
+
+Decisiones técnicas de H7 que apoyan el cumplimiento (no son requisitos legales por sí mismas): borde
+same-origin sin CORS y con cabeceras de seguridad, ingreso firmado a las funciones, backup lógico cifrado con age
+y clave en custodia separada, restauración ensayada con journal independiente, alertas sin datos personales,
+retención técnica documentada en [`docs/legal/RETENCION.md`](legal/RETENCION.md).
+
+Plantillas preparadas (revisables, con marcadores `[[…]]`, sin datos ficticios): [`docs/legal/`](legal/README.md).
+
+Pendiente antes del piloto real (no lo resuelve H7): verificación en fuente primaria por asesoría jurídica;
+firma del encargo y verificación de subencargados, regiones y garantías de transferencia; checklist de
+convenio/pausas y valoración de EIPD por cada empresa; confirmación del estado del Real Decreto de registro
+digital en el BOE en la fecha de alta. **No se declara cumplimiento certificado.**

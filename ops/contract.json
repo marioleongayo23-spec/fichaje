@@ -106,7 +106,8 @@
     "VERSION_CONFLICT_HIGH": {"severity": "WARNING", "source": "metrics", "summary": "VERSION_CONFLICT anormalmente alto", "runbook": "docs/RUNBOOKS.md#clock-regression"},
     "CLOCK_REGRESSION": {"severity": "WARNING", "source": "metrics", "summary": "CLOCK_REGRESSION observado: reloj del servidor por detrás de la marca de agua", "runbook": "docs/RUNBOOKS.md#clock-regression"},
     "RELEASE_DEGRADED": {"severity": "WARNING", "source": "release", "summary": "Release candidata degradada: promoción detenida y rollback en curso", "runbook": "docs/RUNBOOKS.md#release-degraded"},
-    "RELEASE_DEGRADED_NO_ROLLBACK": {"severity": "CRITICAL", "source": "release", "summary": "Release degradada sin rollback exitoso", "runbook": "docs/RUNBOOKS.md#release-degraded"}
+    "RELEASE_DEGRADED_NO_ROLLBACK": {"severity": "CRITICAL", "source": "release", "summary": "Release degradada sin rollback exitoso", "runbook": "docs/RUNBOOKS.md#release-degraded"},
+    "KIOSK_AUTH_ABUSE": {"severity": "WARNING", "source": "metrics", "summary": "Rechazos repetidos de PIN o bloqueo por límite en el kiosco (posible credencial de dispositivo comprometida)", "runbook": "docs/RUNBOOKS.md#kiosk-auth-abuse"}
   },
   "alert_labels": {"check": "checks", "channel": "channels", "invariant": "invariants", "job": "jobs", "kind": "backup_kinds", "component": "components", "operation": "operations", "error_class": "error_classes", "state": "states"},
   "routes": {"CRITICAL": ["pager"], "WARNING": ["ticket"]},
@@ -123,7 +124,8 @@
     "backup_max_age_hours": 26,
     "backup_warn_age_hours": 24,
     "journal_unresolved_minutes": 10,
-    "stale_open_session_hours": 16
+    "stale_open_session_hours": 16,
+    "kiosk_auth_rejections_warning": 20
   },
   "retry": {
     "retryable": ["TIMEOUT", "NETWORK", "UPSTREAM_5XX", "RETRYABLE_TIMEOUT", "DB_UNAVAILABLE", "AUTH_UNAVAILABLE", "UNKNOWN_OUTCOME"],

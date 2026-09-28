@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import http.client as httpclient
 import json
+import os
 import re
 import subprocess
 import sys
@@ -187,6 +188,28 @@ def flows_through_edge(edge: str) -> dict:
     return state
 
 
+def staging_verifier(edge: str, state: dict) -> None:
+    """The operator's staging verifier, run for real against the local staging shape (TLS checks skipped)."""
+    canary_file = suite.scratch / 'canary-state.json'
+    fd = os.open(canary_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+        json.dump(state, handle)
+    result = subprocess.run([sys.executable, str(ROOT / 'scripts' / 'staging' / 'verify_staging.py'), '--local', '--app-url', edge,
+                             '--api-url', S['url'], '--kiosk-direct-url', f'http://127.0.0.1:{KIOSK_PORT}',
+                             '--export-link-direct-url', f'http://127.0.0.1:{EXPORT_PORT}', '--canary-state', str(canary_file)],
+                            env={**os.environ, 'SUPABASE_ANON_KEY': S['anon']}, capture_output=True, text=True, timeout=300)
+    canary_file.unlink()
+    (suite.scratch / 'logs' / 'verify-staging.log').write_text(result.stdout + result.stderr)
+    report = json.loads(result.stdout)
+    skipped = sorted(k for k, v in report['checks'].items() if v.startswith('SKIPPED'))
+    failed = sorted(k for k, v in report['checks'].items() if v == 'FAIL')
+    for name in failed:   # check names only
+        print(f'VERIFY_STAGING_FAIL {name}', file=sys.stderr)
+    check(result.returncode == 0 and report['status'] == 'PASS' and failed == []
+          and skipped == ['tls_http_redirect', 'tls_https_only', 'tls_version'] and len(report['checks']) >= 30,
+          f'STAGING verifier PASS against the local staging shape ({len(report["checks"]) - len(skipped)} checks; only the 3 TLS checks skipped locally)')
+
+
 def sec_h4_01(edge: str, network: str) -> dict:
     """SEC-H4-01 behind a real proxy: the gateway sees the proxy's TCP peer."""
     prov = canary_mod.Provisioner(api, S['service'], 'postgresql://postgres:postgres@127.0.0.1:54322/postgres', None)
@@ -255,6 +278,7 @@ def main() -> None:
         worker = {'token': api.token(state['tenant']['worker']['email'], state['tenant']['worker']['password'])}
         gateway_contract(edge, device['token'])
         bypass(ingress, {'org': state['tenant']['org']}, device, worker)
+        staging_verifier(edge, state)
         report['sec_h4_01'] = sec_h4_01(edge, network)
         check(history_digest() != history_before, 'H7 synthetic activity recorded (history only grows through the real RPC/gateway paths)')
     finally:

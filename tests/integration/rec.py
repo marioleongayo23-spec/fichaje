@@ -40,7 +40,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from h7_support import (ROOT, KioskAdmin, Processes, Suite, canary_mod, functions_env, http, http_json, kiosk_employee,  # noqa: E402
                         leak_scan, make_tenant, reset_opslog, secret_b64, stack, start_edge, start_functions, uid, wait_http)
-import journal_init  # noqa: E402
+from recovery_archive import ARCHIVE_SCHEMA  # noqa: E402
 import psycopg  # noqa: E402
 from psycopg import sql  # noqa: E402
 import alerts  # noqa: E402
@@ -170,7 +170,7 @@ def start_journal(certs: dict, admin_password: str, connection_password: str) ->
         c.execute(sql.SQL('create role fichaje_archive_connection login noinherit password {}').format(sql.Literal(connection_password)))
         c.execute('create role fichaje_archive_writer nologin noinherit nobypassrls')
     with psycopg.connect(admin + ' dbname=fichaje_recovery') as c:
-        c.execute(journal_init.ARCHIVE_SCHEMA)
+        c.execute(ARCHIVE_SCHEMA)
     return admin + ' dbname=fichaje_recovery'
 
 

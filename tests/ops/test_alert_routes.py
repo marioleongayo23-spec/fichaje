@@ -120,3 +120,23 @@ class H7AlertRoutes(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class H7KioskAuthAbuse(unittest.TestCase):
+    """Found by the H7 incident drill: PIN rejections are 'rejected', not failures, so no
+    alert covered the abuse of a kiosk credential. They now open a ticket (WARNING)."""
+
+    def events(self, errors: list[str]) -> list[dict]:
+        return [{'component': 'kiosk-gateway', 'operation': 'kiosk.authenticate', 'outcome': 'rejected', 'error_class': e,
+                 'duration_ms': 300.0} for e in errors]
+
+    def test_rate_limited_or_repeated_rejections_raise_a_ticket_alert(self):
+        import metrics
+        _, locked = alerts.evaluate({'metrics': metrics.rates(self.events(['AUTH_FAILED'] * 3 + ['RATE_LIMITED']))})
+        self.assertEqual([c['alert'] for c in locked], ['KIOSK_AUTH_ABUSE'])
+        _, burst = alerts.evaluate({'metrics': metrics.rates(self.events(['AUTH_FAILED'] * 20))})
+        self.assertEqual([c['alert'] for c in burst], ['KIOSK_AUTH_ABUSE'])
+        self.assertEqual(alerts.severity('KIOSK_AUTH_ABUSE', 'production'), 'WARNING')
+        _, quiet = alerts.evaluate({'metrics': metrics.rates(self.events(['AUTH_FAILED'] * 19) + [
+            {'component': 'kiosk-gateway', 'operation': 'kiosk.authenticate', 'outcome': 'success', 'error_class': 'NONE'}])})
+        self.assertEqual(quiet, [], 'a few mistyped PINs are normal and alert nothing')
