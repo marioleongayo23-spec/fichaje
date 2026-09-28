@@ -105,7 +105,7 @@ aceptación de empresas piloto no existen todavía: esos criterios quedan BLOCKE
 | Criterio | Evidencia | Estado |
 |---|---|---|
 | Borde mismo origen | `h7_edge.py`: rutas/métodos cerrados, sin CORS, origen y fetch-metadata, límites 8 KiB/1 KiB (también chunked), `no-store`, cabeceras estáticas, CSP, HSTS, sin source maps; `edge-gateway.test.ts` | PASS local |
-| Sin bypass directo | `h7_edge.py`: 7 firmas inválidas + health y firmador directos → 403 antes de JSON/JWT/SQL, sin contadores consumidos; `ingress_test.ts` | PASS local |
+| Sin bypass directo | `h7_edge.py`: 7 firmas inválidas + health y firmador directos → 403 antes de JSON/JWT/SQL, sin contadores consumidos; sin puerto local ni secreto, gateway y firmador no arrancan; `ingress_test.ts` | PASS local |
 | SEC-H4-01 real | `h7_edge.py`: peer = proxy, cabeceras ignoradas, 1 bucket por tenant, bloqueo de tenant medido (60 fallos), otro tenant intacto | PASS local; peer de Supabase Edge **BLOCKED** |
 | Verificador de staging | `scripts/staging/verify_staging.py` ejecutado dentro de `h7_edge.py`: 30 comprobaciones PASS + 3 de TLS omitidas solo en local | PASS local; remoto **BLOCKED** |
 | Fallo inducido OPS-02 | `h7_release.py`: release con firma rota promovida con el deployer del borde → detección 3,7 s, página y ticket, rollback, RESOLVED, sin tocar historia laboral | PASS local; staging **BLOCKED** |

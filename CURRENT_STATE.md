@@ -5,8 +5,8 @@
 
 **ESTADO: PASS — OPS-02 aprobado expresamente por el usuario e integrado en `main` mediante
 [PR #12](https://github.com/marioleongayo23-spec/fichaje/pull/12) el 2026-09-28, con SEC-OPS-01 resuelto.
-HITO 7 sigue SIN iniciar: ya no está bloqueado por OPS-02, pero requiere una autorización expresa y posterior
-del usuario para comenzar.** Merge: `f43af0d72a1e88cf14cc71a228e1677252dfe16f` (2026-09-28 06:22 UTC; padres
+HITO 7 no estaba iniciado entonces; se autorizó expresamente después, el 2026-09-28 (ver la sección HITO 7).**
+Merge: `f43af0d72a1e88cf14cc71a228e1677252dfe16f` (2026-09-28 06:22 UTC; padres
 `b64a16a` de `main` y `158de0a` de la rama). Código validado antes del merge:
 `158de0a4c61cd62e086634fd3d1aa101a381f05a`; el árbol de `main` en `f43af0d` es idéntico al de `158de0a`.
 Rama de origen `astra/ops-02-observabilidad-resiliencia`, creada desde `main` `754c7f184fb14db151303c7ab7db72bb2629e7aa`

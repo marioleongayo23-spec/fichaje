@@ -281,7 +281,7 @@ Las funciones `kiosk` y `export-link` comparten `functions/_shared/ingress.ts`: 
 (base64 ≥ 32 bytes; `FICHAJE_INGRESS_SECRET_PREVIOUS` durante la rotación) solo aceptan peticiones firmadas por
 el borde del mismo origen (`x-fichaje-edge`, 60 s, ligada a método, función, ruta y bytes). Sin `KIOSK_PORT` /
 `EXPORT_LINK_PORT` (plataforma) o con `FICHAJE_ENV=staging|production`, el secreto es obligatorio y la función
-no arranca sin él. `config.toml` declara `verify_jwt = false` para ambas: validan cada JWT contra Auth.
+no arranca sin él; por eso los arneses locales (H4, H5, E2E, OPS-02) arrancan las funciones con puerto explícito. `config.toml` declara `verify_jwt = false` para ambas: validan cada JWT contra Auth.
 `deno test supabase/functions/_shared/ingress_test.ts` prueba el contrato; `tests/integration/h7_edge.py`
 lo prueba con el runtime real de Pages y comprueba que la URL directa de las funciones no es una entrada.
 
