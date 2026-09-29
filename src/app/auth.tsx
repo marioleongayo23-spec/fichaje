@@ -56,9 +56,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         : error.status ? new ApiError('validation', 'INVALID_INPUT', error.status) : new ApiError('network', 'NETWORK'),
       false, performance.now() - started);
       if (!error) {
-        setNotice(data.session
-          ? 'Cuenta creada. Completa ahora el alta de tu empresa.'
-          : 'Cuenta creada. Revisa tu correo y confirma la dirección antes de iniciar sesión.');
+        // Registration never leaves an authenticated browser session behind.
+        // Even if Auth returns one because of environment/provider behaviour,
+        // first-company onboarding requires a fresh sign-in after the email has
+        // been confirmed. The server independently enforces verification.
+        if (data.session) {
+          await client.auth.signOut({ scope: 'local' }).catch(() => undefined);
+          clearStoredSession(HUMAN_STORAGE_KEY);
+          setSession(null);
+        }
+        setNotice('Cuenta creada. Revisa tu correo y confirma la dirección antes de iniciar sesión.');
         return null;
       }
       if (error.status === 429) return 'Demasiados intentos. Espera unos minutos antes de volver a intentarlo.';
