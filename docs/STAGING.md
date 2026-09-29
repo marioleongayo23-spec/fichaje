@@ -1,28 +1,30 @@
 # STAGING real — procedimiento del operador (HITO 7)
 
 Revisado el 2026-09-29. **Estado: staging remoto parcial; BLOCKED — no READY FOR PILOT.**
-Supabase `fichaje-staging` en `eu-west-1` conserva las 15 migraciones, Auth
-sin registro público y las dos Edge Functions. Cloudflare Pages
-`fichaje-staging` sirve el frontend y la Pages Function original de
-`functions/gateway/[[path]].ts` desplegada con Wrangler desde el bundle del
-commit `37aa36c`. Las variables VITE públicas, ambos upstreams y el secreto
-`FICHAJE_INGRESS_SECRET` como `secret_text` constan en Pages. El origen
-estable responde 200 en portada y 404 JSON para `/gateway/invalid`;
-HSTS, CSP y `noindex` están presentes, sin CORS abierto observado. La
-ruta `/gateway/kiosk/health/live` transmite un 500 `WORKER_ERROR` de
-Supabase porque allí faltan secretos server-side. Supabase ya tiene
-`FICHAJE_ENV=staging` y `KIOSK_AUTH_URL`, pero no las otras credenciales
-obligatorias. El 403 directo sin firma y las pruebas remotas siguen pendientes.
+Se reutiliza Supabase `fichaje-staging` (`pvfjffeszsedslmwdvgh`,
+`eu-west-1`) con 15 migraciones, RLS, Auth cerrado al registro público,
+bucket privado y Edge Functions `kiosk`/`export-link`. El secreto de
+firma de ingreso ya está emparejado en Supabase y Cloudflare Pages; los
+valores server-side de pepper, red, Auth y anon están en Edge Secrets.
+El frontend y la Pages Function original se desplegaron con Wrangler en
+`https://fichaje-staging.pages.dev` (despliegue `26de4dc6`).
 
-La CLI de Supabase no está autorizada de forma verificable: la revisión
-automática detuvo el intercambio del código de login por un token persistente
-al requerir aprobación específica para ese alcance. No reintentar por una
-vía indirecta. Tras una autorización expresa, completar el store de secrets,
-verificar el 403 y ejecutar todos los gates de la sección 4. La restricción
-expresa de esta sesión es **no crear otro proyecto Supabase**; el ensayo de
-restore en un segundo proyecto de §4 permanece bloqueado hasta acordar una
-alternativa aislada dentro del staging existente. Nada de esto habilita
-producción, datos laborales reales, DNS definitivo ni merge.
+**Prueba real parcial:** `export-link` directo sin firma devuelve 403,
+mientras `/gateway/export-link/health/live` y `/ready` devuelven 200
+(`UP`, dependencias Auth/REST/Storage `UP`) con `no-store` y sin CORS
+abierto observado. `kiosk` sigue en 500 porque falta
+`KIOSK_DATABASE_URL`. La revisión automática detuvo la creación del
+login PostgreSQL `fichaje_gateway_login` con membresía única
+`fichaje_gateway` por requerir autorización específica de control de
+acceso. Una vez aprobada, configurarlo solo en el mismo proyecto staging,
+con privilegios mínimos, DSN con TLS `verify-full`, y comprobar que su
+URL directa sin firma da 403. Después ejecutar todos los gates de §4,
+sin declarar PASS si queda cualquier FAIL/SKIPPED.
+
+No crear otro proyecto Supabase por la restricción expresa de esta sesión:
+el restore en un segundo proyecto descrito en §4 sigue bloqueado hasta
+acordar una alternativa aislada dentro del staging existente. No hay datos
+laborales reales, producción, DNS definitivo ni merge.
 
 ## 1. Topología
 ```
