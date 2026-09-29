@@ -1,37 +1,28 @@
 # STAGING real — procedimiento del operador (HITO 7)
 
-Revisado el 2026-09-28. **Estado: staging remoto parcial; BLOCKED — no READY FOR PILOT.**
-Supabase `fichaje-staging` existe en `eu-west-1`, con 15 migraciones, Auth
-sin registro público y las dos Edge Functions desplegadas. Cloudflare Pages
-`fichaje-staging` existe por Direct Upload: el formulario estático responde en
-`https://fichaje-staging.pages.dev/`. Auth Site URL y la redirección exacta ya
-apuntan a ese origen. Pages ya tiene upstreams, variables VITE públicas y un secreto de ingreso como `secret_text`,
-y se desplegó la Pages Function original con Wrangler (última URL de despliegue
-`https://cc923976.fichaje-staging.pages.dev`). El HTML devuelve 200 con CSP,
-HSTS y noindex; una ruta gateway inválida devuelve 404. La ruta real
-`/gateway/kiosk/health/live` devuelve 500 de Supabase retransmitido: faltan
-secretos custom en Supabase, incluido el mismo secreto de ingreso. Como la
-sesión de Dashboard caducó y la solicitud de login seguro fue cancelada,
-no se ha completado la configuración ni las verificaciones remotas. Al
-reanudar se debe rotar el secreto de ingreso de Pages y cargar la nueva pareja
-en Supabase antes de probar el 403 directo. Una llamada directa sin firma a cada
-función respondió 500 por configuración incompleta; no demuestra el 403
-requerido. La CI prueba la forma local, no sustituye staging remoto.
+Revisado el 2026-09-29. **Estado: staging remoto parcial; BLOCKED — no READY FOR PILOT.**
+Supabase `fichaje-staging` en `eu-west-1` conserva las 15 migraciones, Auth
+sin registro público y las dos Edge Functions. Cloudflare Pages
+`fichaje-staging` sirve el frontend y la Pages Function original de
+`functions/gateway/[[path]].ts` desplegada con Wrangler desde el bundle del
+commit `37aa36c`. Las variables VITE públicas, ambos upstreams y el secreto
+`FICHAJE_INGRESS_SECRET` como `secret_text` constan en Pages. El origen
+estable responde 200 en portada y 404 JSON para `/gateway/invalid`;
+HSTS, CSP y `noindex` están presentes, sin CORS abierto observado. La
+ruta `/gateway/kiosk/health/live` transmite un 500 `WORKER_ERROR` de
+Supabase porque allí faltan secretos server-side. Supabase ya tiene
+`FICHAJE_ENV=staging` y `KIOSK_AUTH_URL`, pero no las otras credenciales
+obligatorias. El 403 directo sin firma y las pruebas remotas siguen pendientes.
 
-El primer bundle del proyecto Pages (`37aa36c`, ZIP SHA-256
-`79278ff732fac64d8b5fc1d7f163c3a4003918abd581a143fe76120b06a30e4f`)
-se construyó con `npm ci`, `VITE_SUPABASE_URL`, clave pública
-`VITE_SUPABASE_PUBLISHABLE_KEY` y `FICHAJE_RELEASE=37aa36c npm run build`.
-Para la subida mediante Dashboard se añadió al `dist/` un `_worker.js`
-compilado en modo avanzado que enruta `/gateway/*` a `handleGateway`
-(`edge/gateway.ts`) y el resto a `env.ASSETS.fetch`. Cloudflare no compila
-`functions/` en la subida por drag-and-drop; para despliegues siguientes
-preferir el `PlatformDeployer` con Wrangler, que sí compila el directorio
-`functions/`. Verificar antes de llamar PASS que la función avanzada y
-`_routes.json` actúan en el dominio remoto. El bundle local respondió 503
-sin secreto y firmó un upstream simulado con secreto de prueba; queda pendiente
-el ensayo remoto. Este documento no autoriza producción, piloto real, DNS
-público definitivo ni compromisos comerciales de SLA/RPO/RTO.
+La CLI de Supabase no está autorizada de forma verificable: la revisión
+automática detuvo el intercambio del código de login por un token persistente
+al requerir aprobación específica para ese alcance. No reintentar por una
+vía indirecta. Tras una autorización expresa, completar el store de secrets,
+verificar el 403 y ejecutar todos los gates de la sección 4. La restricción
+expresa de esta sesión es **no crear otro proyecto Supabase**; el ensayo de
+restore en un segundo proyecto de §4 permanece bloqueado hasta acordar una
+alternativa aislada dentro del staging existente. Nada de esto habilita
+producción, datos laborales reales, DNS definitivo ni merge.
 
 ## 1. Topología
 ```
