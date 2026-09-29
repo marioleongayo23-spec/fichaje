@@ -72,3 +72,10 @@ OPS-02 es obligatorio entre H6 y H7: telemetría, health checks, canaries sinté
 ## Límites de lanzamiento
 No prometer universalidad sectorial: validar convenio, pausas computables, parciales, turnos y
 obligaciones especiales de cada piloto. Bloquea comercialización hasta OPS-02 y H7 aprobados.
+
+
+## Alta self-service de empresa
+La identidad humana se crea mediante Supabase Auth con email/contraseña y confirmación de correo. Auth no concede ningún rol ni tenant.
+Una identidad verificada que todavía no pertenece a ninguna organización puede ejecutar `public.create_organization` desde la app para crear su primera empresa. El servidor genera el `organization_id`, asigna OWNER a `auth.uid()` y delega en el bootstrap protegido existente dentro de la misma transacción.
+La operación es idempotente ante pérdida de ACK; cambiar el nombre con el mismo `request_id` se rechaza. Una identidad que ya pertenece a una organización no puede crear otra por este flujo inicial; el acceso multiempresa posterior se obtiene mediante invitaciones.
+El navegador nunca decide el rol OWNER, nunca escribe tablas directamente y `user_metadata` no participa en autorización.
