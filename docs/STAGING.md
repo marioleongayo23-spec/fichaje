@@ -1,4 +1,24 @@
 # STAGING real — procedimiento del operador (HITO 7)
+## Estado remoto más reciente — 2026-09-29 (PR #15)
+
+`verify_staging.py` se ejecutó contra Pages y Supabase reales, sin `--local`,
+con estado canary `0600`: **33 PASS, 0 FAIL, 0 SKIPPED**. Web y kiosco
+sintéticos completaron sus ciclos. SEC-H4-01 observó un único bucket de
+cuatro fallos PIN desde dos orígenes de red, de modo que Edge ve el peer
+del proxy de Cloudflare. El probe temporal y su secreto se retiraron.
+Invariantes: 0 CRITICAL, 0 WARNING y un INFO de la sesión de control.
+
+**HITO 7 sigue BLOCKED:** el monitor del host de ejecución no está operativo
+sin su DSN y con la latencia del proxy; faltan alertas, fallo inducido y
+rollback, carga, incidente y backup/REC-01..03 remotos. La autorización
+posterior permitió un segundo proyecto temporal exclusivamente para restore,
+previa confirmación del coste. El usuario confirmó el coste consultado de
+0/mes, pero Supabase rechazó la creación por el límite global de dos
+proyectos Free activos del propietario. No se creó otro ni se tocó el
+proyecto `Fichaje APP`. Una organización Pro temporal separada requeriría
+nueva autorización de facturación a su tarifa real. Las notas históricas
+inferiores describen estados anteriores y no prevalecen sobre esta sección.
+
 
 Revisado el 2026-09-29. **Staging remoto parcial: BLOCKED — no READY FOR PILOT.**
 Se reutiliza exclusivamente Supabase `fichaje-staging`
