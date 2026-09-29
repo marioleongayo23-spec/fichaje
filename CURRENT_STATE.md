@@ -1,4 +1,51 @@
 # CURRENT_STATE — 2026-09-29
+## HITO 7 — gates remotos verificados y cuota de restore (2026-09-29)
+
+**BLOCKED — todavía no READY FOR PILOT.** El head previo `040047c45c12b91c9072281fa981f1b2ab5c8880` tuvo los cinco workflows
+CI, Database, E2E, OPS-02 y H7 en `completed/success`. El estado sintético
+local del canary conserva modo `0600` y no se ha subido al repositorio.
+Los canales web y kiosco, ejecutados por separado contra Supabase y
+Cloudflare Pages reales, terminaron **PASS**. Después,
+`scripts/staging/verify_staging.py` sobre las URLs remotas, con
+`--canary-state` y **sin `--local`**, terminó exit 0: **33 PASS, 0 FAIL,
+0 SKIPPED**, incluido el canary web+kiosco, TLS 1.3, CSP/HSTS,
+Auth/Storage/API, borde y rechazo de bypass directo. El host de ejecución
+necesitó su proxy HTTPS para el socket TLS y un User-Agent identificable
+`Fichaje-H7-Monitor/1.0`; se usó un adaptador local sin alterar el script
+del repositorio, las reglas de Cloudflare ni los secretos de despliegue.
+
+**SEC-H4-01 real:** tres PIN erróneos desde el host de operaciones dieron
+403 y un bucket con tres fallos. Un cuarto desde una función Edge temporal
+separada, a través del mismo gateway, dio 403; la consulta posterior a
+`private.kiosk_network_buckets` mostró **un bucket, cuatro fallos**.
+Por tanto, el identificador de red que ve `kiosk` corresponde al peer TCP
+del proxy de Cloudflare y no separa las IP originales de esos dos clientes;
+el límite de 60 fallos/15 min protege conservadoramente el tenant completo.
+La función `h7-network-origin` y su secreto de prueba se eliminaron; el
+inventario volvió a solo `kiosk` y `export-link`. Los intentos fallidos
+no generaron fichajes. Hay 21 eventos y 21 auditorías de eventos,
+exclusivamente sintéticos, en dos organizaciones y tres empleados.
+
+`private.ops_record_invariant_run()` en staging generó el run
+`5a9d6173-baa5-4f8c-a97e-8cd40e03b5aa`: **0 CRITICAL, 0 WARNING**, un
+INFO `OPEN_SESSIONS` correspondiente al control sintético; dos baselines,
+aún no congeladas. El monitor `health.py` desde este host dio DOWN por
+latencia/timeout de su ruta proxy (sin DSN de monitor), aunque readiness de
+ambas funciones y el resto del borde pasaron el verificador remoto. No se
+afirma OPS-02 operativo ni alertas configuradas.
+
+**Restore:** tras la confirmación expresa del usuario del coste consultado
+`amount=0/monthly`, la creación de `fichaje-h7-restore-temp` en
+`eu-west-1` fue rechazada por Supabase: el propietario ya tiene dos
+proyectos gratuitos activos, su límite global. No se creó el tercero, no se
+pausó ni modificó `Fichaje APP`. La tarifa publicada para un tercer proyecto
+requiere Pro ($25/mes de organización; compute adicional según proyectos);
+se precisa una nueva autorización de facturación para esa tarifa real.
+REC-01..03, backup cifrado, custodia age, alertas, fallo inducido/rollback,
+carga H7 e incidente remoto permanecen pendientes. Sin producción,
+clientes reales, datos laborales reales ni merge. Esta nota prevalece sobre
+las notas históricas siguientes.
+
 ## HITO 7 — canary sintético remoto parcial (2026-09-29)
 
 **BLOCKED — todavía no READY FOR PILOT.** Los cinco workflows (CI,
