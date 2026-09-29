@@ -154,7 +154,7 @@ test('revoked membership is reflected immediately and cannot clock', async ({ pa
     p_membership_id: s.employee.membership, p_expected_version: version, p_role: 'EMPLOYEE', p_active: false });
   expect(status).toBe(200);
   await page.getByRole('button', { name: 'Entrada', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'No tienes acceso a ninguna organización' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Configura tu acceso' })).toBeVisible();
   await expect(page.getByText('Tu acceso a la organización seleccionada ha cambiado')).toBeVisible();
   await expect(page.getByText(s.name)).toHaveCount(0);
   expect(eventCount(s.org, s.employee.employee!)).toBe(0);
