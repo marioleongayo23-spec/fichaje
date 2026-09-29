@@ -1,5 +1,10 @@
 # Runbook del piloto comercial (HITO 7)
 
+## Cambio de estrategia — 2026-09-29
+Este documento deja de ser la puerta de cierre de HITO 7. El usuario ha decidido **no realizar un piloto con empresas reales**: primero se terminará la aplicación y se validará con una empresa ficticia y datos sintéticos sobre el entorno desplegado. Los apartados de alta de empresa real, alertas de guardia, backup/restore gestionado, incidentes y operación real se conservan como runbook para la futura activación del primer cliente real, pero no bloquean la aceptación sintética final de H7.
+
+No se contratará infraestructura de pago únicamente para ejecutar un simulacro. Cualquier requisito operativo que implique coste se reevaluará antes del primer cliente real y requerirá autorización expresa.
+
 Revisado el 2026-09-28. **No se ha ejecutado con ninguna empresa real.** Cada paso se ha ensayado solo con datos
 sintéticos (suites citadas en cada apartado). Este runbook no autoriza por sí mismo nada de lo siguiente, que
 requiere aprobación expresa y posterior: abrir producción, dar de alta una empresa piloto, introducir datos
