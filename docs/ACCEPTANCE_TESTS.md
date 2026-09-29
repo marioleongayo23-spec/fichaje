@@ -115,3 +115,20 @@ aceptación de empresas piloto no existen todavía: esos criterios quedan BLOCKE
 | Respuesta a incidentes | `h7_incident.py` y `docs/drills/IR-2026-09-28.md` | PASS local (tiempos humanos pendientes) |
 | Documentación legal | `docs/legal/` (17 plantillas) y revisión en `COMPLIANCE.md` | Plantillas; verificación con fuentes primarias **BLOCKED** |
 | Runbook del piloto | `docs/PILOT_RUNBOOK.md` | No ejecutado con empresa real |
+
+
+## H7 — decisión de aceptación final sintética (2026-09-29)
+Por decisión expresa del usuario, H7 se cierra con **validación end-to-end de la aplicación final mediante una empresa ficticia**, no con un piloto de 1-2 empresas reales.
+
+Puerta de salida H7:
+- todos los workflows obligatorios del head final en PASS;
+- verify_staging.py remoto sin --local: 0 FAIL y 0 SKIPPED;
+- aislamiento multiempresa y SEC-H4-01 verificados en el entorno remoto;
+- una organización ficticia estable con identidades sintéticas OWNER, ADMIN y EMPLOYEE y un kiosco sintético;
+- flujo real desde la UI: login, alta/configuración, CLOCK_IN → BREAK_START → BREAK_END → CLOCK_OUT, salida desde pausa, corrección con aprobación independiente, consulta del registro y exportación;
+- ningún secreto ni dato real en GitHub, logs o artefactos;
+- revisión final del usuario sobre la app desplegada.
+
+No son bloqueadores para cerrar H7 sintético: contratar un tercer proyecto Supabase, ejecutar un restore en un segundo Supabase gestionado, configurar un proveedor real de guardia o hacer un piloto con una empresa real. Las suites locales/CI existentes de fallo, rollback, carga, incidente y REC se conservan y no se desactivan.
+
+Antes del **primer cliente real / producción**, habrá una puerta operativa separada: alertas reales, estrategia de backup/restore viable y probada en el entorno que se vaya a operar, respuesta a incidentes, revisión legal/seguridad necesaria y autorización expresa de producción. Esa puerta puede requerir gasto y se decidirá entonces.
