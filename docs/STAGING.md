@@ -1,30 +1,33 @@
 # STAGING real — procedimiento del operador (HITO 7)
 
-Revisado el 2026-09-29. **Estado: staging remoto parcial; BLOCKED — no READY FOR PILOT.**
-Se reutiliza Supabase `fichaje-staging` (`pvfjffeszsedslmwdvgh`,
-`eu-west-1`) con 15 migraciones, RLS, Auth cerrado al registro público,
-bucket privado y Edge Functions `kiosk`/`export-link`. El secreto de
-firma de ingreso ya está emparejado en Supabase y Cloudflare Pages; los
-valores server-side de pepper, red, Auth y anon están en Edge Secrets.
-El frontend y la Pages Function original se desplegaron con Wrangler en
-`https://fichaje-staging.pages.dev` (despliegue `26de4dc6`).
+Revisado el 2026-09-29. **Staging remoto parcial: BLOCKED — no READY FOR PILOT.**
+Se reutiliza exclusivamente Supabase `fichaje-staging`
+(`pvfjffeszsedslmwdvgh`, `eu-west-1`), con 15 migraciones, RLS,
+Auth sin registro público, bucket privado y Edge Functions `kiosk` y
+`export-link` activas. Cloudflare Pages `fichaje-staging` sirve el
+frontend y `/gateway/*` con secreto de ingreso emparejado, CSP, HSTS,
+`no-store`, `noindex` y sin CORS abierto observado.
 
-**Prueba real parcial:** `export-link` directo sin firma devuelve 403,
-mientras `/gateway/export-link/health/live` y `/ready` devuelven 200
-(`UP`, dependencias Auth/REST/Storage `UP`) con `no-store` y sin CORS
-abierto observado. `kiosk` sigue en 500 porque falta
-`KIOSK_DATABASE_URL`. La revisión automática detuvo la creación del
-login PostgreSQL `fichaje_gateway_login` con membresía única
-`fichaje_gateway` por requerir autorización específica de control de
-acceso. Una vez aprobada, configurarlo solo en el mismo proyecto staging,
-con privilegios mínimos, DSN con TLS `verify-full`, y comprobar que su
-URL directa sin firma da 403. Después ejecutar todos los gates de §4,
-sin declarar PASS si queda cualquier FAIL/SKIPPED.
+Se creó el login de PostgreSQL `fichaje_gateway_login` únicamente en
+ese proyecto, sin privilegios administrativos ni BYPASSRLS y con la sola
+membresía `fichaje_gateway`. `KIOSK_DATABASE_URL` está en Edge Secrets
+con pooler de sesión y TLS `verify-full`. El `kiosk` directo sin firma
+respondió 403 y su liveness por gateway 200. El último readiness observado
+respondió `DEGRADED` en base de datos; después, un diagnóstico en un
+arranque nuevo comprobó `SELECT 1` UP con el pooler. El diagnóstico se
+retiró y la función original volvió a desplegarse. Falta medir de nuevo
+readiness de la versión normal y ejecutar el resto de puertas de §4;
+**no se declara PASS a partir del probe de arranque**.
 
-No crear otro proyecto Supabase por la restricción expresa de esta sesión:
-el restore en un segundo proyecto descrito en §4 sigue bloqueado hasta
-acordar una alternativa aislada dentro del staging existente. No hay datos
-laborales reales, producción, DNS definitivo ni merge.
+El acceso del Cloud Browser al `*.pages.dev` está bloqueado por el
+cliente y el egress de la shell hacia esa URL devuelve 403, de modo que
+el verificador remoto aún no se ejecutó. La revisión automática impidió
+un diagnóstico temporal de autofetch `kiosk → gateway → kiosk` por
+riesgo de llamadas recursivas; no se ejecutó. El restore en segundo
+proyecto que prescribe §4 tampoco se ha efectuado: la instrucción
+expresa es no crear otro Supabase. Se requiere definir una alternativa
+aislada dentro del proyecto existente antes de afirmar REC-01..03.
+No hay datos laborales reales, producción, DNS definitivo ni merge.
 
 ## 1. Topología
 ```
