@@ -13,16 +13,19 @@ export function OrganizationPicker() {
   const tenant = useTenant();
   const { signOut } = useAuth();
   const empty = tenant.entries.length === 0;
-  useEffect(() => { document.title = `${empty ? 'Sin organización' : 'Elegir organización'} · ${BRAND}`; }, [empty]);
+  useEffect(() => { document.title = `${empty ? 'Configurar empresa' : 'Elegir organización'} · ${BRAND}`; }, [empty]);
   return (
     <main id="contenido" className="auth-page">
       <div className="auth-card auth-card-wide">
         <p className="brand-mark" aria-hidden="true">{BRAND}</p>
-        <h1>{empty ? 'No tienes acceso a ninguna organización' : 'Elige organización'}</h1>
+        <h1>{empty ? 'Configura tu acceso' : 'Elige organización'}</h1>
         {tenant.notice && <Notice tone="warning" title={tenant.notice} />}
         {tenant.error && <Notice tone="error" title={tenant.error} />}
         {empty ? (
-          <p>Si has recibido una invitación, introdúcela abajo. Si no, pide acceso a tu empresa.</p>
+          <>
+            <p>Tu cuenta todavía no pertenece a ninguna empresa. Puedes crear tu primera empresa o aceptar una invitación existente.</p>
+            <CreateOrganization />
+          </>
         ) : (
           <>
             <p>Tu cuenta pertenece a varias organizaciones. Sus datos nunca se mezclan: trabajarás solo con la que elijas.</p>
@@ -45,13 +48,57 @@ export function OrganizationPicker() {
   );
 }
 
+function CreateOrganization() {
+  const { client } = useServices();
+  const tenant = useTenant();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const attempt = useRef<{ name: string; requestId: string } | null>(null);
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const name = String(new FormData(event.currentTarget).get('organization') ?? '').trim();
+    if (!name || name.length > 200) { setError('Escribe un nombre de empresa válido.'); return; }
+    if (attempt.current?.name !== name) attempt.current = { name, requestId: newRequestId() };
+    setError(null);
+    setPending(true);
+    try {
+      await rpc<{ id: string }>(client, 'create_organization', {
+        p_request_id: attempt.current.requestId,
+        p_name: name,
+      });
+      attempt.current = null;
+      await tenant.reload();
+    } catch (failure) {
+      const apiError = asApiError(failure);
+      setError(apiError.kind === 'forbidden'
+        ? 'Esta cuenta ya pertenece a una organización. Actualiza la página o acepta una invitación para acceder a otra.'
+        : errorMessage(apiError));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <section aria-labelledby="create-org-title" className="subsection">
+      <h2 id="create-org-title">Dar de alta mi empresa</h2>
+      <form noValidate onSubmit={onSubmit}>
+        <Field label="Nombre de la empresa" hint="Puedes cambiar la configuración operativa después del alta.">
+          {(p) => <input {...p} name="organization" type="text" autoComplete="organization" maxLength={200} required />}
+        </Field>
+        <LiveRegion tone="error" message={error} />
+        <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? 'Creando empresa…' : 'Crear empresa'}</button>
+      </form>
+    </section>
+  );
+}
+
 function AcceptInvitation() {
   const { client } = useServices();
   const tenant = useTenant();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  // Same request_id while the same code is retried: the server replays the receipt.
   const attempt = useRef<{ code: string; requestId: string } | null>(null);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
