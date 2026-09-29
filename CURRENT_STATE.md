@@ -1,4 +1,47 @@
-# CURRENT_STATE — 2026-09-28
+# CURRENT_STATE — 2026-09-29
+## Avance remoto Pages/Edge — 2026-09-29 (PR #15)
+
+**HITO 7: BLOCKED — aún no READY FOR PILOT.** El proyecto Cloudflare Pages existente
+`fichaje-staging` tiene variables de producción `FICHAJE_KIOSK_UPSTREAM`,
+`FICHAJE_EXPORT_LINK_UPSTREAM`, `VITE_SUPABASE_URL`,
+`VITE_SUPABASE_PUBLISHABLE_KEY`, `NODE_VERSION=24` y
+`FICHAJE_INGRESS_SECRET` de tipo `secret_text`. No se imprimió ni guardó en
+GitHub el valor secreto. Se desplegó con Wrangler el frontend y la Pages
+Function original `functions/gateway/[[path]].ts` del bundle de `37aa36c`;
+el despliegue limpio quedó activo en
+`https://cc923976.fichaje-staging.pages.dev` (alias estable
+`https://fichaje-staging.pages.dev`). El proyecto reporta
+`uses_functions=true`. El origen estable respondió 200 para la portada y
+404 JSON `NOT_FOUND` para una ruta `/gateway/invalid`. La portada sirvió
+HSTS, CSP, `X-Robots-Tag: noindex, nofollow` y cabeceras de seguridad;
+no se observó `Access-Control-Allow-Origin`. La llamada real a
+`/gateway/kiosk/health/live` respondió 500 JSON
+`WORKER_ERROR` con `no-store`: es la respuesta de la Edge Function de
+Supabase retransmitida por el gateway, que todavía falla al arrancar sin
+sus secretos obligatorios. El despliegue diagnóstico temporal se retiró y
+se redeplegó la función exacta del repositorio. **No es PASS de gateway ni
+rechazo 403 directo.**
+
+La sesión del dashboard Supabase se recuperó mediante GitHub y verificación
+de dispositivo; el panel mostró el proyecto existente `fichaje-staging`.
+En Edge Function Secrets quedaron guardados `FICHAJE_ENV=staging` y
+`KIOSK_AUTH_URL` apuntando al API de este mismo proyecto. Siguen ausentes
+los demás valores server-side (incluidos ingress, pepper, red, Auth y DSN de
+login restringido). El conector no ofrece escritura de secrets. Se intentó
+vincular la CLI de Supabase a la sesión web, pero la revisión automática
+rechazó el intercambio del código de verificación por una credencial CLI
+persistente: consideró que ampliaba el acceso local sin aprobación específica.
+No se ha intentado eludir esa denegación. No se afirma que la CLI haya quedado
+autorizada.
+
+Siguen pendientes, por ello, el 403 directo sin firma, `verify_staging.py`
+remoto sin `--local`, SEC-H4-01 en Edge real, canary/health/invariantes/alertas,
+fallo inducido y rollback, carga, incidente y backup/restore REC-01..03.
+No hay PASS remoto con estos FAIL/pendientes. Se mantiene el mismo proyecto
+Supabase (15 migraciones, RLS y bucket privado); no se creó otro. Sin
+producción, datos laborales reales ni merge. La sección Pages/Auth siguiente
+es histórica y queda reemplazada por este avance.
+
 ## Avance remoto posterior — 2026-09-28 (PR #15)
 
 **HITO 7: BLOCKED — no READY FOR PILOT.** En el mismo proyecto Cloudflare Pages
