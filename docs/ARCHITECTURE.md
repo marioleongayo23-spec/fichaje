@@ -7,6 +7,11 @@ PostgREST expone lecturas RLS y RPC permitidas. Supabase Edge Function futura so
 kiosco/exportaciones: secretos aislados del bundle; no sustituye autorizaciones en PostgreSQL.
 GitHub Actions valida cambios y permite backup manual de código, sin despliegues.
 
+## Onboarding self-service
+Supabase Auth permite crear la identidad humana y exige confirmación de email. La creación de cuenta por sí sola no crea ninguna fila de negocio.
+Si la identidad verificada no tiene membresías, la UI puede llamar a `public.create_organization(request_id,name)`. La RPC SECURITY DEFINER pertenece al rol técnico mínimo de bootstrap, genera el UUID de organización en servidor y reutiliza `private.bootstrap_organization`; RLS/capabilities siguen acotando la transacción al tenant recién creado.
+Una tabla privada de idempotencia de onboarding conserva solo identidad técnica, request UUID, hash SHA-256 del nombre y organization UUID; el cliente no puede leerla. Reintento del mismo request devuelve el mismo tenant. Tras la primera membresía, nuevas organizaciones solo llegan por los flujos autorizados (p. ej. invitación), no por autoelevación.
+
 ## Multiempresa
 Un proyecto Supabase y esquema compartido para pilotos; no una base por cliente.
 Todas las tablas de negocio llevan organization_id NOT NULL, índices empezando por tenant y
