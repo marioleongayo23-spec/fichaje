@@ -34,7 +34,7 @@ No permitir al rol técnico cambiar roles, desactivar triggers o concederse perm
 Revalidar organización/membresía/empleado en transacción; expected_version y FK compuestas.
 No confiar en JWT user_metadata ni organization_id recibido sin comprobación.
 Toda alta, baja, invitación y cambio de rol es idempotente, auditado y mantiene un OWNER activo.
-Alta de la primera organización por flujo controlado servidor; no signup público autootorgado.
+Alta de la primera organización mediante onboarding self-service controlado por servidor: el signup Auth exige email confirmado y no otorga tenant ni rol. `public.create_organization` usa exclusivamente `auth.uid()` verificado, genera el tenant en servidor y asigna OWNER dentro del bootstrap protegido. El cliente no elige rol ni `organization_id`; una identidad con membresía previa no puede repetir el alta inicial.
 
 ### Adaptadores Auth de H1
 El esquema Auth pertenece a Supabase. `private.request_uid()` y
