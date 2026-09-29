@@ -89,9 +89,15 @@ def employee_args(org, membership=None):
                 p_code=uuid.uuid4().hex[:12], p_display_name='Synthetic employee', p_membership_id=membership, p_active=True)
 
 
-# No public self-enrolment. GoTrue, not a JavaScript Auth stand-in.
-code, _ = api('/auth/v1/signup', data={'email': 'denied@example.invalid', 'password': secrets.token_urlsafe(32)})
-check(code >= 400, 'public Auth signup disabled')
+# Public Auth signup creates identity only. Email confirmation and the onboarding
+# RPC are separate gates; Auth must never auto-grant a tenant or role.
+signup_email = f'signup-{uuid.uuid4().hex}@example.invalid'
+code, _ = api('/auth/v1/signup', data={'email': signup_email, 'password': secrets.token_urlsafe(32)})
+check(code in (200, 201), 'public Auth signup enabled')
+check(sql(f"select count(*) from auth.users where email='{signup_email}' and email_confirmed_at is null;") == '1',
+      'public signup remains unverified')
+check(sql(f"select count(*) from public.memberships m join auth.users u on u.id=m.auth_user_id where u.email='{signup_email}';") == '0',
+      'public signup grants no tenant or role')
 orgs = [uid(), uid()]
 teams = []
 for n, org in enumerate(orgs):
