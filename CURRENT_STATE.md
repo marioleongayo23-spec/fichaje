@@ -1,4 +1,43 @@
 # CURRENT_STATE — 2026-09-29
+## Avance ingress remoto — 2026-09-29 (PR #15)
+
+**HITO 7: BLOCKED — aún no READY FOR PILOT.** Tras autorización expresa del
+usuario para una credencial de gestión de la CLI, Supabase CLI 2.90.0 inició
+sesión y guardó el token local con modo `0600`; la versión 2.117.0
+informó éxito pero no persistió el perfil (su ejecución posterior no encontró
+token). La CLI confirmó que el único proyecto modificado es
+`fichaje-staging` (`pvfjffeszsedslmwdvgh`, `eu-west-1`). Las Edge Secrets
+custom ahora incluyen `FICHAJE_ENV`, `KIOSK_AUTH_URL`,
+`KIOSK_ANON_KEY`, `KIOSK_AUTH_PROVISION_KEY`, `KIOSK_PEPPER`,
+`KIOSK_NETWORK_SECRET` y `FICHAJE_INGRESS_SECRET`. Valores aleatorios
+independientes para pepper/red/ingress y clave de Auth permanecen solo en
+stores server-side y archivos temporales `0600`; no en GitHub. Falta
+`KIOSK_DATABASE_URL` porque todavía no existe el login restringido.
+
+El secreto ingress de Pages se rotó para emparejarlo con Supabase y se
+redeplegó la Pages Function original; despliegue
+`26de4dc6.fichaje-staging.pages.dev`. En el origen estable,
+`/gateway/export-link/health/live` devolvió **200** `UP`, y
+`/gateway/export-link/health/ready` devolvió **200** con Auth/REST/Storage
+`UP`, `no-store` y sin CORS abierto observado. La URL Supabase directa
+de `export-link` sin `x-fichaje-edge` devolvió **403** en ambas rutas:
+rechazo seguro remoto comprobado para ese componente. `kiosk` directo y
+por gateway aún devuelve **500** al no tener URL del login PostgreSQL; su
+403 y SEC-H4-01 permanecen pendientes. No es PASS de staging completo.
+
+La revisión automática rechazó una operación para crear
+`fichaje_gateway_login` y concederle `fichaje_gateway`: la consideró
+un cambio de control de acceso que requiere autorización específica, distinta
+de la aprobación de la CLI. No se ha reintentado por otra vía. La operación
+propuesta es solo para el proyecto de staging, con LOGIN, INHERIT, sin
+SUPERUSER/CREATEDB/CREATEROLE/REPLICATION/BYPASSRLS y una única membresía
+`fichaje_gateway`; password aleatorio para un DSN server-side con TLS
+`verify-full`. Sin esa aprobación, `verify_staging.py` remoto sin
+`--local`, SEC-H4-01 en kiosk, canary/health/invariantes/alertas completos,
+fallo inducido/rollback, carga, incidente y REC-01..03 siguen pendientes.
+No se creó otro proyecto, no hay empleados ni fichajes reales, producción
+ni merge. La sección de avance Pages/Edge debajo es histórica.
+
 ## Avance remoto Pages/Edge — 2026-09-29 (PR #15)
 
 **HITO 7: BLOCKED — aún no READY FOR PILOT.** El proyecto Cloudflare Pages existente
