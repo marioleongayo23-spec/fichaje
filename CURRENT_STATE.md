@@ -1,4 +1,43 @@
 # CURRENT_STATE — 2026-09-29
+## HITO 7 — canary sintético remoto parcial (2026-09-29)
+
+**BLOCKED — todavía no READY FOR PILOT.** Los cinco workflows (CI,
+Database, E2E, OPS-02, H7) del head `f5e3ee3390c167dd5e0be6b4274c24e34295ccc3`
+terminaron success. En el único proyecto de staging existente se crearon
+**dos organizaciones, tres usuarios Auth y dos empleados iniciales exclusivamente
+sintéticos** (tenant y control). El control conservó un evento `CLOCK_IN`;
+el tenant tenía cuatro eventos del primer intento web, con estado final `OUT`.
+Se reconstruyó un estado canary local `0600`; las credenciales sintéticas se
+rotaron con una función temporal restringida a esos tres identificadores,
+y se **eliminó** la función y su secreto de recuperación tras comprobar los
+tres cambios. El inventario Edge volvió a mostrar solo `kiosk` y `export-link`.
+No se registraron contraseñas, PIN, claves privadas ni secretos en GitHub.
+
+El comando real `scripts/ops/canary.py run --channels web`, contra
+`https://pvfjffeszsedslmwdvgh.supabase.co`, terminó con exit 0 e informe
+`{"status":"PASS","channels":{"web":{"status":"PASS","rotated":false}}}`.
+Verificó el ciclo completo, respuestas, versiones, marcas de tiempo,
+aislamiento entre tenants, auditoría y reintentos idempotentes. La URL
+`/gateway/kiosk/health/ready` devolvió 200 `UP` desde la shell.
+
+La provisión del kiosco por `/gateway/kiosk/provision` recibió 403; una
+petición diagnóstica autenticada desde el mismo cliente devolvió el texto
+Cloudflare `error code: 1010`, anterior al gateway. La portada sí dio 200
+desde curl y abrió en Cloud Browser. Por tanto, **kiosco y SEC-H4-01 no están
+verificados**. Se ejecutó `verify_staging.py` con ambas URLs remotas y
+`--canary-state`, **sin `--local`**: abortó antes del informe por
+`socket.gaierror: Temporary failure in name resolution` al abrir su socket
+TLS directo. No hay resultado de 0 FAIL/0 SKIPPED. No se alteró la protección
+de Cloudflare ni se acreditan gates remotos por inferencia.
+
+El conector Supabase `get_cost` para un proyecto adicional en la organización
+respondió `amount=0`, recurrencia mensual. **No se ha creado** el proyecto
+vacío temporal de restore: falta la confirmación expresa del usuario incluso
+con coste indicado de 0/mes. También faltan canary kiosco, SEC-H4-01,
+health/invariants/alertas completas, fallo y rollback, carga, incidente,
+backup cifrado y REC-01..03. Sin producción, clientes ni datos laborales reales;
+PR #15 abierto, sin merge. Las notas anteriores quedan como historial.
+
 ## Readiness remoto recuperado — 2026-09-29 (PR #15)
 
 **HITO 7: BLOCKED — todavía no READY FOR PILOT.** Tras el despliegue
