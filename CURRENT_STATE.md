@@ -1,4 +1,26 @@
 # CURRENT_STATE — 2026-09-29
+## Readiness remoto recuperado — 2026-09-29 (PR #15)
+
+**HITO 7: BLOCKED — todavía no READY FOR PILOT.** Tras el despliegue
+normal de `kiosk` con el DSN del pooler, se hizo una única petición
+desde una versión diagnóstica temporal de `export-link` a
+`https://fichaje-staging.pages.dev/gateway/kiosk/health/ready`.
+El log de Supabase Edge registró `H7_GATEWAY_READINESS 200 UP DB_UP`
+a las 07:10:27 UTC: readiness real del gateway y base de datos UP.
+La llamada directa sin firma a `export-link` siguió en 403. Se retiró
+el probe y se redeplegó `export-link` original; `kiosk` permanece
+con el código original. No se instaló `pg_net` ni se creó otro proyecto.
+No se registraron secretos ni cuerpos en ese diagnóstico.
+
+Los cinco workflows (CI, Database, E2E, OPS-02, H7) del head
+`8c12ccde` terminaron **success**. Esta CI sigue validando la forma
+local y no sustituye `verify_staging.py` remoto. Permanecen pendientes
+canary sintético, SEC-H4-01 real, invariantes/alertas, fallo/rollback,
+carga, incidente y backup/restore REC-01..03 remotos. El verificador
+requiere un estado canary `0600` para evitar SKIPPED; la provisión
+sintética y la ruta de ejecución externa siguen por configurar. Sin
+producción, datos reales ni merge.
+
 ## Avance del login de kiosk — 2026-09-29 (PR #15)
 
 **HITO 7: BLOCKED — no READY FOR PILOT.** Con la autorización expresa del
