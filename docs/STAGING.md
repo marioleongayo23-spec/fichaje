@@ -12,12 +12,14 @@ Se creó el login de PostgreSQL `fichaje_gateway_login` únicamente en
 ese proyecto, sin privilegios administrativos ni BYPASSRLS y con la sola
 membresía `fichaje_gateway`. `KIOSK_DATABASE_URL` está en Edge Secrets
 con pooler de sesión y TLS `verify-full`. El `kiosk` directo sin firma
-respondió 403 y su liveness por gateway 200. El último readiness observado
-respondió `DEGRADED` en base de datos; después, un diagnóstico en un
-arranque nuevo comprobó `SELECT 1` UP con el pooler. El diagnóstico se
-retiró y la función original volvió a desplegarse. Falta medir de nuevo
-readiness de la versión normal y ejecutar el resto de puertas de §4;
-**no se declara PASS a partir del probe de arranque**.
+respondió 403 y su liveness por gateway 200. Una petición remota a
+`/gateway/kiosk/health/ready` con la función `kiosk` normal desplegada
+respondió **200 `UP`**, con `database=UP` (log Edge de las 07:10:27 UTC).
+La lectura se hizo desde un probe temporal en `export-link` sin ciclo
+de llamadas; se retiró y se redeplegó `export-link` original. Los cinco
+workflows del head `8c12ccd` acabaron success. Quedan pendientes
+`verify_staging.py` sin `--local` y las otras puertas de §4; la CI
+local no da PASS al staging remoto.
 
 El acceso del Cloud Browser al `*.pages.dev` está bloqueado por el
 cliente y el egress de la shell hacia esa URL devuelve 403, de modo que
