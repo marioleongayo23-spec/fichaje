@@ -1,4 +1,14 @@
 # CURRENT_STATE — 2026-09-29
+## Cambio de alcance HITO 7 — validación final con empresa ficticia (2026-09-29)
+
+Por decisión expresa del usuario, **se abandona el piloto con empresas reales y los simulacros remotos separados como condición de cierre de H7**. El objetivo inmediato es terminar la aplicación y validarla de principio a fin en el entorno desplegado utilizando una empresa ficticia y datos exclusivamente sintéticos.
+
+La evidencia remota ya conseguida se conserva: verify_staging.py 33 PASS / 0 FAIL / 0 SKIPPED, web y kiosco sintéticos PASS, SEC-H4-01 remoto verificado e invariantes sin CRITICAL/WARNING. Las suites existentes de fallo/rollback, carga, incidente y REC permanecen en CI/local y no se eliminan.
+
+**Nueva puerta de salida H7:** empresa ficticia estable con OWNER/ADMIN/EMPLOYEE y kiosco sintéticos; recorrido real desde la UI de login, configuración, fichajes/pausas/salida, correcciones, registro e informes/exportación; aislamiento y seguridad ya verificados; workflows del head final en verde; revisión del usuario de la app final. No se requiere tercer Supabase, proveedor de guardia real ni empresa piloto real para cerrar esta fase.
+
+Los requisitos operativos que solo son necesarios antes de aceptar clientes reales —alertas reales, backup/restore en la infraestructura definitiva, respuesta a incidentes, revisión legal/seguridad final y autorización de producción— quedan **diferidos, no eliminados**, a una puerta específica previa al primer cliente real. Política de coste: 0 EUR mientras no sea estrictamente necesario; cualquier gasto requiere autorización expresa. PR #15 continúa abierto y no se hace merge sin orden posterior.
+
 ## HITO 7 — gates remotos verificados y cuota de restore (2026-09-29)
 
 **BLOCKED — todavía no READY FOR PILOT.** El head previo `040047c45c12b91c9072281fa981f1b2ab5c8880` tuvo los cinco workflows
