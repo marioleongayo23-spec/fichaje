@@ -5,7 +5,7 @@ expresamente el 2026-09-25; el resto de H1-H5 (RLS, RPC, motor, auditoría) no c
 
 ## Alcance entregado
 React + TypeScript + Vite, sin framework adicional ni router externo. Español, mobile-first.
-- **Sesión**: login email/contraseña de Supabase Auth, sin registro público; restauración de sesión
+- **Sesión**: login email/contraseña de Supabase Auth y registro self-service con confirmación de correo; crear una identidad no concede ningún tenant ni rol. Tras verificar el email, una cuenta sin membresías puede crear su primera empresa mediante la RPC protegida `create_organization`; restauración de sesión
   por Supabase Auth (clave `fichaje-auth`); cierre de sesión local que borra la sesión guardada
   aunque no haya red. Un 401 cierra sesión; un 403 revalida membresías y, si el tenant ya no es
   accesible, descarta su estado y lo explica.
@@ -58,7 +58,7 @@ Nada se confirma hasta el ACK de `record_time_event` o de `kiosk/record` (recibo
 ## Decisiones derivadas de los contratos existentes
 - **Personas sin email visible**: los contratos no exponen el correo de las membresías; se muestran
   por su ficha de empleado vinculada o como «Persona sin ficha de empleado».
-- **Invitaciones**: el token (32 bytes) se genera en el navegador y solo su SHA-256 llega a
+- **Onboarding**: `LoginPage` permite crear cuenta; Supabase Auth gestiona contraseña y confirmación. `OrganizationPicker` ofrece «Dar de alta mi empresa» únicamente cuando RLS devuelve cero membresías. El servidor genera el tenant y OWNER; el navegador solo envía nombre + `request_id`.\n- **Invitaciones**: el token (32 bytes) se genera en el navegador y solo su SHA-256 llega a
   `create_invitation`. El código `organización.token` se muestra una vez para entrega fuera de banda;
   nunca va en una URL. Aceptarlo requiere una cuenta Auth ya existente y verificada con ese correo.
 - **Entregas cifradas H4** (credencial de dispositivo y PIN): par RSA-OAEP-256 generado en memoria con
