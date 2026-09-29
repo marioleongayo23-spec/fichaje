@@ -27,7 +27,9 @@ language sql stable security definer set search_path='' as $$
     where auth_user_id = private.request_uid()
   )
 $$;
+grant create on schema private to fichaje_guard;
 alter function private.has_any_membership() owner to fichaje_guard;
+revoke create on schema private from fichaje_guard;
 revoke all on function private.has_any_membership() from public,anon,authenticated,service_role,fichaje_writer,fichaje_acceptor;
 grant execute on function private.has_any_membership() to fichaje_bootstrap;
 
@@ -75,6 +77,8 @@ begin
   perform private.bootstrap_organization(v_org,btrim(p_name),v_uid,p_request_id);
   return jsonb_build_object('id',v_org);
 end $$;
+grant create on schema public to fichaje_bootstrap;
 alter function public.create_organization(uuid,text) owner to fichaje_bootstrap;
+revoke create on schema public from fichaje_bootstrap;
 revoke all on function public.create_organization(uuid,text) from public,anon,service_role;
 grant execute on function public.create_organization(uuid,text) to authenticated;
