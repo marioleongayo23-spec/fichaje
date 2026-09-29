@@ -24,7 +24,9 @@ enabled = true
 site_url = "http://127.0.0.1:5173"
 additional_redirect_urls = []
 jwt_expiry = 3600
-enable_signup = false
+# Self-service company onboarding: Auth account creation is public, but no tenant
+# or role is granted by Auth. A verified identity must pass create_organization RPC.
+enable_signup = true
 [auth.email]
 # Email/password provider enabled; public signup remains disabled by auth.enable_signup.
 enable_signup = true
