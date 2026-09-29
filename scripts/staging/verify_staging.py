@@ -4,7 +4,7 @@ Checks the deployed environment from the outside, the way a browser and an
 attacker see it: TLS and HSTS, static security headers and CSP, caching, no
 source maps, no secret in the public bundle, the /gateway edge contract (routes,
 methods, origin policy, limits, no-store, no CORS), that the functions refuse a
-direct call that skips the edge, Auth settings (no public signup), private
+direct call that skips the edge, Auth settings (verified public signup), private
 Storage, anonymous API denial and the private schema not exposed. Optionally
 runs the synthetic canary (web + kiosk through the edge) from a canary state
 file. Prints only check names and PASS/FAIL/SKIPPED: never URLs, keys, tokens
@@ -140,15 +140,19 @@ def platform_checks(api: str, anon: str, kiosk_direct: str, export_direct: str) 
     try:
         settings = json.loads(body)
         external = settings.get('external', {})
-        record('auth_signup_disabled', status == 200 and settings.get('disable_signup') is True)
+        signup_enabled = status == 200 and settings.get('disable_signup') is False
+        confirmation_required = settings.get('mailer_autoconfirm') is False
+        record('auth_signup_enabled', signup_enabled)
         record('auth_email_only', external.get('email') is True and not any(v for k, v in external.items() if k != 'email'))
-        record('auth_confirmation_required', settings.get('mailer_autoconfirm') is False)
+        record('auth_confirmation_required', confirmation_required)
+        # Remote verification remains side-effect free: browser E2E exercises a real
+        # signup, while staging checks the platform contract without leaving probe users.
+        record('auth_signup_confirmation_flow', signup_enabled and confirmation_required)
     except ValueError:
-        record('auth_signup_disabled', False)
-    probe = f'verify-{secrets.token_hex(6)}@example.invalid'
-    status, _, _ = fetch('POST', api + '/auth/v1/signup', {'apikey': anon, 'Content-Type': 'application/json'},
-                         json.dumps({'email': probe, 'password': secrets.token_urlsafe(24)}).encode())
-    record('auth_public_signup_refused', 400 <= status < 500)
+        record('auth_signup_enabled', False)
+        record('auth_email_only', False)
+        record('auth_confirmation_required', False)
+        record('auth_signup_confirmation_flow', False)
     status, _, _ = fetch('GET', api + '/storage/v1/object/public/fichaje-evidence/probe.zip')
     record('storage_no_public_object', status >= 400)
     status, _, body = fetch('POST', api + '/storage/v1/object/list/fichaje-evidence', {'apikey': anon, 'Authorization': 'Bearer ' + anon,
