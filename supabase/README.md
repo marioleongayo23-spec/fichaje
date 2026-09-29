@@ -35,9 +35,7 @@ los contenedores al terminar. Un check pendiente/fallido bloquea H1.
   transaccionales, bloqueo de organización, autorización tras lock y antes de replay.
   Versionado optimista en empleados/membresías. Una transferencia previa puede repetirse
   por el antiguo OWNER aún activo como ADMIN; no puede iniciar otra.
-- Alta inicial: `private.bootstrap_organization(org_uuid,name,verified_auth_uuid,request_uuid)`
-  solo operador PostgreSQL; NO grant al cliente/service_role, NO signup trigger. Requiere
-  Auth verificado preexistente. Idempotente, auditada, mínimo OWNER validado al commit.
+- Alta inicial: `private.bootstrap_organization(org_uuid,name,verified_auth_uuid,request_uuid)` sigue siendo la primitiva privada sin grant al cliente/service_role. H7 añade `public.create_organization(request_uuid,name)` para onboarding self-service: solo `authenticated`, exige Auth verificado, genera `organization_id` en servidor, crea exactamente la primera organización de una identidad sin membresías y asigna OWNER mediante la primitiva privada. Reintentos con el mismo `request_uuid` reproducen el mismo tenant; el cliente nunca elige rol ni tenant.
 - Invitación: gestor genera token aleatorio de 32 bytes/64 caracteres hex; pasa solo SHA-256
   a `create_invitation`. `accept_invitation` recibe token, ligado a tenant/email verificado/rol,
   TTL 24 h, un uso, revalidación del emisor. No reactiva membresías revocadas. Sin envío email
