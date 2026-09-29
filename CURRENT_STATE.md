@@ -1,4 +1,42 @@
 # CURRENT_STATE — 2026-09-29
+## Avance del login de kiosk — 2026-09-29 (PR #15)
+
+**HITO 7: BLOCKED — no READY FOR PILOT.** Con la autorización expresa del
+usuario se creó **solo en** `fichaje-staging` (`pvfjffeszsedslmwdvgh`)
+el login `fichaje_gateway_login`: LOGIN/INHERIT, sin SUPERUSER,
+CREATEDB, CREATEROLE, REPLICATION ni BYPASSRLS, con única membresía
+`fichaje_gateway`. La contraseña aleatoria se guardó únicamente en
+archivo temporal `0600` y `KIOSK_DATABASE_URL` se configuró en Edge Secrets;
+no se imprimió ni se guardó en GitHub. El DSN usa el pooler compartido de
+sesión (`aws-1-eu-west-1.pooler.supabase.com:5432`), usuario
+`fichaje_gateway_login.pvfjffeszsedslmwdvgh` y TLS `verify-full`.
+La consulta de metadatos verificó los privilegios y la membresía; la base
+sigue con **0 organizaciones, 0 empleados y 0 fichajes**.
+
+En Supabase Edge real, `kiosk` directo sin `x-fichaje-edge` respondió
+**403 `AUTH_FAILED`** y `/gateway/kiosk/health/live` respondió
+**200 `UP`**. Una lectura de `/gateway/kiosk/health/ready` devolvió
+HTTP 200 pero cuerpo **`DEGRADED`** (`database=DEGRADED`) tras el
+primer cambio de DSN. Un diagnóstico temporal, limitado a estados y sin
+cadena de conexión, comprobó `SELECT 1` **UP** en un arranque nuevo con
+el DSN del pooler. Se retiró el diagnóstico y se redeplegó la función
+original (versión 9, ACTIVE, `verify_jwt=false`). No se ha repetido una
+lectura fiable del readiness tras el redespliegue; el resultado anterior
+no se convierte en PASS por inferencia.
+
+La revisión automática rechazó una propuesta de diagnóstico que hacía
+fetch desde `kiosk` al gateway que a su vez llama a `kiosk`, por posible
+recursión y perturbación del servicio. No se ejecutó ni se reintentó por
+otra vía. Falta `verify_staging.py` remoto sin `--local`, SEC-H4-01
+real, canary/health/invariantes/alertas, fallo inducido y rollback, carga,
+incidente, y backup cifrado más REC-01..03. El restore del runbook exige
+un segundo proyecto vacío y no se ha creado por la prohibición expresa
+de crear otro Supabase. Tampoco hay destino/journal independiente ni
+custodia offline age resueltos. No hay PASS remoto con estas pruebas
+obligatorias pendientes. Sin producción, datos laborales reales ni merge.
+Las secciones siguientes registran avances anteriores y quedan
+sustituidas por esta nota para el estado actual.
+
 ## Avance ingress remoto — 2026-09-29 (PR #15)
 
 **HITO 7: BLOCKED — aún no READY FOR PILOT.** Tras autorización expresa del
