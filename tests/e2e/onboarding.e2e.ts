@@ -3,14 +3,15 @@ import { randomBytes } from 'node:crypto';
 import { createAccount, sql } from './support/backend';
 import { login } from './support/ui';
 
-test('public registration creates only an unverified Auth identity, never a tenant or role', async ({ page }) => {
+for (const entry of ['Dar de alta una empresa', 'Crear cuenta para aceptar una invitación']) {
+test(`public registration via ${entry} creates only an unverified Auth identity, never a tenant or role`, async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
   const email = `signup-${randomBytes(6).toString('hex')}@example.invalid`;
   const password = `Aa9!${randomBytes(18).toString('base64url')}`;
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Dar de alta una empresa' }).click();
+  await page.getByRole('button', { name: entry }).click();
   await expect(page.getByRole('heading', { name: 'Crear cuenta' })).toBeVisible();
   await page.getByLabel('Correo electrónico').fill(email);
   await page.getByLabel('Contraseña', { exact: true }).fill(password);
@@ -27,6 +28,7 @@ test('public registration creates only an unverified Auth identity, never a tena
   expect(sql(`select count(*) from auth.users where email='${email}' and email_confirmed_at is null;`)).toBe('1');
   expect(sql(`select count(*) from public.memberships m join auth.users u on u.id=m.auth_user_id where u.email='${email}';`)).toBe('0');
 });
+}
 
 test('verified account creates its first company from the app and becomes OWNER', async ({ page }) => {
   const owner = await createAccount('self-service-owner');
