@@ -183,7 +183,8 @@ def start_functions(processes: Processes, env: dict, kiosk_port: int, export_por
                     tag: str = 'fn') -> None:
     processes.spawn(f'{tag}-kiosk', ['deno', 'run', '--allow-env', '--allow-net', '--config', str(source / 'kiosk' / 'deno.json'),
                                      str(source / 'kiosk' / 'index.ts')], {**env, 'KIOSK_PORT': str(kiosk_port)})
-    processes.spawn(f'{tag}-export-link', ['deno', 'run', '--allow-env', '--allow-net', '--config', str(source / 'export-link' / 'deno.json'),\n                                      str(source / 'export-link' / 'index.ts')],
+    processes.spawn(f'{tag}-export-link', ['deno', 'run', '--allow-env', '--allow-net', '--config', str(source / 'export-link' / 'deno.json'),
+                                      str(source / 'export-link' / 'index.ts')],
                     {**env, 'EXPORT_LINK_PORT': str(export_port)})
     for port in (kiosk_port, export_port):
         assert wait_http(f'http://127.0.0.1:{port}/health/live', 90, ok=(200, 403)), 'function did not start'
