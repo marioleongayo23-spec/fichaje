@@ -1,7 +1,7 @@
 // Server-only export generator + signer. Labour evidence is read only after
 // user authorization; PostgreSQL work runs under the existing minimal
 // fichaje_export_worker role. Storage service credentials never reach clients.
-import postgres from 'npm:postgres@3.4.8';
+import postgres from 'postgres';
 import { healthHandler, opsEvent, type ErrorClass, type Outcome } from '../_shared/ops.ts';
 import { INGRESS_HEADER, ingressPolicy, readBounded, routeOf, verifyIngress } from '../_shared/ingress.ts';
 import { packageSnapshot, type EvidenceSnapshot } from './package.ts';
