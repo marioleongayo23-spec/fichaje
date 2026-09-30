@@ -50,7 +50,9 @@ type Row = Record<(typeof HEADINGS)[number], string | number | null>;
 const encoder = new TextEncoder();
 
 async function sha256(data: Uint8Array): Promise<string> {
-  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
+  const copy = new Uint8Array(data.byteLength);
+  copy.set(data);
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', copy.buffer));
   return Array.from(hash, (x) => x.toString(16).padStart(2, '0')).join('');
 }
 
