@@ -37,6 +37,7 @@ jobs:
       - name: Operational contract unit tests (events, metrics, retries, alerts, leak scanner, gateway telemetry)
         run: |
           python3 -m unittest discover -s tests/ops -v
+          python3 -m py_compile tests/integration/h7_support.py
           deno check --config supabase/functions/kiosk/deno.json supabase/functions/kiosk/index.ts
           deno check --config supabase/functions/export-link/deno.json supabase/functions/export-link/index.ts
           deno test --allow-env=FICHAJE_RELEASE,FICHAJE_COMMIT --allow-read=ops/contract.json supabase/functions/_shared/ops_test.ts
