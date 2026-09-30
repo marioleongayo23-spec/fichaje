@@ -31,8 +31,11 @@ jobs:
           python -m pip install cryptography==50.0.1 reportlab==4.4.9 pypdf==6.19.0 'psycopg[binary]==3.2.10'
           deno check --config supabase/functions/kiosk/deno.json supabase/functions/kiosk/index.ts
           deno check supabase/functions/export-link/index.ts
-      - name: Network minimization tests
-        run: deno test supabase/functions/kiosk/network_test.ts
+          deno check supabase/functions/export-link/package_test.ts
+      - name: Network minimization and export renderer tests
+        run: |
+          deno test supabase/functions/kiosk/network_test.ts
+          deno test supabase/functions/export-link/package_test.ts
       - name: Start isolated local Supabase
         run: |
           for attempt in 1 2 3; do
