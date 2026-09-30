@@ -172,7 +172,7 @@ def functions_env(stack_info: dict, gateway_dsn: str, pepper: str, network: str,
     env = {**os.environ, 'KIOSK_AUTH_URL': stack_info['url'], 'KIOSK_ANON_KEY': stack_info['anon'],
            'KIOSK_AUTH_PROVISION_KEY': stack_info['service'], 'KIOSK_DATABASE_URL': gateway_dsn, 'KIOSK_PEPPER': pepper,
            'KIOSK_NETWORK_SECRET': network, 'SUPABASE_URL': stack_info['url'], 'SUPABASE_ANON_KEY': stack_info['anon'],
-           'SUPABASE_SERVICE_ROLE_KEY': stack_info['service'], 'SUPABASE_DB_URL': gateway_dsn,
+           'SUPABASE_SERVICE_ROLE_KEY': stack_info['service'], 'SUPABASE_DB_URL': OPERATOR,
            'FICHAJE_RELEASE': release, 'FICHAJE_ENV': 'ci'}
     if ingress:
         env['FICHAJE_INGRESS_SECRET'] = ingress
