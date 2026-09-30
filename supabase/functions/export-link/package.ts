@@ -1,6 +1,6 @@
-import { zipSync } from 'npm:fflate@0.8.2';
-import { PDFDocument, StandardFonts } from 'npm:pdf-lib@1.17.1';
-import { Temporal } from 'npm:@js-temporal/polyfill@0.5.1';
+import { zipSync } from 'fflate';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { Temporal } from '@js-temporal/polyfill';
 
 const HEADINGS = [
   'organization_id', 'employee_id', 'employee_code', 'employee_name',
