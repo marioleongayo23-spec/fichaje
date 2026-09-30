@@ -33,6 +33,13 @@ jobs:
         run: npm run build
       - name: Secret scan of build output
         run: npm run scan:secrets
+      - name: Upload Pages build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-dist-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
       - name: OPS-02 operational contract unit tests
         run: python3 -m unittest discover -s tests/ops
       - name: Shell syntax and whitespace
