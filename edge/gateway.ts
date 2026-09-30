@@ -1,5 +1,5 @@
 // H7 same-origin edge for the server-only functions (Cloudflare Pages Functions).
-// /gateway/kiosk/<route> and /gateway/export-link are the only entrances the
+// /gateway/kiosk/<route> and /gateway/export-link[/generate] are the only entrances the
 // browser uses (no CORS). The edge: closed route/method table, fetch-metadata
 // and origin policy, bounded JSON bodies, only Authorization/Content-Type go
 // upstream (never client IP/forwarding headers, cookies or origin), a fresh
@@ -37,6 +37,7 @@ export function resolveRoute(pathname: string): Route | null {
   if (rest === '/health/live' || rest === '/health/ready') return { component, route: rest.slice(1), method: 'GET', limit: 0, suffix: rest };
   if (component === 'kiosk' && KIOSK_ROUTES.includes(rest.slice(1))) return { component, route: rest.slice(1), method: 'POST', limit: LIMITS.kiosk, suffix: rest };
   if (component === 'export-link' && rest === '') return { component, route: 'sign', method: 'POST', limit: LIMITS['export-link'], suffix: '' };
+  if (component === 'export-link' && rest === '/generate') return { component, route: 'generate', method: 'POST', limit: LIMITS['export-link'], suffix: rest };
   return null;
 }
 
@@ -102,7 +103,7 @@ export async function handleGateway(request: Request, env: EdgeEnv, options: Edg
   let upstream: Response;
   try {
     upstream = await fetch(base + route.suffix, { method: route.method, headers, body: route.method === 'POST' ? body : undefined,
-      redirect: 'manual', signal: AbortSignal.timeout(options.timeoutMs ?? UPSTREAM_TIMEOUT_MS) });
+      redirect: 'manual', signal: AbortSignal.timeout(options.timeoutMs ?? (route.component === 'export-link' && route.route === 'generate' ? 45000 : UPSTREAM_TIMEOUT_MS)) });
   } catch (error) {
     const timeout = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
     return reply(timeout ? 504 : 502, timeout ? 'UPSTREAM_TIMEOUT' : 'UPSTREAM_UNAVAILABLE');
