@@ -80,7 +80,10 @@ export async function verifyIngress(secrets: Uint8Array<ArrayBuffer>[], header: 
 export function routeOf(component: IngressComponent, method: string, pathname: string): string {
   const health = /\/health\/(live|ready)\/?$/.exec(pathname);
   if (health) return `health/${health[1]}`;
-  if (component === 'export-link') return method.toUpperCase() === 'POST' ? 'sign' : 'invalid';
+  if (component === 'export-link') {
+    if (method.toUpperCase() !== 'POST') return 'invalid';
+    return /\/generate\/?$/.test(pathname) ? 'generate' : 'sign';
+  }
   return pathname.replace(/\/$/, '').split('/').pop() || 'invalid';
 }
 
