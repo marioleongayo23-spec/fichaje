@@ -1,4 +1,10 @@
-# CURRENT_STATE — 2026-09-29
+# CURRENT_STATE — 2026-09-30
+## HITO 7 — corrección del formulario de registro (2026-09-30)
+
+El HEAD `eb6d9e7151bc6280470d3eafc4f1e4421ce2d1e9` terminó con CI, Database, OPS-02 y H7 PASS; E2E run 36679773856 FAIL, 48/50 PASS. Fallaron solo las pruebas de registro desktop/mobile al esperar el regreso al login. Además del aislamiento Auth ya aplicado, LoginPage usaba `event.currentTarget` después de un await: React limpia esa referencia al terminar el dispatch. Se conserva ahora el formulario antes del await y se resetea mediante esa referencia. Las pruebas existentes comprueban también ausencia de pageerror y campos vacíos tras signup. La regresión del nuevo HEAD está pendiente; no se afirma PASS.
+
+Staging no se ha modificado en esta sesión: migración onboarding, configuración Auth, despliegue y validación de Fichaje Demo desde la app quedan pendientes hasta los cinco workflows PASS. Sin merge, producción, datos reales, infraestructura adicional ni coste.
+
 ## Cambio de alcance HITO 7 — validación final con empresa ficticia (2026-09-29)
 
 Por decisión expresa del usuario, **se abandona el piloto con empresas reales y los simulacros remotos separados como condición de cierre de H7**. El objetivo inmediato es terminar la aplicación y validarla de principio a fin en el entorno desplegado utilizando una empresa ficticia y datos exclusivamente sintéticos.
