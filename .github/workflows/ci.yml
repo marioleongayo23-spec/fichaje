@@ -30,13 +30,16 @@ jobs:
       - name: Tests
         run: npm test
       - name: Build
+        env:
+          FICHAJE_RELEASE: ${{ github.event.pull_request.head.sha || github.sha }}
+          FICHAJE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: npm run build
       - name: Secret scan of build output
         run: npm run scan:secrets
       - name: Upload Pages build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pages-dist-${{ github.sha }}
+          name: pages-dist-${{ github.event.pull_request.head.sha || github.sha }}
           path: dist/
           if-no-files-found: error
           retention-days: 1
