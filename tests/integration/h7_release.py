@@ -72,7 +72,7 @@ def main() -> None:
     suite.remember(pepper, network, ingress)
     runtime = {'KIOSK_AUTH_URL': S['url'], 'KIOSK_ANON_KEY': S['anon'], 'KIOSK_AUTH_PROVISION_KEY': S['service'], 'KIOSK_DATABASE_URL': gateway_dsn,
                'KIOSK_PEPPER': pepper, 'KIOSK_NETWORK_SECRET': network, 'SUPABASE_URL': S['url'], 'SUPABASE_ANON_KEY': S['anon'],
-               'SUPABASE_SERVICE_ROLE_KEY': S['service'], 'FICHAJE_ENV': 'ci'}
+               'SUPABASE_SERVICE_ROLE_KEY': S['service'], 'SUPABASE_DB_URL': OPERATOR, 'FICHAJE_ENV': 'ci'}
     deployer = deployers.EdgeLocalDeployer(suite.scratch / 'deploy', runtime, {'VITE_SUPABASE_URL': S['url'], 'VITE_SUPABASE_PUBLISHABLE_KEY': S['publishable']},
                                            {'app': 4288, 'kiosk': 8777, 'export_link': 8012}, ingress, WRANGLER)
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
