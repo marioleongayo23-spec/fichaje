@@ -1,7 +1,7 @@
 import { readFileSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { addMember, clock, createEmployee, eventCount, rpc, runExportWorker, scenario, sql, stateVersion } from './support/backend';
+import { addMember, clock, createEmployee, eventCount, rpc, scenario, sql, stateVersion } from './support/backend';
 import { browserPersistence, go, login } from './support/ui';
 
 // Real Auth, PostgREST RPCs and PostgreSQL. page.route is used only to lose or
@@ -200,17 +200,14 @@ test('correction request with review, independent approval and own export', asyn
   await expect(page.locator('article.session')).toContainText('Sustituido por una corrección');
   expect(sql(`select server_at='${entry.server_at}'::timestamptz from public.time_events where id='${entry.event_id}';`)).toBe('t');
 
-  // Own export: request, generate (offline worker), then fresh signed link.
+  // Own export: request generates the package through the server-side product path.
   await go(page, 'Exportar mi registro');
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   await page.getByLabel('Desde').fill(today.slice(0, 8) + '01');
   await page.getByLabel('Hasta').fill(today);
   await page.getByRole('button', { name: 'Solicitar exportación' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Exportación solicitada' })).toBeVisible();
-  // Not generated yet: the signer refuses and the UI says so without a link.
-  await page.getByRole('button', { name: 'Descargar' }).click();
-  await expect(page.getByRole('alert')).toContainText('todavía no está listo');
-  runExportWorker();
+  await expect(page.getByRole('status').filter({ hasText: 'Paquete preparado' })).toBeVisible();
+  await expect(page.getByText('Lista para descargar')).toBeVisible();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Descargar' }).click();
   const file = testInfo.outputPath('export.zip');
