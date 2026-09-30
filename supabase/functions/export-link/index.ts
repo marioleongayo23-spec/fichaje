@@ -34,7 +34,9 @@ const uuid = (v: unknown): v is string => typeof v === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 
 async function digest(data: Uint8Array): Promise<string> {
-  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
+  const copy = new Uint8Array(data.byteLength);
+  copy.set(data);
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', copy.buffer));
   return Array.from(hash, (x) => x.toString(16).padStart(2, '0')).join('');
 }
 
@@ -45,7 +47,12 @@ async function storage(method: 'POST' | 'GET' | 'DELETE', path: string, body?: U
     apikey: storageKey, Authorization: 'Bearer ' + storageKey,
     'Cache-Control': 'no-store',
   };
-  let payload: BodyInit | undefined = body;
+  let payload: BodyInit | undefined;
+  if (body) {
+    const copy = new Uint8Array(body.byteLength);
+    copy.set(body);
+    payload = copy.buffer;
+  }
   if (method === 'POST') {
     headers['Content-Type'] = 'application/zip';
     headers['x-upsert'] = 'true';
@@ -178,14 +185,13 @@ async function generate(request: Request, trace: Trace): Promise<Response> {
     objectPath = `${fields.organizationId}/${fields.jobId}.zip`;
     trace.errorClass = 'DB_UNAVAILABLE';
     const status = await database.begin(async (sql) => {
-      await sql`set local role fichaje_export_worker`;
-      const jobs = await sql`
-        select organization_id,id,status,snapshot
-        from private.export_jobs
-        where organization_id=${fields.organizationId}::uuid and id=${fields.jobId}::uuid
-          and status in ('PENDING','READY') and expires_at>clock_timestamp()
-        for update
-      `;
+      await sql.unsafe('set local role fichaje_export_worker');
+      const jobs = await sql.unsafe(
+        "select organization_id,id,status,snapshot from private.export_jobs " +
+        "where organization_id=$1::uuid and id=$2::uuid and status in ('PENDING','READY') " +
+        "and expires_at>clock_timestamp() for update",
+        [fields.organizationId, fields.jobId],
+      );
       if (jobs.length !== 1) throw new Error('EXPORT_UNAVAILABLE');
       if (jobs[0].status === 'READY') return 'READY';
 
@@ -198,12 +204,12 @@ async function generate(request: Request, trace: Trace): Promise<Response> {
       if (await digest(downloaded) !== checksum) throw new Error('EXPORT_VERIFY_FAILED');
 
       trace.errorClass = 'DB_UNAVAILABLE';
-      const updated = await sql`
-        update private.export_jobs set status='READY',checksum=${checksum},object_path=${objectPath}
-        where organization_id=${fields.organizationId}::uuid and id=${fields.jobId}::uuid
-          and status='PENDING' and expires_at>clock_timestamp()
-        returning id
-      `;
+      const updated = await sql.unsafe(
+        "update private.export_jobs set status='READY',checksum=$1,object_path=$2 " +
+        "where organization_id=$3::uuid and id=$4::uuid and status='PENDING' " +
+        "and expires_at>clock_timestamp() returning id",
+        [checksum, objectPath, fields.organizationId, fields.jobId],
+      );
       if (updated.length !== 1) throw new Error('EXPORT_EXPIRED');
       return 'READY';
     });
