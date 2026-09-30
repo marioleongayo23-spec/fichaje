@@ -8,7 +8,7 @@ import { ApiError, asApiError, errorMessage } from '../lib/errors';
 import { currentMonth, daysBetween, DEFAULT_ZONE, formatDateTime, monthRange, previousMonth, ZONES, type SpanishZone } from '../lib/time';
 import { Dialog, EmptyState, Field, LiveRegion } from '../ui/components';
 
-interface Job { id: string; label: string; cutoffAt: string; expiresAt: string; status: 'PENDING' | 'DOWNLOADED' | 'UNAVAILABLE'; delivered?: string }
+interface Job { id: string; label: string; cutoffAt: string; expiresAt: string; status: 'PENDING' | 'READY' | 'DOWNLOADED' | 'UNAVAILABLE'; delivered?: string }
 
 // Export jobs requested in this session are kept in memory only. A signed link
 // is requested on each click, used immediately and never stored or cached.
@@ -29,6 +29,12 @@ export function ExportPanel({ employees, ownEmployeeId }: { employees: Employee[
   // A retried request with identical filters reuses its request_id (same job).
   const attempt = useRef<{ key: string; requestId: string } | null>(null);
 
+  const generate = async (jobId: string, token: string) => {
+    const result = await postJson<{ status: string }>(config.exportLinkUrl + '/generate', token,
+      { organization_id: org, job_id: jobId }, 'export.link', true, 45000);
+    if (result.status !== 'READY') throw new ApiError('server', 'SERVER');
+  };
+
   const request = async (event: FormEvent) => {
     event.preventDefault();
     setStatus(null);
@@ -45,8 +51,25 @@ export function ExportPanel({ employees, ownEmployeeId }: { employees: Employee[
       });
       const who = manager ? (employees?.find((e) => e.id === subject)?.display_name ?? 'Toda la organización') : 'Mi registro';
       attempt.current = null;
-      setJobs((list) => [{ id: job.job_id, label: `${who}: ${range.start} a ${range.end}`, cutoffAt: job.cutoff_at, expiresAt: job.expires_at, status: 'PENDING' }, ...list]);
-      setStatus('Exportación solicitada. El servidor prepara el paquete; pulsa «Descargar» para comprobar si está listo.');
+      const next: Job = { id: job.job_id, label: `${who}: ${range.start} a ${range.end}`, cutoffAt: job.cutoff_at, expiresAt: job.expires_at, status: 'PENDING' };
+      setJobs((list) => [next, ...list]);
+      setStatus('Exportación solicitada. Preparando el paquete…');
+      const { data } = await client.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new ApiError('unauthenticated', 'UNAUTHENTICATED');
+      try {
+        await generate(job.job_id, token);
+        setJobs((list) => list.map((j) => j.id === job.job_id ? { ...j, status: 'READY' } : j));
+        setStatus('Paquete preparado. Ya puedes descargarlo.');
+      } catch (generationFailure) {
+        const generationError = asApiError(generationFailure);
+        if (generationError.kind === 'forbidden') {
+          setJobs((list) => list.map((j) => j.id === job.job_id ? { ...j, status: 'UNAVAILABLE' } : j));
+          setError('No se ha podido preparar este paquete.');
+        } else {
+          setStatus('La solicitud está guardada. Pulsa «Descargar» para reintentar la preparación de forma segura.');
+        }
+      }
     } catch (failure) {
       tenant.handleError(failure);
       setError(errorMessage(failure));
@@ -62,6 +85,10 @@ export function ExportPanel({ employees, ownEmployeeId }: { employees: Employee[
       const { data } = await client.auth.getSession();
       const token = data.session?.access_token;
       if (!token) throw new ApiError('unauthenticated', 'UNAUTHENTICATED');
+      if (job.status === 'PENDING') {
+        await generate(job.id, token);
+        setJobs((list) => list.map((j) => j.id === job.id ? { ...j, status: 'READY' } : j));
+      }
       const link = await postJson<{ url: string; expires_in: number }>(config.exportLinkUrl, token, { organization_id: org, job_id: job.id }, 'export.link', false);
       if (typeof link.url !== 'string' || !/^https?:\/\//.test(link.url)) throw new ApiError('server', 'SERVER');
       const anchor = document.createElement('a');
@@ -119,7 +146,8 @@ export function ExportPanel({ employees, ownEmployeeId }: { employees: Employee[
             <li key={job.id} className="card">
               <h3 className="card-title">{job.label}</h3>
               <p>Corte: {formatDateTime(job.cutoffAt, zone)} · disponible hasta {formatDateTime(job.expiresAt, zone)}.</p>
-              <p><strong>Estado:</strong> {job.status === 'PENDING' ? 'En preparación o lista para descargar'
+              <p><strong>Estado:</strong> {job.status === 'PENDING' ? 'Pendiente de preparación'
+                : job.status === 'READY' ? 'Lista para descargar'
                 : job.status === 'DOWNLOADED' ? 'Descarga iniciada' : 'No disponible en este momento'}
                 {job.delivered ? ` · Entrega registrada (${job.delivered})` : ''}</p>
               <div className="button-row">
