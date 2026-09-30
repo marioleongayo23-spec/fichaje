@@ -53,7 +53,7 @@ export function LoginPage() {
         <h1>{mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}</h1>
         {notice && <Notice tone="info" title={notice} />}
         {mode === 'register' && (
-          <p className="hint">Crea la cuenta de la persona responsable. Después de confirmar el correo podrás dar de alta tu empresa y quedarás como OWNER.</p>
+          <p className="hint">Crear una cuenta no te da acceso a ninguna empresa ni te asigna un rol. Confirma tu correo e inicia sesión; después podrás crear tu primera empresa como OWNER o aceptar la invitación de tu empresa.</p>
         )}
         <form noValidate onSubmit={onSubmit}>
           <Field label="Correo electrónico" error={fieldErrors.email}>
@@ -77,6 +77,8 @@ export function LoginPage() {
           <>
             <p className="hint">¿Tu empresa todavía no usa Fichaje APP?</p>
             <button type="button" className="btn btn-secondary btn-block" onClick={() => changeMode('register')}>Dar de alta una empresa</button>
+            <p className="hint">¿Tu empresa te ha enviado una invitación y todavía no tienes cuenta?</p>
+            <button type="button" className="btn btn-secondary btn-block" onClick={() => changeMode('register')}>Crear cuenta para aceptar una invitación</button>
           </>
         ) : (
           <button type="button" className="btn btn-secondary btn-block" onClick={() => changeMode('login')}>Ya tengo una cuenta</button>
