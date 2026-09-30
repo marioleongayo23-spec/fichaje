@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Session } from '@supabase/supabase-js';
+import { createClient, type Session } from '@supabase/supabase-js';
 import { ApiError } from '../lib/errors';
 import { clearStoredSession, HUMAN_STORAGE_KEY } from '../lib/storage';
 import { recordRequest } from '../lib/telemetry';
@@ -16,7 +16,14 @@ const AuthContext = createContext<AuthValue | null>(null);
 // Supabase Auth owns the session (persisted under its own storage key and
 // refreshed by the library). Only public credentials exist in the browser.
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { client } = useServices();
+  const { client, config } = useServices();
+  // Registration is intentionally isolated from the persisted human session.
+  // Some Auth environments may return a transient session on sign-up; that
+  // must never switch the app into an authenticated tenant flow before the
+  // user explicitly signs in after confirming the email.
+  const signupClient = useMemo(() => createClient(config.supabase.url, config.supabase.key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  }), [config.supabase.url, config.supabase.key]);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
@@ -51,20 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!navigator.onLine) return 'Sin conexión. No se puede crear la cuenta sin conexión.';
     const started = performance.now();
     try {
-      const { data, error } = await client.auth.signUp({ email: email.trim(), password });
+      const { error } = await signupClient.auth.signUp({ email: email.trim(), password });
       recordRequest('auth.sign_in', !error ? null : error.status === 429 ? new ApiError('validation', 'RATE_LIMITED', 429)
         : error.status ? new ApiError('validation', 'INVALID_INPUT', error.status) : new ApiError('network', 'NETWORK'),
       false, performance.now() - started);
       if (!error) {
-        // Registration never leaves an authenticated browser session behind.
-        // Even if Auth returns one because of environment/provider behaviour,
-        // first-company onboarding requires a fresh sign-in after the email has
-        // been confirmed. The server independently enforces verification.
-        if (data.session) {
-          await client.auth.signOut({ scope: 'local' }).catch(() => undefined);
-          clearStoredSession(HUMAN_STORAGE_KEY);
-          setSession(null);
-        }
         setNotice('Cuenta creada. Revisa tu correo y confirma la dirección antes de iniciar sesión.');
         return null;
       }
@@ -74,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       return 'No hay conexión con el servicio. Inténtalo de nuevo.';
     }
-  }, [client]);
+  }, [signupClient]);
 
   // Local sign-out: other devices keep their sessions. If the server cannot be
   // reached, the stored session is still removed from this browser.
