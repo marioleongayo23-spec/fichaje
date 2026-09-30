@@ -188,7 +188,7 @@ def main():
     known.extend([pepper, network, SERVICE])
     runtime = {'KIOSK_AUTH_URL': URL, 'KIOSK_ANON_KEY': ANON, 'KIOSK_AUTH_PROVISION_KEY': SERVICE, 'KIOSK_DATABASE_URL': gateway_dsn,
                'KIOSK_PEPPER': pepper, 'KIOSK_NETWORK_SECRET': network, 'SUPABASE_URL': URL, 'SUPABASE_ANON_KEY': ANON,
-               'SUPABASE_SERVICE_ROLE_KEY': SERVICE}
+               'SUPABASE_SERVICE_ROLE_KEY': SERVICE, 'SUPABASE_DB_URL': OPERATOR}
     deployer = release_gate.LocalDeployer(scratch / 'deploy', runtime, {'VITE_SUPABASE_URL': URL, 'VITE_SUPABASE_PUBLISHABLE_KEY': PUBLISHABLE},
                                           {'app': 4180, 'kiosk': 8775, 'export_link': 8011})
     commit = os.environ.get('GITHUB_SHA') or subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
@@ -225,7 +225,7 @@ def run_suite(deployer, targets, engine, sink, monitor_dsn, reviewer_dsn, repair
     check(json.loads(raw) == {'status': 'UP', 'checks': {'auth': 'UP', 'database': 'UP'}} and 'no-store' in headers.get('cache-control', ''),
           'OBS-03 kiosk readiness: Auth and PostgreSQL, statuses only, no-store')
     _, raw, _ = opslib.http_raw('GET', app + '/gateway/export-link/health/ready', {}, 5)
-    check(json.loads(raw) == {'status': 'UP', 'checks': {'auth': 'UP', 'rest': 'UP', 'storage': 'UP'}}, 'OBS-03 signer readiness: Auth, PostgREST and Storage')
+    check(json.loads(raw) == {'status': 'UP', 'checks': {'auth': 'UP', 'rest': 'UP', 'storage': 'UP', 'database': 'UP'}}, 'OBS-03 signer readiness: Auth, PostgREST, Storage and PostgreSQL')
     check(one('select count(*) from public.time_events') == events_before, 'OBS-03 health checks create no fichaje and need no data')
 
     # --- OBS-04: synthetic canary, both channels --------------------------------------------
