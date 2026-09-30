@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, openSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { sql, stack } from './backend';
+import { DB_URL, sql, stack } from './backend';
 
 export const RUN_DIR = join('test-results', '.e2e-run');
 export const STATE_FILE = join(RUN_DIR, 'state.json');
@@ -46,7 +46,7 @@ export async function startServices() {
   const signer = spawn('deno', ['run', '--allow-env', '--allow-net', 'supabase/functions/export-link/index.ts'], {
     // H7: explicit loopback port; without one the signer runs in platform mode and requires the edge signature.
     env: { ...process.env, SUPABASE_URL: url, SUPABASE_ANON_KEY: anon, SUPABASE_SERVICE_ROLE_KEY: service,
-      EXPORT_LINK_PORT: String(EXPORT_LINK_PORT) },
+      SUPABASE_DB_URL: DB_URL, EXPORT_LINK_PORT: String(EXPORT_LINK_PORT) },
     stdio: ['ignore', openSync(LOG_FILES[1], 'w'), openSync(LOG_FILES[1], 'a')], detached: true,
   });
   writeFileSync(STATE_FILE, JSON.stringify({ role, pids: [kiosk.pid, signer.pid] }));
