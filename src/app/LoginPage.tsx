@@ -21,7 +21,9 @@ export function LoginPage() {
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    // React clears currentTarget after dispatch; retain the form across Auth's await.
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const email = String(form.get('email') ?? '').trim();
     const password = String(form.get('password') ?? '');
     const repeat = String(form.get('repeat') ?? '');
@@ -39,7 +41,7 @@ export function LoginPage() {
     setPending(false);
     if (message) setError(message);
     else if (mode === 'register') {
-      (event.currentTarget as HTMLFormElement).reset();
+      formElement.reset();
       setMode('login');
     }
   };
