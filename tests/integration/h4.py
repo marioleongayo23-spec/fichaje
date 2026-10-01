@@ -46,7 +46,7 @@ def main():
         'private.kiosk_record(uuid,uuid,public.time_action,bigint,uuid,text)'::regprocedure
       ] loop
         definition := pg_get_functiondef(target);
-        guarded := regexp_replace(definition, '\\mBEGIN\\M',
+        guarded := regexp_replace(definition, '[[:<:]]BEGIN[[:>:]]',
           'BEGIN IF current_setting(''role'') <> ''fichaje_gateway'' THEN RAISE EXCEPTION ''GATEWAY_ROLE_REQUIRED''; END IF;', 'i');
         if guarded = definition then raise exception 'guard insertion failed'; end if;
         execute guarded;
