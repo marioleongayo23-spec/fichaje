@@ -57,7 +57,7 @@ Definidos en `docs/GO_LIVE.md`. Bloqueos reales actuales:
 
 Supabase Free no aporta backups automáticos gestionados; su documentación recomienda dumps/exportaciones off-site para Free. No se contratará Pro/PITR ni otro servicio sin autorización expresa.
 
-Los scripts de backup/restore DB quedaron portables entre Linux y macOS y aceptan el trust store del sistema para Supabase manteniendo TLS `verify-full`, permisos 0600/0700, cifrado age en stream y separación de la clave privada. El login de backup GO-LIVE quedó además reducido a lectura explícita de `public`, `private` y `auth.users`/`auth.identities`; se revoca `pg_read_all_data`.
+Los scripts de backup/restore DB quedaron portables entre Linux y macOS y aceptan el trust store del sistema para Supabase manteniendo TLS `verify-full`, permisos 0600/0700, cifrado age en stream y separación de la clave privada. El login de backup GO-LIVE quedó además reducido a lectura explícita de `public`, `private` y `auth.users`/`auth.identities`; se revoca `pg_read_all_data`. El bootstrap guarda la identidad privada `age` en macOS Keychain y elimina sus copias temporales antes de iniciar `pg_dump`; el backup opera únicamente con el destinatario público.
 
 Se añadieron `scripts/go_live_recovery_bootstrap.sh` y `scripts/go_live_restore_drill.sh`: contraseñas introducidas ocultas localmente, credenciales técnicas generadas fuera de GitHub, identidad age en macOS Keychain, journal producción→staging separado, logins de backup read-only, backup remoto sintético cifrado y restore exacto en Supabase local desechable. Falta su ejecución real; el código no sustituye esa evidencia.
 
