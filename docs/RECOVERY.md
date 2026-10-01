@@ -143,3 +143,17 @@ sigue bloqueado; este ensayo no habilita backup ni restore de producción.
 - **BLOCKED para activar**: destino privado definitivo, custodia offline de la identidad age separada del
   destino, host de operación con conexión verify-full a staging, instancia independiente del journal con CA
   utilizable desde la base gestionada (`STAGING.md` §3.4) y ensayo en staging con un segundo proyecto vacío.
+
+
+## H8 — corrección de restore vacío y activación productiva
+`restore_database.sh` ya no usa `count(*) > 0 from public.organizations` como prueba de
+éxito: una copia anterior al primer tenant es válida. El lado de descifrado + `pg_restore`
+sale explícitamente no-cero si falla, `PIPESTATUS` exige éxito tanto del productor como de
+`psql`, y la validación de FK permanece dentro de la misma transacción. Después del commit
+se comprueba conectividad, no existencia artificial de datos. `test_restore_contract.py`
+cubre tanto el restore con cero organizaciones como un `pg_restore` fallido que debe acabar
+en ROLLBACK y FAIL.
+
+Para GO-07 sigue siendo obligatorio restaurar **la misma copia cifrada real** en un objetivo
+aislado antes de afirmar que el backup operativo es recuperable. El arreglo anterior no
+convierte por sí solo el backup de producción en PASS.
