@@ -13,7 +13,8 @@ it('keeps CI unprivileged and repository backup scheduled/manual, with no databa
   const ciRun = JSON.stringify(ci.jobs.validate.steps);
   expect(ciRun).toContain('npm ci --prefix edge');
   expect(ciRun).toContain('wrangler pages functions build functions');
-  expect(ciRun).toContain('--outfile pages-upload/_worker.js');
+  expect(ciRun).toContain('--outdir pages-worker');
+  expect(ciRun).toContain('mv pages-upload/index.js pages-upload/_worker.js');
   const upload = ci.jobs.validate.steps.find((s: { uses?: string }) => s.uses === 'actions/upload-artifact@v4');
   expect(upload.with.path).toBe('pages-upload/');
   expect(upload.with.name).toContain('pages-dist-');

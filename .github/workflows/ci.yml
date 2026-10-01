@@ -40,12 +40,15 @@ jobs:
         run: npm run scan:secrets
       - name: Build self-contained Pages upload
         run: |
-          rm -rf pages-upload
+          rm -rf pages-upload pages-worker
           cp -R dist pages-upload
           edge/node_modules/.bin/wrangler pages functions build functions \
-            --outfile pages-upload/_worker.js \
+            --outdir pages-worker \
             --project-directory . \
             --compatibility-date 2026-09-01
+          test -s pages-worker/index.js
+          cp -R pages-worker/. pages-upload/
+          mv pages-upload/index.js pages-upload/_worker.js
           test -s pages-upload/_worker.js
       - name: Upload Pages build artifact
         uses: actions/upload-artifact@v4
