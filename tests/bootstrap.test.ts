@@ -36,6 +36,15 @@ describe('bootstrap without backend', () => {
 });
 
 describe('go-live deployment binding', () => {
+  it('fails closed when a managed Fichaje backend is configured without a deployment tier', () => {
+    for (const url of [STAGING_SUPABASE_ORIGIN, PRODUCTION_SUPABASE_ORIGIN]) {
+      expect(() => readAppConfig({
+        VITE_SUPABASE_URL: url,
+        VITE_SUPABASE_PUBLISHABLE_KEY: key,
+      })).toThrow(/Deployment tier is required/);
+    }
+  });
+
   it('pins staging builds to the staging Supabase project', () => {
     expect(readAppConfig({
       VITE_DEPLOYMENT_TIER: 'staging',
