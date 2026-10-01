@@ -167,3 +167,18 @@ Bloqueos que siguen siendo reales:
 La integración de Supabase usada durante GO-LIVE rechazó de forma segura el intento de aprovisionar una
 credencial SQL entre proyectos; no se forzó el control ni se dejó configuración parcial. Por tanto GL-06/07
 siguen sin PASS hasta ejecutar esos pasos por un canal de secretos apropiado.
+
+
+### Ejecución del drill GO-LIVE
+Desde un clon limpio de la rama GO-LIVE en macOS:
+
+```bash
+bash scripts/go_live_recovery_bootstrap.sh
+bash scripts/go_live_restore_drill.sh
+```
+
+El primer comando solicita en modo oculto las contraseñas PostgreSQL de staging y del candidato productivo; **no deben pegarse en ChatGPT, GitHub, un issue ni un fichero del repositorio**. Genera los logins técnicos mínimos, guarda la identidad privada `age` en macOS Keychain, cablea el journal independiente y produce el primer backup cifrado del staging remoto sintético en `~/.fichaje-go-live/db-backups`.
+
+El segundo comando toma exactamente ese backup, obtiene temporalmente la identidad desde Keychain, arranca un Supabase local desechable con TLS, restaura el ciphertext por el mismo `restore_database.sh` y valida datos, Auth, RLS y trigger de inmutabilidad. El entorno local se destruye al terminar; el resultado del restore queda junto al backup cifrado para que `backup_monitor.py` pueda exigir restore real y no solo checksum.
+
+El backup remoto de este drill usa staging porque contiene únicamente datos sintéticos. El candidato productivo permanece vacío. Antes del primer dato real, el login `fichaje_backup` de producción debe seguir verificándose `default_transaction_read_only=on` y el destino definitivo del backup de producción debe estar aprobado contractualmente.
