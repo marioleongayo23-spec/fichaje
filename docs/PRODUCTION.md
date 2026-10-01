@@ -13,8 +13,9 @@ GO-01..GO-10 estén PASS y exista aprobación expresa posterior del usuario.
   0 usuarios Auth y 0 objetos Storage; existe únicamente el bucket privado técnico.
 - Staging permanece separado: `pvfjffeszsedslmwdvgh`. Nunca reutilizar sus secretos,
   identidades sintéticas ni URLs como configuración de producción.
-- Las Edge Functions existentes en el candidato son anteriores al release final de staging;
-  deben sustituirse mediante el release aprobado por el gate antes de habilitar tráfico.
+- El código de `kiosk` se sincronizó durante H8 con `main` (ACTIVE v6) y `export-link`
+  ya coincidía archivo a archivo. Esto elimina deriva de fuente, pero **no** acredita GO-04:
+  faltan el borde Cloudflare productivo, una identidad de release común y el verificador remoto.
 
 ## Puerta GO-LIVE
 | Criterio | Evidencia obligatoria |
@@ -42,8 +43,9 @@ autorización servidor y tests de aislamiento. Cualquier hallazgo que contradiga
 - prohibición de reutilizar los hosts de staging si están cargados.
 
 El provisionador del canary exige además `FICHAJE_PRODUCTION_DB_HOST` y comprueba que el
-host real de la DSN coincide exactamente, con `sslmode=verify-full`. Una DSN basada solo
-en `service=` se rechaza para esta operación porque no permite comprobar el destino.
+destino efectivo de la DSN coincide exactamente, con `sslmode=verify-full`. Se rechazan
+`service=`, `hostaddr`, overrides de host/puerto/DB en la query URI, campos objetivo
+duplicados y puertos remotos distintos de 5432. La API/app remota solo acepta HTTPS estándar.
 
 ## Recuperación
 Una base vacía también es un backup válido. Desde H8, `restore_database.sh` determina el
