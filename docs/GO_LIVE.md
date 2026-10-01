@@ -29,11 +29,20 @@ El producto funcional ya está cerrado en H7. GO-LIVE solo valida que la operaci
 | GL-07 | Journal de recuperación independiente operativo y reconciliable | BLOCKED |
 | GL-08 | Runbook de incidente con responsable, corte de escrituras, restore/reapertura y contacto de brechas | PARTIAL |
 | GL-09 | Revisión normativa vigente, contrato de encargo/subencargados y documentación de información a plantilla disponibles para el primer cliente | PARTIAL |
-| GL-10 | Branch protection/ruleset en `main`: PR + checks obligatorios, sin push directo | BLOCKED |
+| GL-10 | Control de procedencia de release: branch protection si el plan lo permite o gate equivalente que rechace cualquier SHA que no sea HEAD de `main`, merge de PR y 5/5 checks verdes | IMPLEMENTED; pendiente CI |
 | GL-11 | Deploy final de Cloudflare separado de staging, con CSP/HSTS/gateway firmado y release verificable | BLOCKED |
 | GL-12 | Autorización expresa del usuario para activar producción | BLOCKED |
 
 No se declara PASS si cualquiera de GL-01..12 sigue PENDING/BLOCKED/PARTIAL.
+
+### Compensación GitHub Free
+El repositorio es privado y GitHub Free no ofrece protected branches/rulesets para repositorios privados. No se hará público el código ni se contratará GitHub Pro solo por este gate. Como control compensatorio, `.github/workflows/production-candidate.yml` solo empaqueta un candidato productivo cuando:
+- el SHA solicitado es exactamente el HEAD actual de `main`;
+- ese SHA es el merge commit de exactamente un PR mergeado contra `main`;
+- CI, Database, E2E H6, OPS-02 y H7 constan `completed/success` para ese mismo SHA;
+- el build usa el Supabase productivo fijado y pasa el escáner de secretos.
+
+Un push directo a `main` puede existir técnicamente en GitHub Free, pero no puede convertirse en artefacto productivo mediante el flujo autorizado.
 
 ## Seguridad
 
