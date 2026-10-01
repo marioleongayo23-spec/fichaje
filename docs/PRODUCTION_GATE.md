@@ -59,3 +59,10 @@ documentar coste/beneficio y solicitar autorización expresa.
 - PRE-02: DPA y fuentes oficiales de subencargados de Supabase/Cloudflare verificadas; faltan entidad
   contratante de Fichaje, proveedores aún no elegidos, completar marcadores y revisión jurídica independiente.
 - PRE-03: se fija como requisito región específica de la UE para Supabase producción; entorno aún no creado.
+
+
+## Inventario de infraestructura — 2026-10-01
+- Supabase: `fichaje-staging` ACTIVE_HEALTHY y `Fichaje APP` INACTIVE, ambos en `eu-west-1`.
+  `Fichaje APP` es candidato a producción aislada; no se ha restaurado ni inspeccionado su contenido.
+- Cloudflare: solo existe `fichaje-staging`; no existe aún proyecto Pages productivo.
+- No se ha realizado ninguna mutación de infraestructura ni contratación durante este inventario.
