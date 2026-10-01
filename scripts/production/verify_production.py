@@ -22,7 +22,11 @@ def _origin_host(value: str) -> str | None:
         parsed = urlparse(value)
     except ValueError:
         return None
-    if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password \
+    try:
+        port = parsed.port
+    except ValueError:
+        return None
+    if parsed.scheme != 'https' or port not in (None, 443) or not parsed.hostname or parsed.username or parsed.password \
             or parsed.query or parsed.fragment or parsed.path not in ('', '/'):
         return None
     return parsed.hostname
