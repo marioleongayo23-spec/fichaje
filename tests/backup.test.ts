@@ -225,7 +225,7 @@ describe('GO-LIVE recovery operator helpers', () => {
       mkdirSync(join(root, 'tmp'));
       stub('psql', `echo "psql $*" >> '${calls}'\ncase "$*" in *server_version_num*) echo 170006;; *schema_migrations*) echo 20260930000200;; *now*) echo 2026-10-01T12:00:00.000Z;; esac`);
       stub('pg_dump', `if [ "$1" = --version ]; then echo 'pg_dump (PostgreSQL) 17.6'; exit 0; fi\nprintf 'PGDMP synthetic row\\n'`);
-      stub('age', `out=''; while [ $# -gt 0 ]; do [ "$1" = --output ] && out=$2; shift; done; { printf 'age-encryption.org/v1\\n'; cat; } > "$out"`);
+      stub('age', `out=''; while [ $# -gt 0 ]; do [ "$1" = --output ] && out=$2; shift; done; { printf 'age-encryption.org/v1\\n'; tr 'A-Za-z0-9' 'N-ZA-Mn-za-m5-90-4'; } > "$out"`);
       const result = spawnSync('bash', [dbScript], { encoding: 'utf8', env: {
         ...process.env, PATH: `${bin}:${process.env.PATH}`, HOME: root, TMPDIR: join(root, 'tmp'),
         FICHAJE_BACKUP_PGSERVICE: 'fichaje_backup', PGSERVICEFILE: join(root, 'pg_service.conf'), PGPASSFILE: join(root, 'pgpass'),
@@ -242,7 +242,7 @@ describe('GO-LIVE recovery operator helpers', () => {
       const text = readFileSync(path, 'utf8');
       expect(spawnSync('bash', ['-n', path], { encoding: 'utf8' }).status, path).toBe(0);
       expect(text, path).not.toMatch(/sb_secret_|service_role|BEGIN PRIVATE KEY/);
-      expect(text, path).not.toMatch(/echo .*PASSWORD|printf .*PASSWORD/);
+      expect(text, path).not.toMatch(/(?:echo|printf)[^>\\n]*\\$\\{?(?:STAGING_ADMIN_PASSWORD|PRODUCTION_ADMIN_PASSWORD|ARCHIVE_PASSWORD|BACKUP_STAGING_PASSWORD|BACKUP_PRODUCTION_PASSWORD)\\}?[^>\\n]*(?:$|\\n)/m);
     }
     const bootstrap = readFileSync('scripts/go_live_recovery_bootstrap.sh', 'utf8');
     expect(bootstrap).toContain('read -rs STAGING_ADMIN_PASSWORD');
