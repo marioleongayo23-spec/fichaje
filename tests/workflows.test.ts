@@ -156,11 +156,12 @@ it('keeps the real GO-LIVE GitHub alert probe explicit, synthetic and minimally 
   expect(flow.permissions).toEqual({ contents: 'read', issues: 'write' });
   expect(text).not.toMatch(/\bsecrets\./);
   expect(flow.jobs['real-github-alert-route'].if).toContain('go-live-alert-test');
-  const run = JSON.stringify(flow.jobs['real-github-alert-route'].steps);
+  const job = flow.jobs['real-github-alert-route'];
+  const run = JSON.stringify(job.steps);
   expect(run).toContain("environment='production'");
-  expect(run).toContain('OPS_ALERT_ROUTE_PAGER');
-  expect(run).toContain('OPS_ALERT_ROUTE_TICKET');
-  expect(run).toContain('github-issues:');
+  expect(job.env.OPS_ALERT_ROUTE_PAGER).toContain('github-issues:');
+  expect(job.env.OPS_ALERT_ROUTE_TICKET).toContain('github-issues:');
+  expect(job.env.OPS_GITHUB_TOKEN).toContain('github.token');
   expect(run).toContain('APP_DOWN');
   expect(run).toContain('INVARIANT_WARNING');
   expect(run).toContain('state=closed&labels=fichaje-alert');
