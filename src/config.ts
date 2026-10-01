@@ -3,7 +3,13 @@ import { readSupabaseConfig, type PublicEnvironment, type SupabaseConfig } from 
 // Placeholder identity: sober and replaceable, no definitive brand.
 export const BRAND = 'Fichaje';
 
+export const STAGING_SUPABASE_ORIGIN = 'https://pvfjffeszsedslmwdvgh.supabase.co';
+export const PRODUCTION_SUPABASE_ORIGIN = 'https://bypdviatamosygndeqhh.supabase.co';
+
+export type DeploymentTier = 'staging' | 'production';
+
 export interface AppEnvironment extends PublicEnvironment {
+  VITE_DEPLOYMENT_TIER?: DeploymentTier;
   VITE_KIOSK_GATEWAY_URL?: string;
   VITE_EXPORT_LINK_URL?: string;
 }
@@ -26,9 +32,27 @@ export function readEndpoint(value: string | undefined, fallback: string): strin
   return parsed.origin + parsed.pathname.replace(/\/$/, '');
 }
 
+function assertDeploymentBinding(env: AppEnvironment, supabase: SupabaseConfig): void {
+  if (!env.VITE_DEPLOYMENT_TIER) return;
+  const expected = env.VITE_DEPLOYMENT_TIER === 'production'
+    ? PRODUCTION_SUPABASE_ORIGIN
+    : STAGING_SUPABASE_ORIGIN;
+  if (supabase.url !== expected) {
+    throw new Error(`Deployment tier ${env.VITE_DEPLOYMENT_TIER} is bound to a different Supabase project`);
+  }
+  if (env.VITE_DEPLOYMENT_TIER === 'production') {
+    for (const endpoint of [env.VITE_KIOSK_GATEWAY_URL, env.VITE_EXPORT_LINK_URL]) {
+      if (endpoint?.trim() && !endpoint.trim().startsWith('/')) {
+        throw new Error('Production server functions must use same-origin relative endpoints');
+      }
+    }
+  }
+}
+
 export function readAppConfig(env: AppEnvironment): AppConfig | null {
   const supabase = readSupabaseConfig(env);
   if (!supabase) return null;
+  assertDeploymentBinding(env, supabase);
   return {
     supabase,
     kioskGatewayUrl: readEndpoint(env.VITE_KIOSK_GATEWAY_URL, '/gateway/kiosk'),
