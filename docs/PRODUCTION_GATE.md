@@ -20,7 +20,7 @@ una orden expresa del usuario para activar producción / primer cliente real.
 | PRE-02 | Paquete legal comercial | PARTIAL | Encargo art. 28, subencargados, transferencias/localización, información empleados, derechos, incidentes, baja y retención completados sin marcadores |
 | PRE-03 | Entorno de producción aislado | BLOCKED | Supabase + Cloudflare separados de staging; región UE; secretos distintos; cero datos sintéticos heredados |
 | PRE-04 | Dominio y protección de borde | BLOCKED | Dominio definitivo, TLS/HSTS, CSP, WAF/rate limits verificados; sin bypass de edge |
-| PRE-05 | Correo transaccional | BLOCKED | SMTP/proveedor aprobado, confirmación e invitaciones probadas sin exponer tokens; SPF/DKIM/DMARC cuando aplique |
+| PRE-05 | Correo transaccional | PARTIAL | SMTP/proveedor aprobado, confirmación e invitaciones probadas sin exponer tokens; SPF/DKIM/DMARC cuando aplique |
 | PRE-06 | Alertas reales y operación | BLOCKED | CRITICAL y WARNING recibidos por rutas reales, RESOLVED probado, canary e invariantes programados |
 | PRE-07 | Backup/restore real | BLOCKED | Backup cifrado activo, destino privado, clave age separada, restore aislado real REC-01..03, RPO/RTO medidos |
 | PRE-08 | Seguridad independiente | BLOCKED | Revisión independiente de RLS/Auth/edge/Storage/dependencias y resolución de hallazgos críticos/altos |
@@ -66,3 +66,16 @@ documentar coste/beneficio y solicitar autorización expresa.
   `Fichaje APP` es candidato a producción aislada; no se ha restaurado ni inspeccionado su contenido.
 - Cloudflare: solo existe `fichaje-staging`; no existe aún proyecto Pages productivo.
 - No se ha realizado ninguna mutación de infraestructura ni contratación durante este inventario.
+
+
+## Candidato SMTP 0 € — 2026-10-01
+Supabase documenta que su SMTP por defecto no es apto para producción y exige configurar un servidor SMTP propio.
+Para mantener coste 0 € se selecciona **Brevo Free** como candidato inicial, sujeto a alta/aceptación contractual:
+- SMTP transaccional compatible con Supabase;
+- 300 emails/día en plan Free según documentación vigente;
+- documentación pública de RGPD/DPA y centros de datos principales en la UE.
+
+No se crea cuenta todavía. PRE-05 sigue PARTIAL hasta disponer de dominio de envío, DPA/entidad contratante,
+SPF/DKIM/DMARC y prueba real de confirmación/recuperación. Alternativas evaluadas: Resend Free (3.000/mes,
+100/día) dispone de DPA/SCC, pero declara almacenamiento de datos de cliente en EE. UU., lo que añade análisis
+de transferencia innecesario para la primera opción.
