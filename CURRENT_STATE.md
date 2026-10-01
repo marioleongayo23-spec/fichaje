@@ -12,7 +12,7 @@ Contrato de puerta: `docs/PRODUCTION_GATE.md`
 ### Estado inicial PRE-01..10
 
 - PRE-01 normativa/convenio: PARTIAL — base estatal y AEPD revisadas el 2026-10-01; el convenio se valida por cliente concreto.
-- PRE-02 paquete legal/comercial: BLOCKED — plantillas existen, requieren completar marcadores y revisión jurídica independiente antes de datos reales.
+- PRE-02 paquete legal/comercial: PARTIAL — DPA/subencargados principales verificados; faltan identidad contractual de Fichaje, proveedores pendientes, marcadores y revisión jurídica independiente antes de datos reales.
 - PRE-03 producción aislada: BLOCKED — no se ha creado producción.
 - PRE-04 dominio/borde: BLOCKED — no hay dominio definitivo/WAF de producción.
 - PRE-05 correo transaccional: BLOCKED — no hay proveedor SMTP productivo aprobado.
