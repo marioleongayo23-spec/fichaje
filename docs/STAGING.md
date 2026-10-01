@@ -100,8 +100,7 @@ GitHub Actions **no** recibe ningún secreto persistente: la CI sigue trabajando
    `supabase migration list` = las 15 migraciones del repositorio y ningún drift.
 3. **Logins técnicos** (psql como propietario, con `\password` para no dejar contraseñas en el historial):
    login de gateway con `grant fichaje_gateway`; logins OPS con `fichaje_ops_monitor`, `fichaje_ops_reviewer`,
-   `fichaje_ops_repairer`; login de backup `LOGIN BYPASSRLS CONNECTION LIMIT 2` con `pg_read_all_data` y
-   `default_transaction_read_only=on`. Ninguno con otros privilegios.
+   `fichaje_ops_repairer`; login de backup `LOGIN BYPASSRLS CONNECTION LIMIT 2` con `USAGE` solo en `public`, `private` y `auth`, `SELECT` solo en tablas/secuencias de aplicación y `auth.users`/`auth.identities`, y `default_transaction_read_only=on`. No recibe `pg_read_all_data` ni otros privilegios.
 4. **Journal independiente**: instancia PostgreSQL separada (proveedor/cuenta `[[…]]`) con el esquema de
    `scripts/recovery_archive.py`, roles `fichaje_archive_connection` (LOGIN, solo `journal.prepare/verify`) y
    `fichaje_archive_writer`, TLS obligatorio para ese rol en `pg_hba`. En la base de staging: servidor

@@ -210,3 +210,60 @@ out=''; while [ $# -gt 0 ]; do [ "$1" = --output ] && out=$2; shift; done
     expect(spawnSync('bash', [restore, dest, 'not-a-backup'], env()).status).toBe(2);
   });
 });
+
+
+describe('GO-LIVE recovery operator helpers', () => {
+  it('accepts the system CA store for managed Supabase backup', () => {
+    const root = mkdtempSync(join(tmpdir(), 'fichaje-system-ca-'));
+    try {
+      const bin = join(root, 'bin'); mkdirSync(bin);
+      const dest = join(root, 'dest'); mkdirSync(dest, { mode: 0o700 });
+      const calls = join(root, 'calls.log');
+      const stub = (name: string, body: string) => writeFileSync(join(bin, name), `#!/bin/bash\n${body}\n`, { mode: 0o700 });
+      writeFileSync(join(root, 'pg_service.conf'), '[fichaje_backup]\nhost=db.synthetic.invalid\ndbname=postgres\nuser=fichaje_backup\n', { mode: 0o600 });
+      writeFileSync(join(root, 'pgpass'), 'db.synthetic.invalid:5432:postgres:fichaje_backup:synthetic\n', { mode: 0o600 });
+      mkdirSync(join(root, 'tmp'));
+      stub('psql', `echo "psql $*" >> '${calls}'\ncase "$*" in *server_version_num*) echo 170006;; *schema_migrations*) echo 20260930000200;; *now*) echo 2026-10-01T12:00:00.000Z;; esac`);
+      stub('pg_dump', `if [ "$1" = --version ]; then echo 'pg_dump (PostgreSQL) 17.6'; exit 0; fi\nprintf 'PGDMP synthetic row\\n'`);
+      stub('age', `out=''; while [ $# -gt 0 ]; do [ "$1" = --output ] && out=$2; shift; done; { printf 'age-encryption.org/v1\\n'; tr 'A-Za-z0-9' 'N-ZA-Mn-za-m5-90-4'; } > "$out"`);
+      const result = spawnSync('bash', [dbScript], { encoding: 'utf8', env: {
+        ...process.env, PATH: `${bin}:${process.env.PATH}`, HOME: root, TMPDIR: join(root, 'tmp'),
+        FICHAJE_BACKUP_PGSERVICE: 'fichaje_backup', PGSERVICEFILE: join(root, 'pg_service.conf'), PGPASSFILE: join(root, 'pgpass'),
+        FICHAJE_BACKUP_CA: 'system', FICHAJE_BACKUP_AGE_RECIPIENT: 'age1' + 'q'.repeat(58),
+        FICHAJE_BACKUP_DEST: dest, FICHAJE_BACKUP_MIN_FREE_MB: '1',
+      }});
+      expect(result.status, result.stderr).toBe(0);
+      expect(readFileSync(calls, 'utf8')).toContain('sslrootcert=system');
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('keeps bootstrap and restore drill free of hardcoded credentials and chat-visible prompts', () => {
+    for (const path of ['scripts/go_live_recovery_bootstrap.sh', 'scripts/go_live_restore_drill.sh']) {
+      const text = readFileSync(path, 'utf8');
+      expect(spawnSync('bash', ['-n', path], { encoding: 'utf8' }).status, path).toBe(0);
+      expect(text, path).not.toMatch(/sb_secret_|service_role|BEGIN PRIVATE KEY/);
+      expect(text, path).not.toMatch(/(?:echo|printf)[^>\\n]*\\$\\{?(?:STAGING_ADMIN_PASSWORD|PRODUCTION_ADMIN_PASSWORD|ARCHIVE_PASSWORD|BACKUP_STAGING_PASSWORD|BACKUP_PRODUCTION_PASSWORD)\\}?[^>\\n]*(?:$|\\n)/m);
+    }
+    const bootstrap = readFileSync('scripts/go_live_recovery_bootstrap.sh', 'utf8');
+    expect(bootstrap).toContain('read -rs STAGING_ADMIN_PASSWORD');
+    expect(bootstrap).toContain('read -rs PRODUCTION_ADMIN_PASSWORD');
+    expect(bootstrap).toContain('security add-generic-password');
+    expect(bootstrap).toContain('unset AGE_SECRET');
+    expect(bootstrap).toContain('rm -f "$WORK/age-identity.txt" "$WORK/age-full.txt"');
+    expect(bootstrap.indexOf('rm -f "$WORK/age-identity.txt" "$WORK/age-full.txt"')).toBeLessThan(bootstrap.indexOf('FICHAJE_BACKUP_PGSERVICE=fichaje_backup_staging'));
+    expect(bootstrap).toContain("select private.verify_journal_entry");
+    expect(bootstrap).toContain('fichaje_backup_production');
+    expect(bootstrap).toContain('FICHAJE_BACKUP_CA=system');
+    expect(bootstrap).not.toContain('grant pg_read_all_data to fichaje_backup');
+    expect(bootstrap).toContain('revoke pg_read_all_data from fichaje_backup');
+    expect(bootstrap).toContain('grant usage on schema public, private, auth to fichaje_backup');
+    expect(bootstrap).toContain('grant select on all tables in schema public, private to fichaje_backup');
+    expect(bootstrap).toContain('grant select on auth.users, auth.identities to fichaje_backup');
+
+    const drill = readFileSync('scripts/go_live_restore_drill.sh', 'utf8');
+    expect(drill).toContain('git -C "$ROOT" archive HEAD');
+    expect(drill).toContain('FICHAJE_RESTORE_RESULT');
+    expect(drill).toContain("select count(*) > 0 from public.time_events");
+    expect(drill).toContain("bool_and(c.relrowsecurity)");
+  });
+});

@@ -10,7 +10,7 @@
 servidor (no de tu dispositivo). Si tienes cuenta, tu email de acceso; si no, fichas en el kiosco con tu código y
 un PIN personal. También las solicitudes de corrección que presentes y su decisión por una persona gestora
 distinta. **No** usamos biometría, fotografías ni geolocalización, ni el registro sirve para medir tu
-productividad.
+productividad. **Fichaje V1 no utiliza sistemas algorítmicos o automatizados para decidir la duración o distribución de tu jornada, salario, asignación de tareas, progresión profesional, lugar de trabajo o extinción del contrato.** Si la Empresa incorpora herramientas de decisión automatizada ajenas a este alcance, deberá informarlas por separado cuando resulte exigible.
 
 **Para qué y con qué base**: cumplir la obligación legal de registro diario de jornada (art. 34.9 del Estatuto de
 los Trabajadores; y, si procede, arts. 12.4.c y 35.5), base jurídica art. 6.1.c RGPD (obligación legal).

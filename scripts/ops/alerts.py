@@ -226,11 +226,18 @@ class GitHubIssueNotifier:
         if not re.fullmatch(r'[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}', repository):
             raise ValueError('ALERT_ROUTE_CONFIG')
         token = os.environ.get(token_env, '')
-        if not re.fullmatch(r'[A-Za-z0-9_]{20,255}', token):
+        # Provider tokens are opaque and their format can change. Validate only
+        # basic secret hygiene; never log, persist or parse the credential.
+        if len(token) < 20 or len(token) > 2048 or any(ch.isspace() for ch in token):
             raise ValueError('ALERT_ROUTE_CONFIG')
         self._token = token
         self.repository = repository
         self.api = _endpoint(self.DEFAULT_API, 'OPS_GITHUB_API_URL')
+        # The Issues listing endpoint can be briefly eventually consistent just
+        # after creation. Keep the number returned by POST so an immediate
+        # RESOLVED transition can close the exact issue without relying on a
+        # fresh list result. A restarted process still falls back to _open_issue.
+        self._known_issues: dict[str, int] = {}
 
     def _call(self, method: str, path: str, body: dict | None = None):
         headers = {'Authorization': 'Bearer ' + self._token, 'Accept': 'application/vnd.github+json',
@@ -262,17 +269,25 @@ class GitHubIssueNotifier:
 
     def send(self, payload: dict) -> None:
         marker = f"[{payload['fingerprint']}]"
-        number = self._open_issue(marker)
+        number = self._known_issues.get(marker)
+        if number is None:
+            number = self._open_issue(marker)
+            if number is not None:
+                self._known_issues[marker] = number
         if payload['status'] == 'FIRING':
             if number is None:
                 labels = ' '.join(f'{k}={v}' for k, v in sorted(payload['labels'].items()))
                 title = f"[{payload['severity']}][{payload['environment']}] {payload['alert']} {labels} {marker}".replace('  ', ' ')
-                self._call('POST', f'/repos/{self.repository}/issues', {'title': title[:256], 'body': self.body(payload),
-                                                                        'labels': ['fichaje-alert']})
+                created = self._call('POST', f'/repos/{self.repository}/issues', {
+                    'title': title[:256], 'body': self.body(payload), 'labels': ['fichaje-alert']})
+                if not isinstance(created, dict) or not isinstance(created.get('number'), int):
+                    raise OpsError('UPSTREAM_INVALID')
+                self._known_issues[marker] = int(created['number'])
             return
         if number is not None:
             self._call('POST', f'/repos/{self.repository}/issues/{number}/comments', {'body': self.body(payload)})
             self._call('PATCH', f'/repos/{self.repository}/issues/{number}', {'state': 'closed', 'state_reason': 'completed'})
+            self._known_issues.pop(marker, None)
 
 
 def notifier_for(target: str, environment: str = 'ci'):

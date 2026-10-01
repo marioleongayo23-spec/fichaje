@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { App } from '../src/App';
+import {
+  PRODUCTION_SUPABASE_ORIGIN,
+  STAGING_SUPABASE_ORIGIN,
+  readAppConfig,
+} from '../src/config';
 import { createSupabaseClient, readSupabaseConfig } from '../src/lib/supabase';
 
 const key = 'sb_publishable_synthetic_test_only';
@@ -27,5 +32,58 @@ describe('bootstrap without backend', () => {
   });
   it.each(['sb_secret_synthetic', 'eyJhbGciOiJIUzI1NiJ9.synthetic', 'arbitrary'])('rejects private or unsupported key format', (invalid) => {
     expect(() => readSupabaseConfig({ VITE_SUPABASE_URL: 'https://example.com', VITE_SUPABASE_PUBLISHABLE_KEY: invalid })).toThrow();
+  });
+});
+
+describe('go-live deployment binding', () => {
+  it('fails closed when a managed Fichaje backend is configured without a deployment tier', () => {
+    for (const url of [STAGING_SUPABASE_ORIGIN, PRODUCTION_SUPABASE_ORIGIN]) {
+      expect(() => readAppConfig({
+        VITE_SUPABASE_URL: url,
+        VITE_SUPABASE_PUBLISHABLE_KEY: key,
+      })).toThrow(/Deployment tier is required/);
+    }
+  });
+
+  it('pins staging builds to the staging Supabase project', () => {
+    expect(readAppConfig({
+      VITE_DEPLOYMENT_TIER: 'staging',
+      VITE_SUPABASE_URL: STAGING_SUPABASE_ORIGIN,
+      VITE_SUPABASE_PUBLISHABLE_KEY: key,
+    })?.supabase.url).toBe(STAGING_SUPABASE_ORIGIN);
+    expect(() => readAppConfig({
+      VITE_DEPLOYMENT_TIER: 'staging',
+      VITE_SUPABASE_URL: PRODUCTION_SUPABASE_ORIGIN,
+      VITE_SUPABASE_PUBLISHABLE_KEY: key,
+    })).toThrow(/different Supabase project/);
+  });
+
+  it('pins production builds to the production Supabase project', () => {
+    expect(readAppConfig({
+      VITE_DEPLOYMENT_TIER: 'production',
+      VITE_SUPABASE_URL: PRODUCTION_SUPABASE_ORIGIN,
+      VITE_SUPABASE_PUBLISHABLE_KEY: key,
+    })?.supabase.url).toBe(PRODUCTION_SUPABASE_ORIGIN);
+    expect(() => readAppConfig({
+      VITE_DEPLOYMENT_TIER: 'production',
+      VITE_SUPABASE_URL: STAGING_SUPABASE_ORIGIN,
+      VITE_SUPABASE_PUBLISHABLE_KEY: key,
+    })).toThrow(/different Supabase project/);
+  });
+
+  it('requires same-origin gateway paths in production', () => {
+    expect(() => readAppConfig({
+      VITE_DEPLOYMENT_TIER: 'production',
+      VITE_SUPABASE_URL: PRODUCTION_SUPABASE_ORIGIN,
+      VITE_SUPABASE_PUBLISHABLE_KEY: key,
+      VITE_KIOSK_GATEWAY_URL: 'https://example.com/kiosk',
+    })).toThrow(/same-origin/);
+    expect(readAppConfig({
+      VITE_DEPLOYMENT_TIER: 'production',
+      VITE_SUPABASE_URL: PRODUCTION_SUPABASE_ORIGIN,
+      VITE_SUPABASE_PUBLISHABLE_KEY: key,
+      VITE_KIOSK_GATEWAY_URL: '/gateway/kiosk',
+      VITE_EXPORT_LINK_URL: '/gateway/export-link',
+    })).not.toBeNull();
   });
 });
