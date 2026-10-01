@@ -1,0 +1,67 @@
+name: GO-LIVE real alert route
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  real-github-alert-route:
+    if: github.head_ref == 'astra/go-live-produccion' && contains(github.event.pull_request.labels.*.name, 'go-live-alert-test')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPS_GITHUB_TOKEN: ${{ github.token }}
+      OPS_ALERT_ROUTE_PAGER: github-issues:${{ github.repository }}
+      OPS_ALERT_ROUTE_TICKET: github-issues:${{ github.repository }}
+      FICHAJE_RELEASE: ${{ github.event.pull_request.head.sha }}
+      FICHAJE_COMMIT: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Send and resolve synthetic CRITICAL and WARNING alerts through the real private GitHub Issues route
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import sys
+          import tempfile
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path.cwd() / 'scripts' / 'ops'))
+          import alerts
+
+          state = Path(tempfile.mkdtemp()) / 'alerts.json'
+          engine = alerts.AlertEngine(state, environment='production')
+
+          critical = {'health': {'checks': {'app': {'status': 'DOWN', 'error_class': 'UPSTREAM_5XX'}}}}
+          engine.process(critical)
+          engine.process({'health': {'checks': {'app': {'status': 'UP'}}}})
+
+          warning = {'invariants': {'summary': [
+              {'invariant': 'OPEN_SESSION_STALE', 'severity': 'WARNING', 'findings': 1}
+          ]}}
+          engine.process(warning)
+          engine.process({'invariants': {'summary': []}})
+
+          if engine.pending() != 0 or engine.firing():
+              raise SystemExit('ALERT_ROUTE_NOT_DRAINED')
+
+          notifier = alerts.GitHubIssueNotifier(os.environ['GITHUB_REPOSITORY'])
+          expected = {
+              alerts.fingerprint(alerts.condition('APP_DOWN', {'error_class': 'UPSTREAM_5XX'}, check='app')),
+              alerts.fingerprint(alerts.condition('INVARIANT_WARNING', invariant='OPEN_SESSION_STALE')),
+          }
+          issues = notifier._call('GET', f"/repos/{os.environ['GITHUB_REPOSITORY']}/issues?state=closed&labels=fichaje-alert&per_page=100") or []
+          found = {fp for fp in expected if any(f'[{fp}]' in str(issue.get('title', '')) for issue in issues)}
+          if found != expected:
+              raise SystemExit(f'ALERT_ROUTE_EVIDENCE_MISSING:{sorted(expected-found)}')
+          print('GO-LIVE real GitHub alert route: PASS')
+          PY
