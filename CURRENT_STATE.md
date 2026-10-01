@@ -50,12 +50,16 @@ Definidos en `docs/GO_LIVE.md`. Bloqueos reales actuales:
 - backup DB real cifrado y restore remoto: **PARTIAL**; existe destino privado candidato `02 - DB Encrypted Backups`, pero faltan credencial DB de solo lectura, identidad age offline y restore real;
 - journal independiente operativo: **BLOCKED**; el diseño permite una instancia separada, pero la integración bloqueó de forma segura el aprovisionamiento de la credencial SQL y no dejó cambios parciales;
 - simulacro operativo final;
-- kit legal/contractual final para cliente real;
+- kit legal/contractual final para cliente real: proveedores principales, región y transferencias revisados a 2026-10-01; pendiente completar entidad jurídica de Fichaje, SMTP/destino backup definitivo y datos/convenio del primer cliente;
 - control de procedencia de release: implementado en `production-candidate.yml`, pendiente de CI;
 - despliegue Cloudflare productivo separado y verificado;
 - autorización expresa posterior de producción.
 
 Supabase Free no aporta backups automáticos gestionados; su documentación recomienda dumps/exportaciones off-site para Free. No se contratará Pro/PITR ni otro servicio sin autorización expresa.
+
+Los scripts de backup/restore DB quedaron portables entre Linux y macOS manteniendo TLS verify-full, permisos 0600/0700, cifrado age en stream y separación de la clave privada. La ejecución real sigue bloqueada por custodia de credenciales y restore remoto, no por el código.
+
+Revisión de proveedores: Supabase productivo `eu-west-1` corresponde a Irlanda según documentación vigente; DPA y lista de subencargados revisados. Cloudflare dispone de DPA/SCC, pero Pages/Workers procesa globalmente por defecto salvo controles adicionales de Data Localization Suite. La documentación comercial ya no promete residencia UE total en el borde.
 
 ### Coste y datos
 - 0 clientes reales.
