@@ -1,4 +1,4 @@
-# Cumplimiento — base de diseño revisada 2026-09-21; revisión H7 2026-09-28 (ver al final)
+# Cumplimiento — base de diseño revisada 2026-09-21; revisión H7 2026-09-28; preproducción 2026-10-01
 No es certificación de producto ni validación jurídica del piloto. H0 no procesa datos reales.
 
 ## Base normativa consultada
@@ -61,3 +61,26 @@ Fuentes primarias consultadas mediante lectura web el 2026-09-28:
 Decisiones técnicas propias: originales inmutables y correcciones append-only; borde con ingreso firmado; cifrado age, journal independiente y alertas minimizadas; cuatro años desde el cierre del periodo y extensión de la cadena tras correcciones. Estas decisiones sirven al diseño y a la auditabilidad; la ley no prescribe este stack ni estos mecanismos concretos.
 
 Las [plantillas legales](legal/README.md) siguen siendo revisables. Antes de usar datos reales hacen falta revisión jurídica del caso y convenio, encargo, subencargados/transferencias, información a la plantilla y valoración de riesgos/EIPD cuando corresponda. Esta revisión no certifica cumplimiento ni autoriza el piloto.
+
+
+## Revisión preproducción HITO 8 — 2026-10-01
+Se volvió a consultar la fuente consolidada del
+[Estatuto de los Trabajadores](https://www.boe.es/buscar/act.php?id=BOE-A-2015-11430).
+El art. 34.9 mantiene registro diario con hora concreta de inicio y fin, conservación durante
+cuatro años y disponibilidad para persona trabajadora, representantes e Inspección; la forma
+de organización/documentación sigue sometida al cauce de negociación/acuerdo o decisión
+empresarial previa consulta que establece el propio artículo. La ficha consolidada consultada
+indica última actualización general publicada el 04/12/2025.
+
+Se revisaron asimismo el
+[RGPD](https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=es), la
+[LOPDGDD](https://www.boe.es/buscar/act.php?id=BOE-A-2018-16673) y la
+[FAQ de la AEPD sobre control horario](https://www.aepd.es/preguntas-frecuentes/3-proteccion-de-datos-en-el-ambito-laboral/FAQ-0311-es-necesario-el-consentimiento-del-trabajador-para-implantar-un-sistema-de-control-horario).
+Para el registro ordinario la referencia sigue siendo obligación legal, no consentimiento,
+con deber de información; cuando Fichaje APP trate datos por cuenta de la empresa debe existir
+el correspondiente encargo del art. 28 RGPD.
+
+Esta comprobación no es certificación jurídica ni sustituye la revisión de cada cliente:
+antes del alta real hay que cerrar convenio/pausas, información a plantilla, representantes
+cuando corresponda, subencargados/transferencias, derechos y valoración de riesgos/EIPD según
+el caso. No se promete que cualquier configuración de cliente sea conforme por defecto.
