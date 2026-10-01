@@ -132,3 +132,22 @@ Puerta de salida H7:
 No son bloqueadores para cerrar H7 sintético: contratar un tercer proyecto Supabase, ejecutar un restore en un segundo Supabase gestionado, configurar un proveedor real de guardia o hacer un piloto con una empresa real. Las suites locales/CI existentes de fallo, rollback, carga, incidente y REC se conservan y no se desactivan.
 
 Antes del **primer cliente real / producción**, habrá una puerta operativa separada: alertas reales, estrategia de backup/restore viable y probada en el entorno que se vaya a operar, respuesta a incidentes, revisión legal/seguridad necesaria y autorización expresa de producción. Esa puerta puede requerir gasto y se decidirá entonces.
+
+
+## PREPROD-01 — puerta primer cliente real
+
+| ID | Criterio de aceptación |
+|---|---|
+| PRE-01 | Revisión normativa vigente con fuentes primarias y convenio de la empresa concreta; sin asumir universalidad sectorial |
+| PRE-02 | Paquete legal/comercial completado y revisado: encargo, subencargados, localización/transferencias, información, derechos, incidentes, baja y retención |
+| PRE-03 | Producción aislada de staging con proyectos, secretos y datos separados; región UE; sin reutilizar credenciales |
+| PRE-04 | Dominio definitivo, TLS/HSTS/CSP y controles de borde/rate limit verificados desde fuera; funciones directas sin bypass |
+| PRE-05 | Correo transaccional probado con proveedor aprobado y configuración anti-spoofing aplicable |
+| PRE-06 | Alertas reales CRITICAL/WARNING recibidas y resueltas; canary, health e invariantes programados |
+| PRE-07 | Backup cifrado real y restore aislado REC-01..03 del mismo backup; RPO/RTO medidos |
+| PRE-08 | Revisión independiente de seguridad sin hallazgos críticos/altos pendientes |
+| PRE-09 | Flujo production-like completo con datos sintéticos y fallo/rollback real |
+| PRE-10 | Contratos y checklist del cliente concreto cerrados + autorización expresa posterior de producción y datos reales |
+
+PREPROD-01 no puede ser PASS con un control BLOCKED, FAIL o sin evidencia real. Un PASS de esta puerta tampoco
+autoriza automáticamente producción: requiere una orden expresa y posterior del usuario.
