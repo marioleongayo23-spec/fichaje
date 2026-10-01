@@ -226,7 +226,9 @@ class GitHubIssueNotifier:
         if not re.fullmatch(r'[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}', repository):
             raise ValueError('ALERT_ROUTE_CONFIG')
         token = os.environ.get(token_env, '')
-        if not re.fullmatch(r'[A-Za-z0-9_]{20,255}', token):
+        # Provider tokens are opaque and their format can change. Validate only
+        # basic secret hygiene; never log, persist or parse the credential.
+        if len(token) < 20 or len(token) > 2048 or any(ch.isspace() for ch in token):
             raise ValueError('ALERT_ROUTE_CONFIG')
         self._token = token
         self.repository = repository
