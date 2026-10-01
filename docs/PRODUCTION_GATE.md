@@ -21,7 +21,7 @@ una orden expresa del usuario para activar producción / primer cliente real.
 | PRE-03 | Entorno de producción aislado | BLOCKED | Supabase + Cloudflare separados de staging; región UE; secretos distintos; cero datos sintéticos heredados |
 | PRE-04 | Dominio y protección de borde | BLOCKED | Dominio definitivo, TLS/HSTS, CSP, WAF/rate limits verificados; sin bypass de edge |
 | PRE-05 | Correo transaccional | PARTIAL | SMTP/proveedor aprobado, confirmación e invitaciones probadas sin exponer tokens; SPF/DKIM/DMARC cuando aplique |
-| PRE-06 | Alertas reales y operación | BLOCKED | CRITICAL y WARNING recibidos por rutas reales, RESOLVED probado, canary e invariantes programados |
+| PRE-06 | Alertas reales y operación | PARTIAL | CRITICAL y WARNING recibidos por rutas reales, RESOLVED probado, canary e invariantes programados |
 | PRE-07 | Backup/restore real | BLOCKED | Backup cifrado activo, destino privado, clave age separada, restore aislado real REC-01..03, RPO/RTO medidos |
 | PRE-08 | Seguridad independiente | PARTIAL | Revisión independiente de RLS/Auth/edge/Storage/dependencias y resolución de hallazgos críticos/altos |
 | PRE-09 | Ensayo final production-like | BLOCKED | Alta, OWNER/ADMIN/EMPLOYEE, kiosco, ciclo horario, corrección, exportación, aislamiento y fallo/rollback con datos sintéticos |
@@ -115,3 +115,30 @@ Supabase Security Advisor ejecutado contra staging:
 
 PRE-08 permanece PARTIAL: falta revisión independiente externa/final del candidato productivo y resolver
 cualquier hallazgo crítico/alto que esa revisión encuentre.
+
+
+## Alertas y borde a coste 0 € — 2026-10-01
+**PRE-06:** PagerDuty Incident Management Free es el candidato preferente para CRITICAL: 0 USD/año,
+hasta 5 usuarios, una guardia y una política de escalado, con notificaciones básicas por email/push/SMS/teléfono.
+Encaja con el adaptador `pagerduty` ya implementado. WARNING seguirá usando GitHub Issues privado con token
+fine-grained limitado a Issues R/W. No se han creado cuentas/tokens ni rutas reales todavía.
+
+Better Stack Free se evaluó, pero su capa gratuita prioriza monitores y alertas email/Slack; las capacidades
+de responder/on-call con teléfono pertenecen a licencia de responder de pago. No se selecciona para esta puerta.
+
+**PRE-04:** Cloudflare Pages puede alojar un segundo proyecto productivo en Free; estáticos son gratuitos y
+las Pages Functions consumen la cuota Workers Free (100.000 requests/día compartidos). WAF/rate limiting de
+zona está disponible en Free con restricciones de campos, pero exige que el dominio esté añadido a Cloudflare.
+El `*.pages.dev` no es una zona propia sobre la que Fichaje pueda aplicar esas reglas. Por tanto el dominio
+propio sigue siendo el bloqueo real de PRE-04; no se compra todavía.
+
+## Backup real a coste 0 € — límite actual
+Supabase recomienda que Free exporte regularmente con CLI/`db dump`; no ofrece los backups gestionados de
+Pro. El pipeline de Fichaje ya cifra en stream con age y exige restore aislado, pero necesita un **host de
+operación fiable** que ejecute diariamente `pg_dump`, custodie credenciales fuera de GitHub y verifique el
+destino. GitHub Actions no recibirá secretos persistentes por contrato del proyecto.
+
+Se puede ejecutar un ensayo remoto de backup/restore con datos sintéticos y un proyecto temporal Free cuando
+se autorice infraestructura, pero eso no resuelve por sí solo el backup diario productivo. PRE-07 permanece
+BLOCKED hasta disponer de host de operación fiable o aprobar una alternativa gestionada (por ejemplo Pro)
+antes de introducir el primer dato real.
