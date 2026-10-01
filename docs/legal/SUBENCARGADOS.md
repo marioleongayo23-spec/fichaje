@@ -20,3 +20,28 @@
 Procedimiento de cambios: aviso a cada Empresa con `[[PLAZO PREAVISO]]`; derecho de oposición; actualización
 de este inventario (versión y fecha) y del anexo del contrato. Evaluación anual de cada subencargado:
 `[[RESPONSABLE]]`.
+
+
+## Verificación PREPROD-01 — 2026-10-01
+
+Fuentes oficiales verificadas:
+- Supabase DPA vigente (versión 1, 2026-08-01):
+  https://supabase.com/legal/customer-resources/data-processing-addendum
+- Supabase lista de subencargados:
+  https://supabase.com/legal/customer-resources/subprocessor-list
+- Cloudflare DPA v6.4 (2026-04-03):
+  https://www.cloudflare.com/cloudflare-customer-dpa/
+- Cloudflare lista de subencargados:
+  https://www.cloudflare.com/gdpr/subprocessors/cloudflare-services/
+
+Hallazgos útiles para contratación:
+- Supabase declara rol processor/subprocessor según la cadena contractual, autorización general de
+  subencargados y SCC para transferencias cuando proceda. Su lista incluye, entre otros, AWS y Cloudflare
+  para determinadas funciones del servicio.
+- Cloudflare mantiene DPA y lista pública de subencargados con aviso previo de cambios.
+- Estas fuentes permiten completar la parte técnica del inventario, pero **no** sustituyen identificar la
+  entidad que contrata realmente la cuenta de Fichaje, aceptar/archivar el DPA aplicable y documentar la
+  garantía de transferencia concreta al firmar con el cliente.
+
+Estado PRE-02: PARTIAL. Proveedores principales verificados documentalmente; siguen pendientes entidad
+contratante real de Fichaje, SMTP, alertas, backup/journal y revisión jurídica del anexo comercial.
