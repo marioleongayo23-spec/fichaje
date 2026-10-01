@@ -13,7 +13,7 @@ Contrato de puerta: `docs/PRODUCTION_GATE.md`
 
 - PRE-01 normativa/convenio: PARTIAL — base estatal y AEPD revisadas el 2026-10-01; el convenio se valida por cliente concreto.
 - PRE-02 paquete legal/comercial: PARTIAL — DPA/subencargados principales verificados; faltan identidad contractual de Fichaje, proveedores pendientes, marcadores y revisión jurídica independiente antes de datos reales.
-- PRE-03 producción aislada: BLOCKED — candidato Supabase `Fichaje APP` identificado en `eu-west-1` e INACTIVE; Cloudflare solo tiene `fichaje-staging`. No se ha reactivado/creado producción.
+- PRE-03 producción aislada: PARTIAL — Supabase `Fichaje APP` reactivado con autorización expresa, `ACTIVE_HEALTHY` en `eu-west-1` y verificado vacío (0 migraciones, 0 tablas app, 0 usuarios Auth, 0 objetos Storage, 0 Edge Functions). Cloudflare productivo aún no existe; no se ha desplegado nada ni introducido datos.
 - PRE-04 dominio/borde: BLOCKED — Pages productivo puede ser 0 €, pero no hay dominio propio; WAF/rate limits de zona requieren ese dominio.
 - PRE-05 correo transaccional: PARTIAL — Brevo Free seleccionado como candidato 0 €; pendiente dominio, DPA/alta, SPF/DKIM/DMARC y prueba real.
 - PRE-06 alertas reales: PARTIAL — PagerDuty Free + GitHub Issues seleccionados como rutas 0 €; cuentas/tokens y prueba real aún no activados.
