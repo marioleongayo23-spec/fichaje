@@ -46,9 +46,9 @@ Se mantiene como base general el art. 34.9 ET y la orientación AEPD sobre base 
 
 ### Gates pendientes
 Definidos en `docs/GO_LIVE.md`. Bloqueos reales actuales:
-- ruta de alerta real probada;
-- backup DB real cifrado y restore remoto;
-- journal independiente operativo;
+- ruta de alerta real: **PASS** (run `36881276163`; CRITICAL #22 y WARNING #23 abiertos/cerrados por el adaptador real);
+- backup DB real cifrado y restore remoto: **PARTIAL**; existe destino privado candidato `02 - DB Encrypted Backups`, pero faltan credencial DB de solo lectura, identidad age offline y restore real;
+- journal independiente operativo: **BLOCKED**; el diseño permite una instancia separada, pero la integración bloqueó de forma segura el aprovisionamiento de la credencial SQL y no dejó cambios parciales;
 - simulacro operativo final;
 - kit legal/contractual final para cliente real;
 - control de procedencia de release: implementado en `production-candidate.yml`, pendiente de CI;
@@ -65,5 +65,7 @@ Supabase Free no aporta backups automáticos gestionados; su documentación reco
 - No se ha activado producción.
 
 GitHub Free no permite protected branches/rulesets en repositorios privados. Se implementó un control compensatorio gratuito: el workflow manual `Production Candidate` rechaza cualquier SHA que no sea el HEAD actual de `main`, merge commit de un PR y 5/5 gates verdes, y solo entonces empaqueta el build productivo fijado al Supabase `bypdviatamosygndeqhh`.
+
+GL-05 quedó probado de extremo a extremo con GitHub Issues privado y token efímero de Actions. La prueba real detectó y corrigió dos defectos del adaptador (formato opaco del token y cierre inmediato tras creación); el run `36881276163` terminó `success` y dejó #22/#23 cerrados como evidencia.
 
 No declarar PASS hasta que todos los GL-01..12 estén acreditados.
