@@ -17,14 +17,14 @@ una orden expresa del usuario para activar producción / primer cliente real.
 | ID | Control | Estado inicial | Evidencia exigida |
 |---|---|---|---|
 | PRE-01 | Base normativa vigente y convenio aplicable | PARTIAL | Revisión con fuentes primarias en fecha de alta; art. 34.9 ET, RGPD/LOPDGDD y convenio/empresa concreta |
-| PRE-02 | Paquete legal comercial | PARTIAL | Encargo art. 28, subencargados, transferencias/localización, información empleados, derechos, incidentes, baja y retención completados sin marcadores |
+| PRE-02 | Paquete legal comercial | PARTIAL | Encargo art. 28, subencargados, transferencias/localización, información empleados, derechos, incidentes, baja y retención completados sin marcadores y revisión jurídica independiente documentada |
 | PRE-03 | Entorno de producción aislado | PARTIAL | Supabase + Cloudflare separados de staging; región UE; secretos distintos; cero datos sintéticos heredados |
 | PRE-04 | Dominio y protección de borde | BLOCKED | Dominio definitivo, TLS/HSTS, CSP, WAF/rate limits verificados; sin bypass de edge |
 | PRE-05 | Correo transaccional | PARTIAL | SMTP/proveedor aprobado, confirmación e invitaciones probadas sin exponer tokens; SPF/DKIM/DMARC cuando aplique |
 | PRE-06 | Alertas reales y operación | PARTIAL | CRITICAL y WARNING recibidos por rutas reales, RESOLVED probado, canary e invariantes programados |
 | PRE-07 | Backup/restore real | BLOCKED | Backup cifrado activo, destino privado, clave age separada, restore aislado real REC-01..03, RPO/RTO medidos |
 | PRE-08 | Seguridad independiente | PARTIAL | Revisión independiente de RLS/Auth/edge/Storage/dependencias y resolución de hallazgos críticos/altos |
-| PRE-09 | Ensayo final production-like | BLOCKED | Alta, OWNER/ADMIN/EMPLOYEE, kiosco, ciclo horario, corrección, exportación, aislamiento y fallo/rollback con datos sintéticos |
+| PRE-09 | Ensayo final production-like | BLOCKED | Alta, OWNER/ADMIN/EMPLOYEE, kiosco, ciclo horario, corrección, exportación, aislamiento y fallo/rollback con datos sintéticos; simulacro humano con recepción/acuse de guardia, evaluación de comunicación/notificación y postmortem |
 | PRE-10 | Autorización primer cliente | BLOCKED | Empresa concreta + convenio revisados; contratos firmados; aprobación expresa del usuario para producción y datos reales |
 
 ## Revisión normativa 2026-10-01
@@ -49,7 +49,7 @@ documentar coste/beneficio y solicitar autorización expresa.
 - Sin datos reales.
 - Sin cliente real.
 - Sin merge sin aprobación.
-- Sin producción hasta PRE-01..PRE-10 y autorización posterior.
+- Candidato productivo autorizado exclusivamente con datos sintéticos; sin operación con clientes/datos reales hasta PRE-01..PRE-10 y autorización posterior.
 - Sin secretos en GitHub.
 - Cambios mínimos y tests obligatorios.
 
@@ -181,3 +181,30 @@ Con autorización expresa del usuario para configurar `Fichaje APP` como candida
 
 Pendiente para completar PRE-03: Edge Secrets exclusivos, Auth productivo, login técnico de gateway,
 Edge Functions `kiosk`/`export-link`, Cloudflare productivo separado y verificación production-like.
+
+## Continuidad verificable — 2026-10-01
+
+Evidencia técnica y límites de esta sesión: CURRENT_STATE.md, sección Verificación de continuidad.
+Se permite preparar el candidato sintético; ello no equivale a activar producción con clientes reales.
+La documentación histórica de inventario conserva su fecha y no describe el estado actual del candidato.
+
+### Dependencias agrupadas antes del primer cliente
+
+| PRE | Qué falta / por qué es obligatorio | Coste / intervención mínima |
+|---|---|---|
+| 01, 02, 10 | Identidad contractual/fiscal del proveedor, cliente y convenio concretos, anexos y contratos revisados/firma. El convenio se revisa por cada cliente; la baseline estatal no acredita todos los sectores. | Información/decisiones: 0 EUR. Revisión jurídica independiente: presupuesto no disponible; no inventar tarifa ni contratar. Facilitar identidad y designar revisor/asesoría. |
+| 03, 09 | Acceso autorizado a la configuración de secretos/Auth y Cloudflare; desplegar y verificar release, gateway, secretos propios y ensayo completo. El bloqueo de navegador impide acreditar el entorno completo. | 0 EUR en los planes actuales. Autorizar expresamente acceso a secretos del candidato y resolver la autenticación/verificación de la cuenta cuando sea posible. Nunca enviar contraseñas/tokens por chat. |
+| 04, 05 | Dominio definitivo bajo control del proveedor y DNS; borde/WAF y correo SPF/DKIM/DMARC no se verifican con un dominio inventado. | 0 EUR adicional si ya dispone de dominio; adquisición/renovación depende del dominio elegido y no está presupuestada. Indicar dominio disponible y autorizar DNS; no comprar. |
+| 05 | Cuenta/DPA de Brevo Free y acceso seguro a SMTP; envío real de confirmación, invitación y recuperación. SMTP de prueba de Supabase no cierra el control. | Plan Free: 0 EUR dentro de su cuota; falta alta/aceptación de términos por el titular y verificación de dominio. Agrupar con DNS/identidad contractual. |
+| 06, 09 | Cuenta de guardia PagerDuty Free y custodio; token Issues mínimo fuera de GitHub; host programado; prueba CRITICAL/WARNING/RESOLVED y simulacro humano. Los receptores de CI no prueban entrega a guardia real. | PagerDuty Free: 0 USD/año; Issues sin plan adicional. El titular acepta términos/designa guardia y proporciona acceso seguro en host, no tokens por chat. |
+| 07, 06 | Host fiable externo, destino privado, identidad age separada y journal PostgreSQL independiente con TLS verificable; backup del candidato y restore aislado del mismo backup REC-01..03. | 0 EUR de servicios nuevos solo si ya existen recursos fiables y custodia. Sin ellos no hay alternativa de 0 EUR acreditada para este contrato. Pro base 25 USD/mes no incluye host/journal independiente/objetos Storage ni sustituye este ensayo; no presentarlo como cierre automático. Elegir host/journal/destino disponibles o solicitar presupuesto completo antes de contratar. |
+| 08 | Revisión de seguridad independiente con evidencia del candidato, resolución de CRITICAL/HIGH y repetición de pruebas. Advisor/CI/autorrevisión no sustituyen independencia. | 0 EUR si un revisor independiente competente lo aporta sin cobrar; tarifa profesional desconocida hasta presupuesto. Designar revisor y alcance; no contratar. |
+| 10 | Primer cliente concreto, contratos/checklist y autorización posterior para datos reales/cutover. | 0 EUR por autorización; no solicitarla antes de cerrar controles anteriores. |
+
+Fuentes oficiales de costes/limitaciones consultadas el 2026-10-01:
+- https://supabase.com/pricing
+- https://supabase.com/docs/guides/platform/backups
+- https://www.pagerduty.com/pricing/
+- https://www.brevo.com/pricing/
+
+No se han contratado servicios. Precio de dominio y revisiones humanas no puede expresarse como importe exacto sin una elección/presupuesto; cualquier cifra sería inventada.

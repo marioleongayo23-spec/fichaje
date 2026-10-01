@@ -181,7 +181,7 @@ async function handle(req: Request, info: Deno.ServeHandlerInfo, trace: Trace): 
       // the database stores only their hashes, one per legal action it offers.
       const tokens = [hex(random(32)), hex(random(32))];
       const hashes = await Promise.all(tokens.map(digest));
-      const result = await db.begin(async tx => {
+      const result = await gatewayTx(async tx => {
         await identity(tx,id);
         const [r] = await tx.unsafe('select private.kiosk_auth_begin($1::uuid,$2::uuid,$3,$4) as r',[org,device,body.code as string,network]);
         const a = r.r;
@@ -205,7 +205,7 @@ async function handle(req: Request, info: Deno.ServeHandlerInfo, trace: Trace): 
     if (!['CLOCK_IN','BREAK_START','BREAK_END','CLOCK_OUT'].includes(action) || !Number.isSafeInteger(expected) || expected < 0) return fail();
     if (typeof body.challenge !== 'string' || !/^[0-9a-f]{64}$/.test(body.challenge)) return fail();
     const tokenHash = await digest(body.challenge); body.challenge = '';
-    const result = await db.begin(async tx => {
+    const result = await gatewayTx(async tx => {
       await identity(tx,id);
       const [r] = await tx.unsafe('select private.kiosk_record($1::uuid,$2::uuid,$3::public.time_action,$4::bigint,$5::uuid,$6) as r',[org,device,action,expected,request,tokenHash]);
       return r.r;

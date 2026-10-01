@@ -2,11 +2,11 @@
 
 ## PREPROD-01 — puerta previa al primer cliente real / producción
 
-**ESTADO ACTUAL: BLOCKED / EN EJECUCIÓN.** HITO 7 está cerrado. PREPROD-01 se ha iniciado por autorización del usuario, pero no autoriza producción, datos reales ni gasto.
+**ESTADO ACTUAL: BLOCKED / EN EJECUCIÓN.** HITO 7 está cerrado. PREPROD-01 se ha iniciado por autorización del usuario, autoriza configurar y desplegar el candidato productivo exclusivamente sintético. No autoriza clientes/datos reales, gasto ni merge.
 
 Repositorio: `marioleongayo23-spec/fichaje`  
 Rama: `astra/preprod-01-primer-cliente`  
-PR: pendiente de abrir  
+PR: #16 — OPEN  
 Contrato de puerta: `docs/PRODUCTION_GATE.md`
 
 ### Estado inicial PRE-01..10
@@ -21,6 +21,24 @@ Contrato de puerta: `docs/PRODUCTION_GATE.md`
 - PRE-08 seguridad independiente: PARTIAL — Supabase Advisor sin hallazgos críticos nuevos; 20 SECURITY DEFINER intencionales y HIBP Pro-only documentados. Falta revisión externa/independiente del candidato productivo.
 - PRE-09 ensayo production-like: BLOCKED — se ejecutará sin datos reales cuando exista entorno candidato.
 - PRE-10 primer cliente: BLOCKED — requiere empresa concreta, convenio, contratos y autorización expresa posterior.
+
+
+### Verificación de continuidad PREPROD-01 — 2026-10-01
+
+- HEAD inicial verificado: `52f345cdd47b72f0b6ea3ac3172b16a3acc23571`; sus cinco workflows están completed/success.
+- Supabase candidato `bypdviatamosygndeqhh`: ACTIVE_HEALTHY, eu-west-1; historial de 17 migraciones coincide con Git. Recuento real: 0 usuarios Auth, organizaciones, empleados, fichajes y objetos Storage.
+- RLS + FORCE RLS en todas las tablas public/private. Anon: 0 permisos de tablas y 0 SECURITY DEFINER de negocio ejecutables. Gateway: 0 permisos de tablas, únicamente cinco entrypoints privados. Export worker: solo SELECT directo de export_jobs, sin escritura ni lectura directa de eventos.
+- Roles gateway/export/monitor: NOLOGIN, NOINHERIT, NOSUPERUSER, NOCREATEROLE y NOBYPASSRLS. SET LOCAL ROLE probado en transacciones remotas revertidas, con acceso directo a empleados/estado/eventos denegado.
+- Advisor productivo: 20 avisos SECURITY DEFINER intencionales; no son una auditoría independiente. No revocar ni ampliar permisos mecánicamente.
+- Comparación de todos los archivos desplegados: export-link v3 coincide byte a byte con el HEAD inicial; kiosk v4 difiere en index.ts. No afirmar correspondencia de release hasta redesplegar y volver a comparar.
+- Defecto detectado en el HEAD inicial: authenticate y record abrían db.begin sin SET LOCAL ROLE. Se corrigen para usar gatewayTx. La integración H4 incorpora guards de prueba dentro de las dos funciones SQL reales que rechazan llamadas sin role=fichaje_gateway; las suites Auth/PIN/challenge/fichaje existentes ejercitan esas rutas.
+- Ingress remoto sin firma: GET de health/live y health/ready de ambas funciones devuelve 403 y no-store. Esta evidencia no prueba secretos exclusivos, FICHAJE_ENV, readiness firmada ni el frontend productivo.
+- Cloudflare: el navegador permanece en verificación de seguridad tras una recarga; no se creó ni desplegó Pages productivo.
+- Gestión de secretos Supabase: apertura rechazada por revisión automática de permisos; el conector no expone configuración de secretos/Auth. No se han leído valores ni rotado/configurado secretos por esta sesión.
+- Journal `fichaje_recovery`: no existe. Sin host/destino/custodia/journal no hay backup diario ni restore del candidato; RPO/RTO productivos no medidos.
+- Todos los controles siguen PARTIAL/BLOCKED. PRE-09 no ejecutado; PRE-10 requiere cliente, contratos y autorización posterior.
+- La corrección debe superar CI, Database, E2E H6, OPS-02 y H7 del mismo HEAD antes de desplegar. La evidencia final vinculante son los runs del HEAD actual del PR #16; los PASS del HEAD inicial no validan un commit posterior.
+- Sin datos reales, gasto, nuevo hito/rama/PR ni merge.
 
 ### Política de coste
 
