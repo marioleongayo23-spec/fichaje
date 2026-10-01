@@ -82,3 +82,131 @@ describe('recoverable repository backup', () => {
     expect(readdirSync(temp)).not.toContain('pg-dump-called');
   });
 });
+
+// H7: the encrypted database backup is enabled only when every precondition of
+// docs/RECOVERY.md holds. Platform tools are stubbed here (they record their
+// calls); the real pg_dump → age → restore chain runs in tests/integration/rec.py.
+describe('H7 encrypted database backup preconditions and pipeline', () => {
+  const RECIPIENT = 'age1' + 'q'.repeat(58);
+  let root: string;
+  let bin: string;
+  let dest: string;
+  let calls: string;
+
+  const stub = (name: string, body: string) => writeFileSync(join(bin, name), `#!/bin/bash\n${body}\n`, { mode: 0o700 });
+  const run = (env: NodeJS.ProcessEnv = {}) => spawnSync('bash', [dbScript], { encoding: 'utf8', env: {
+    PATH: `${bin}:${process.env.PATH}`, HOME: root, TMPDIR: join(root, 'tmp'),
+    FICHAJE_BACKUP_PGSERVICE: 'fichaje_backup', PGSERVICEFILE: join(root, 'pg_service.conf'), PGPASSFILE: join(root, 'pgpass'),
+    FICHAJE_BACKUP_CA: join(root, 'ca.crt'), FICHAJE_BACKUP_AGE_RECIPIENT: RECIPIENT, FICHAJE_BACKUP_DEST: dest,
+    FICHAJE_BACKUP_MIN_FREE_MB: '1', ...env } });
+  const called = () => (readdirSync(root).includes('calls.log') ? readFileSync(calls, 'utf8') : '');
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'fichaje-dbbackup-'));
+    bin = join(root, 'bin'); mkdirSync(bin); mkdirSync(join(root, 'tmp'));
+    dest = join(root, 'dest'); mkdirSync(dest, { mode: 0o700 });
+    calls = join(root, 'calls.log');
+    writeFileSync(join(root, 'pg_service.conf'), '[fichaje_backup]\nhost=db.synthetic.invalid\ndbname=postgres\nuser=fichaje_backup\n', { mode: 0o600 });
+    writeFileSync(join(root, 'pgpass'), 'db.synthetic.invalid:5432:postgres:fichaje_backup:synthetic\n', { mode: 0o600 });
+    writeFileSync(join(root, 'ca.crt'), '-----BEGIN CERTIFICATE-----\nMIIsynthetic\n-----END CERTIFICATE-----\n');
+    stub('psql', `echo "psql $*" >> '${calls}'
+case "$*" in *server_version_num*) echo 170006;; *schema_migrations*) echo 20260926000100;; *now*) echo 2026-09-28T08:00:00.000Z;; esac`);
+    stub('pg_dump', `if [ "$1" = --version ]; then echo 'pg_dump (PostgreSQL) 17.6'; exit 0; fi
+echo "pg_dump $*" >> '${calls}'; [ -n "$STUB_PG_DUMP_FAIL" ] && exit 3; printf 'PGDMP synthetic plaintext row 12345678Z\\n'`);
+    // Stand-in cipher for orchestration only (real age runs in the REC drill).
+    stub('age', `echo "age $*" >> '${calls}'; [ -n "$STUB_AGE_FAIL" ] && exit 4
+out=''; while [ $# -gt 0 ]; do [ "$1" = --output ] && out=$2; shift; done
+{ printf 'age-encryption.org/v1\\n'; tr 'A-Za-z0-9' 'N-ZA-Mn-za-m5-90-4'; } > "$out"`);
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('encrypts in one stream with verify-full and leaves only ciphertext, checksum and manifest', () => {
+    const result = run();
+    expect(result.status, result.stderr).toBe(0);
+    const files = readdirSync(dest).sort();
+    expect(files).toHaveLength(3);
+    const name = files[0].replace(/\.dump\.age$/, '');
+    expect(files).toEqual([`${name}.dump.age`, `${name}.dump.age.sha256`, `${name}.manifest.json`]);
+    const cipher = readFileSync(join(dest, `${name}.dump.age`), 'latin1');
+    expect(cipher.startsWith('age-encryption.org/v1\n')).toBe(true);
+    for (const file of files) expect(readFileSync(join(dest, file), 'latin1')).not.toMatch(/PGDMP|plaintext|12345678/);
+    expect(spawnSync('sha256sum', ['--status', '-c', `${name}.dump.age.sha256`], { cwd: dest }).status).toBe(0);
+    const manifest = JSON.parse(readFileSync(join(dest, `${name}.manifest.json`), 'utf8'));
+    expect(manifest).toMatchObject({ schema: 'fichaje.db-backup.v1', result: 'success', encrypted: true, tls: 'verify-full',
+      migration_version: '20260926000100', server_version_num: '170006', content: 'data-only', restore_test: null });
+    expect(manifest.recipient_sha256).toMatch(/^[0-9a-f]{64}$/);
+    const log = called();
+    expect(log).toMatch(/pg_dump service=fichaje_backup sslmode=verify-full sslrootcert=\S+ca\.crt .*--format=custom --data-only/);
+    expect(log).toContain('--table=public.* --table=private.* --table=auth.users --table=auth.identities');
+    expect(log).toContain('--exclude-table=private.mutation_context');
+    expect(log).toMatch(/age --encrypt --recipient age1q{58} --output/);
+    expect(readdirSync(join(root, 'tmp'))).toEqual([]);
+  });
+
+  it('never keeps a partial or plaintext result when pg_dump or encryption fails', () => {
+    const dumpFailed = run({ STUB_PG_DUMP_FAIL: '1' });
+    expect(dumpFailed.status).toBe(1); expect(dumpFailed.stderr).toContain('PG_DUMP_FAILED');
+    const ageFailed = run({ STUB_AGE_FAIL: '1' });
+    expect(ageFailed.status).toBe(1); expect(ageFailed.stderr).toContain('ENCRYPTION_FAILED');
+    expect(readdirSync(dest)).toEqual([]);
+    expect(readdirSync(join(root, 'tmp'))).toEqual([]);
+  });
+
+  it('fails closed before connecting when any precondition is missing', () => {
+    const cases: [NodeJS.ProcessEnv, string][] = [
+      [{ FICHAJE_BACKUP_AGE_RECIPIENT: '' }, 'FICHAJE_BACKUP_AGE_RECIPIENT is not configured'],
+      [{ FICHAJE_BACKUP_CA: '' }, 'FICHAJE_BACKUP_CA is not configured'],
+      [{ FICHAJE_BACKUP_DEST: '' }, 'FICHAJE_BACKUP_DEST is not configured'],
+      [{ FICHAJE_BACKUP_AGE_RECIPIENT: 'age1short' }, 'not an age public key'],
+      [{ SOME_VARIABLE: 'AGE-SECRET-KEY-1' + 'Q'.repeat(58) }, 'age private key is present'],
+      [{ FICHAJE_BACKUP_DEST: resolve('.') }, 'owner-only (0700)'],
+      [{ FICHAJE_BACKUP_MIN_FREE_MB: '999999999' }, 'not enough free space'],
+    ];
+    for (const [env, message] of cases) {
+      const result = run(env);
+      expect(result.status, message).toBe(2);
+      expect(result.stderr, message).toContain(message);
+    }
+    writeFileSync(join(root, 'ca.crt'), '-----BEGIN CERTIFICATE-----\nx\n-----END CERTIFICATE-----\n-----BEGIN PRIVATE KEY-----\n');
+    expect(run().stderr).toContain('contains a private key');
+    writeFileSync(join(root, 'ca.crt'), '-----BEGIN CERTIFICATE-----\nx\n-----END CERTIFICATE-----\n');
+    writeFileSync(join(root, 'pg_service.conf'), '[fichaje_backup]\nhost=x\npassword=inline\n', { mode: 0o600 });
+    expect(run().stderr).toContain('passwords belong in PGPASSFILE');
+    writeFileSync(join(root, 'pg_service.conf'), '[fichaje_backup]\nhost=x\n');
+    execFileSync('chmod', ['644', join(root, 'pg_service.conf')]);
+    expect(run().stderr).toContain('PGSERVICEFILE must be an owner-only');
+    execFileSync('chmod', ['600', join(root, 'pg_service.conf')]);
+    writeFileSync(join(dest, 'identity.txt'), 'AGE-SECRET-KEY-1' + 'Q'.repeat(58));
+    expect(run().stderr).toContain('private key is stored in the destination');
+    rmSync(join(dest, 'identity.txt'));
+    execFileSync('chmod', ['755', dest]);
+    expect(run().stderr).toContain('owner-only (0700)');
+    execFileSync('chmod', ['700', dest]);
+    stub('pg_dump', `if [ "$1" = --version ]; then echo 'pg_dump (PostgreSQL) 16.13'; exit 0; fi; echo "pg_dump $*" >> '${calls}'`);
+    const old = run();
+    expect(old.status).toBe(2); expect(old.stderr).toContain('older than the server');
+    expect(called()).not.toContain('pg_dump service=');
+    expect(readdirSync(dest)).toEqual([]);
+  });
+
+  it('refuses a restore without the private key custody rules or with an altered ciphertext', () => {
+    const restore = resolve('scripts/restore_database.sh');
+    expect(run().status).toBe(0);
+    const name = readdirSync(dest).find((f) => f.endsWith('.manifest.json'))!.replace('.manifest.json', '');
+    const identity = join(root, 'identity.txt');
+    writeFileSync(identity, 'AGE-SECRET-KEY-1' + 'Q'.repeat(58), { mode: 0o600 });
+    const env = (extra: NodeJS.ProcessEnv = {}) => ({ encoding: 'utf8' as const, env: { PATH: `${bin}:${process.env.PATH}`,
+      FICHAJE_RESTORE_PGSERVICE: 'fichaje_backup', PGSERVICEFILE: join(root, 'pg_service.conf'), PGPASSFILE: join(root, 'pgpass'),
+      FICHAJE_RESTORE_CA: join(root, 'ca.crt'), FICHAJE_RESTORE_IDENTITY: identity, FICHAJE_RESTORE_CONFIRM: 'postgres', ...extra } });
+    expect(spawnSync('bash', [restore, dest, name], env({ FICHAJE_RESTORE_IDENTITY: '' })).status).toBe(2);
+    execFileSync('cp', [identity, join(dest, 'key.txt')]);
+    const beside = spawnSync('bash', [restore, dest, name], env({ FICHAJE_RESTORE_IDENTITY: join(dest, 'key.txt') }));
+    expect(beside.status).toBe(2); expect(beside.stderr).toContain('private key is stored next to the backup');
+    rmSync(join(dest, 'key.txt'));
+    writeFileSync(join(dest, `${name}.dump.age`), 'age-encryption.org/v1\naltered', { flag: 'a' });
+    const altered = spawnSync('bash', [restore, dest, name], env());
+    expect(altered.status).toBe(1); expect(altered.stderr).toContain('CHECKSUM_MISMATCH');
+    expect(called()).not.toMatch(/age --decrypt|psql service=fichaje_backup sslmode=verify-full.*current_database/);
+    expect(spawnSync('bash', [restore, dest, 'not-a-backup'], env()).status).toBe(2);
+  });
+});

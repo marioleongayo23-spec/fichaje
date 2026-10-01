@@ -14,7 +14,7 @@ const CONFLICTS = new Set(['VERSION_CONFLICT', 'IDEMPOTENCY_CONFLICT', 'ALREADY_
 const VALIDATION = new Set([
   'INVALID_INPUT', 'INVALID_TRANSITION', 'POLICY_REQUIRED', 'CLOCK_REGRESSION', 'INVALID_TIMEZONE',
   'INVALID_TIMELINE', 'INVALID_ORDINAL', 'FUTURE_TIME', 'POLICY_BACKDATE', 'HOURS_MISMATCH',
-  'INCOMPLETE_PERIOD', 'LAST_OWNER',
+  'INCOMPLETE_PERIOD', 'LAST_OWNER', 'EMAIL_NOT_VERIFIED',
 ]);
 
 interface ErrorBody { message?: unknown; code?: unknown; error?: unknown }
@@ -76,6 +76,7 @@ const MESSAGES: Record<string, string> = {
   HOURS_MISMATCH: 'La suma no coincide con el tiempo computable del mes calculado por el servicio.',
   INCOMPLETE_PERIOD: 'El mes tiene jornadas abiertas. Deben resolverse antes de clasificar las horas.',
   LAST_OWNER: 'La organización debe conservar al menos una persona propietaria activa.',
+  EMAIL_NOT_VERIFIED: 'Confirma tu correo electrónico antes de crear una empresa.',
 };
 
 export function errorMessage(error: unknown): string {

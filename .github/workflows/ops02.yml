@@ -33,12 +33,13 @@ jobs:
       - name: Install dependencies
         run: |
           npm ci
-          python -m pip install cryptography==46.0.3 reportlab==4.4.9 pypdf==6.1.0 'psycopg[binary]==3.2.10'
+          python -m pip install cryptography==50.0.1 reportlab==4.4.9 pypdf==6.19.0 'psycopg[binary]==3.2.10'
       - name: Operational contract unit tests (events, metrics, retries, alerts, leak scanner, gateway telemetry)
         run: |
           python3 -m unittest discover -s tests/ops -v
+          python3 -m py_compile tests/integration/h7_support.py
           deno check --config supabase/functions/kiosk/deno.json supabase/functions/kiosk/index.ts
-          deno check supabase/functions/export-link/index.ts
+          deno check --config supabase/functions/export-link/deno.json supabase/functions/export-link/index.ts
           deno test --allow-env=FICHAJE_RELEASE,FICHAJE_COMMIT --allow-read=ops/contract.json supabase/functions/_shared/ops_test.ts
       - name: Start isolated local Supabase
         run: |

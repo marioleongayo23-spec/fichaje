@@ -33,7 +33,7 @@ export const MAX_DURATION_MS = 120_000;
 
 const ACTIONS = ['CLOCK_IN', 'BREAK_START', 'BREAK_END', 'CLOCK_OUT'];
 // A lost response of these may have committed: its outcome is unknown.
-const MUTATIONS = new Set(['record_time_event', 'submit_correction', 'decide_correction', 'request_export', 'manage_employee',
+const MUTATIONS = new Set(['create_organization', 'record_time_event', 'submit_correction', 'decide_correction', 'request_export', 'manage_employee',
   'manage_membership', 'transfer_ownership', 'create_invitation', 'accept_invitation', 'create_work_policy',
   'assign_work_policy', 'classify_hours', 'record_evidence_delivery']);
 const MAX_SERIES = 100;

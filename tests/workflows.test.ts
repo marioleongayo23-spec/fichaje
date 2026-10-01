@@ -10,6 +10,18 @@ it('keeps CI unprivileged and repository backup scheduled/manual, with no databa
 
   expect(ci.permissions).toEqual({ contents: 'read' });
   expect(ciText).not.toContain('secrets.');
+  const ciRun = JSON.stringify(ci.jobs.validate.steps);
+  expect(ciRun).toContain('npm ci --prefix edge');
+  expect(ciRun).toContain('wrangler pages functions build functions');
+  expect(ciRun).toContain('--outdir pages-worker');
+  expect(ciRun).toContain('mv pages-upload/index.js pages-upload/_worker.js');
+  const build = ci.jobs.validate.steps.find((s: { name?: string }) => s.name === 'Build');
+  expect(build.env.VITE_SUPABASE_URL).toBe('https://pvfjffeszsedslmwdvgh.supabase.co');
+  expect(build.env.VITE_SUPABASE_PUBLISHABLE_KEY).toMatch(/^sb_publishable_/);
+  expect(JSON.stringify(build.env)).not.toMatch(/sb_secret_|service_role/);
+  const upload = ci.jobs.validate.steps.find((s: { uses?: string }) => s.uses === 'actions/upload-artifact@v4');
+  expect(upload.with.path).toBe('pages-upload/');
+  expect(upload.with.name).toContain('pages-dist-');
 
   expect(Object.keys(backup.on).sort()).toEqual(['push', 'schedule', 'workflow_dispatch']);
   expect(backup.on.push.branches).toEqual(['main']);
@@ -86,4 +98,27 @@ it('monitors backups on a schedule with a read-only token and never enables the 
   expect(run).toContain('scripts/ops/backup_monitor.py');
   expect(run).toContain('scripts/ops/leakscan.py');
   expect(run).toContain('"GITHUB_TOKEN":"${{ github.token }}"');
+});
+
+it('gates H7 on every pull request with the edge, failure, incident, load and encrypted restore drills, without secrets or artefacts', () => {
+  const text = readFileSync('.github/workflows/h7.yml', 'utf8');
+  const h7 = parse(text);
+  expect(h7.on.pull_request.branches).toEqual(['main']);
+  expect(h7.permissions).toEqual({ contents: 'read' });
+  expect(text).not.toMatch(/\bsecrets\.|github\.token|upload-artifact|CLOUDFLARE_API_TOKEN|SUPABASE_ACCESS_TOKEN|wrangler pages deploy|supabase (link|db push|functions deploy)/);
+  expect(Object.keys(h7.jobs).sort()).toEqual(['edge', 'load', 'recovery']);
+  const expected: Record<string, string[]> = {
+    edge: ['npm ci --prefix edge', 'deno test supabase/functions/_shared/ingress_test.ts', 'supabase db reset --local --no-seed',
+      'tests/integration/journal_init.py', 'python3 tests/integration/h7_edge.py', 'python3 tests/integration/h7_release.py',
+      'python3 tests/integration/h7_incident.py', 'supabase stop --no-backup'],
+    load: ['npm ci --prefix edge', 'supabase db reset --local --no-seed', 'python3 tests/integration/h7_load.py', 'supabase stop --no-backup'],
+    recovery: ['sudo apt-get install -y age', 'tests/integration/journal_init.py', 'python3 tests/integration/rec.py', 'supabase stop --no-backup'],
+  };
+  for (const [job, steps] of Object.entries(expected)) {
+    const run = JSON.stringify(h7.jobs[job].steps);
+    for (const step of steps) expect(run).toContain(step);
+    expect(h7.jobs[job].steps[0].with['persist-credentials']).toBe(false);
+  }
+  // The operator's staging verifier runs for real inside the edge suite, against the local staging shape.
+  expect(readFileSync('tests/integration/h7_edge.py', 'utf8')).toContain("'scripts' / 'staging' / 'verify_staging.py'");
 });

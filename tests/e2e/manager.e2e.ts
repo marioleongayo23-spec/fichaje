@@ -1,7 +1,7 @@
 import { readFileSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { addMember, assignPolicy, clock, createAccount, createEmployee, createPolicy, rpc, runExportWorker, scenario, sql, stack } from './support/backend';
+import { addMember, assignPolicy, clock, createAccount, createEmployee, createPolicy, rpc, scenario, sql, stack } from './support/backend';
 import { go, login } from './support/ui';
 
 test.use({ serviceWorkers: 'block' });
@@ -220,8 +220,7 @@ test('organization export with signed download and controlled delivery receipt',
   await page.getByLabel('Desde').fill(today.slice(0, 8) + '01');
   await page.getByLabel('Hasta').fill(today);
   await page.getByRole('button', { name: 'Solicitar exportación' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Exportación solicitada' })).toBeVisible();
-  runExportWorker();
+  await expect(page.getByRole('status').filter({ hasText: 'Paquete preparado' })).toBeVisible();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Descargar' }).click();
   const file = testInfo.outputPath('org-export.zip');

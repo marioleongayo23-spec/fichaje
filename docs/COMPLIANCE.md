@@ -1,4 +1,4 @@
-# Cumplimiento — base de diseño revisada 2026-09-21
+# Cumplimiento — base de diseño revisada 2026-09-21; revisión H7 2026-09-28 (ver al final)
 No es certificación de producto ni validación jurídica del piloto. H0 no procesa datos reales.
 
 ## Base normativa consultada
@@ -45,3 +45,19 @@ información al empleado; procedimiento de representantes e Inspección; conting
 convenio y pausas documentados; valoración de riesgos/EIPD cuando proceda; bajas y ejercicio de derechos;
 pruebas de aislamiento/restore y revisión normativa vigente. No ofertar a sectores especiales sin evaluación.
 Tiempos de respuesta/recuperación y costes solo se comprometen después de medición real.
+
+## Revisión normativa HITO 7 — 2026-09-28
+
+Fuentes primarias consultadas mediante lectura web el 2026-09-28:
+
+| Fuente | Comprobación | Naturaleza |
+|---|---|---|
+| [ET consolidado, BOE-A-2015-11430](https://www.boe.es/buscar/act.php?id=BOE-A-2015-11430), arts. 34.9, 12.4.c y 35.5 | Inicio y fin diarios, conservación durante cuatro años, disponibilidad a personas trabajadoras, representantes e Inspección; registro y resumen mensual del tiempo parcial, y totalización de horas extraordinarias. La organización del registro se remite a negociación/acuerdo o decisión empresarial previa consulta. | Obligación vigente |
+| [RGPD, EUR-Lex](https://eur-lex.europa.eu/legal-content/ES/TXT/HTML/?uri=CELEX:32016R0679), arts. 5, 6, 13, 28, 32–35 y 44 y ss. | Minimización, información, encargo, seguridad, gestión de brechas y transferencias según el supuesto. | Obligación vigente |
+| [LOPDGDD, BOE-A-2018-16673](https://www.boe.es/buscar/act.php?id=BOE-A-2018-16673), art. 32 y arts. 87–91 | Bloqueo cuando proceda; derechos digitales y límites en el ámbito laboral. Los arts. 89–90 tratan de vídeo y geolocalización, que V1 no incorpora. | Obligación vigente según supuesto |
+| [AEPD, pregunta sobre control horario](https://www.aepd.es/preguntas-frecuentes/3-proteccion-de-datos-en-el-ambito-laboral/FAQ-0311-es-necesario-el-consentimiento-del-trabajador-para-implantar-un-sistema-de-control-horario) y [guía de relaciones laborales](https://www.aepd.es/guias/la-proteccion-de-datos-en-las-relaciones-laborales.pdf) | La AEPD indica que no se precisa consentimiento para el registro horario ordinario: base del art. 6.1.c RGPD y art. 34.9 ET. La guía es orientación de la autoridad. | Interpretación/orientación |
+| [Texto de proyecto del Ministerio de Trabajo](https://expinterweb.mites.gob.es/participa/listado/download/6cb63e79-48a8-4e99-9784-3a0b26ae6106) | La digitalización y otros requisitos del texto son una **propuesta**. No se incorporan como obligación vigente sin publicación y entrada en vigor. La búsqueda de esta fecha no demuestra por sí sola la ausencia de publicación posterior: comprobar el BOE en el alta real. | Borrador, sujeto a vigilancia |
+
+Decisiones técnicas propias: originales inmutables y correcciones append-only; borde con ingreso firmado; cifrado age, journal independiente y alertas minimizadas; cuatro años desde el cierre del periodo y extensión de la cadena tras correcciones. Estas decisiones sirven al diseño y a la auditabilidad; la ley no prescribe este stack ni estos mecanismos concretos.
+
+Las [plantillas legales](legal/README.md) siguen siendo revisables. Antes de usar datos reales hacen falta revisión jurídica del caso y convenio, encargo, subencargados/transferencias, información a la plantilla y valoración de riesgos/EIPD cuando corresponda. Esta revisión no certifica cumplimiento ni autoriza el piloto.

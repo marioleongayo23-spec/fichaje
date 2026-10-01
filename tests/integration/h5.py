@@ -195,7 +195,10 @@ export_worker.run(APP,h.URL,h.SERVICE)
 with tempfile.TemporaryDirectory(prefix='h5-signer-') as temp:
     with open(Path(temp)/'server.log','wb') as log:
         proc=subprocess.Popen(['deno','run','--allow-env','--allow-net','supabase/functions/export-link/index.ts'],
-            env=dict(os.environ,SUPABASE_URL=h.URL,SUPABASE_ANON_KEY=h.ANON,SUPABASE_SERVICE_ROLE_KEY=h.SERVICE),stdout=log,stderr=log)
+            # H7: an explicit local port selects the loopback listener; without one the signer runs in
+            # platform mode and only serves requests signed by the edge (fail closed).
+            env=dict(os.environ,SUPABASE_URL=h.URL,SUPABASE_ANON_KEY=h.ANON,SUPABASE_SERVICE_ROLE_KEY=h.SERVICE,
+                     EXPORT_LINK_PORT='8000'),stdout=log,stderr=log)
         try:
             for _ in range(100):
                 try:

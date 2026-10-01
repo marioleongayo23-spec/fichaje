@@ -1,0 +1,12 @@
+{
+  "nodeModulesDir": "auto",
+  "imports": {
+    "postgres": "npm:postgres@3.4.8",
+    "fflate": "npm:fflate@0.8.2",
+    "pdf-lib": "npm:pdf-lib@1.17.1",
+    "@js-temporal/polyfill": "npm:@js-temporal/polyfill@0.5.1"
+  },
+  "compilerOptions": {
+    "strict": true
+  }
+}

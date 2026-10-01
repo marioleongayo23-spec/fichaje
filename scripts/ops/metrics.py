@@ -185,7 +185,8 @@ def rates(events, component: str | None = None) -> dict:
     by_component: dict[str, dict] = {}
     for event in selected:
         stats = by_component.setdefault(event['component'], {'total': 0, 'errors': 0, 'clock': 0, 'version_conflicts': 0,
-                                                             'clock_regressions': 0, 'retries': 0, 'durations': []})
+                                                             'clock_regressions': 0, 'retries': 0, 'kiosk_auth_rejections': 0,
+                                                             'kiosk_rate_limited': 0, 'durations': []})
         stats['total'] += 1
         if event['outcome'] in ('failure', 'timeout', 'unknown'):
             stats['errors'] += 1
@@ -195,6 +196,11 @@ def rates(events, component: str | None = None) -> dict:
                 stats['version_conflicts'] += 1
         if event.get('error_class') == 'CLOCK_REGRESSION':
             stats['clock_regressions'] += 1
+        # H7: PIN rejections are "rejected", not failures; a burst of them is a security signal.
+        if event['operation'] == 'kiosk.authenticate' and event.get('error_class') in ('AUTH_FAILED', 'RATE_LIMITED'):
+            stats['kiosk_auth_rejections'] += 1
+            if event['error_class'] == 'RATE_LIMITED':
+                stats['kiosk_rate_limited'] += 1
         if event.get('attempt', 1) > 1:
             stats['retries'] += 1
         if 'duration_ms' in event:

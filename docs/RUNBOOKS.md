@@ -77,6 +77,38 @@ Comandos (entorno de operación con login técnico que solo hereda el rol de ent
 - **Evidencia**: eventos `kiosk-gateway` (fase y clase estable, nunca PIN/challenge/IP), release/commit.
 - **Recuperación**: ready UP y canary kiosco PASS con el mismo contrato KIO-H6-01.
 
+<a id="kiosk-auth-abuse"></a>
+## Abuso de PIN o bloqueo en el kiosco — `KIOSK_AUTH_ABUSE` (H7)
+- **Detección**: métricas de los eventos del gateway (`metrics.rates`): al menos un rechazo `RATE_LIMITED`
+  (límite 5/empleado, 30/dispositivo o 60/red alcanzado) o ≥ `kiosk_auth_rejections_warning` rechazos de PIN
+  (`AUTH_FAILED`) en la ventana evaluada. Añadida en H7 tras el ensayo de incidentes: antes ninguna alerta
+  cubría el abuso de una credencial de dispositivo.
+- **Impacto**: posible dispositivo o credencial comprometidos; tras el borde (SEC-H4-01) el límite de red de
+  60/15 min es **compartido por todos los kioscos del tenant**: su bloqueo impide identificar a cualquier persona
+  de esa empresa durante 15 minutos.
+- **Automático permitido**: ninguno sobre datos ni sobre los límites.
+- **Manual**: identificar el dispositivo (gestión → kioscos, auditoría `kiosk_*` del tenant), revocarlo
+  (`/revoke`, efecto inmediato aunque su JWT siga vigente), aprovisionar uno nuevo y entregar su credencial en
+  mano; si el bloqueo es de red, aplicar la [contingencia](legal/CONTINGENCIA.md) hasta que expire.
+- **Prohibido**: desbloquear contadores a mano, subir límites, desactivar Argon2 o el suelo de 300 ms,
+  registrar PIN, códigos o IP en logs.
+- **Escalar**: ticket; incidente de seguridad (procedimiento de [incidentes](legal/INCIDENTES.md)) si hay
+  indicios de credencial comprometida.
+- **Evidencia**: eventos `kiosk.authenticate` (clase de error y fase, nunca PIN/IP), auditoría de revocación.
+- **Recuperación**: dispositivo sustituido, canary de kiosco PASS, sin nuevos rechazos anómalos.
+
+<a id="edge-ingress"></a>
+## Borde o firma de ingreso (H7) — `KIOSK_GATEWAY_DOWN`, `EXPORT_LINK_DOWN` a través del borde
+- **Detección**: `health.py` contra `<app>/gateway/*/health/ready` devuelve 403/502/503/504; canary de kiosco FAIL.
+- **Causas típicas**: `FICHAJE_INGRESS_SECRET` distinto entre Cloudflare y Supabase, reloj desfasado > 60 s,
+  upstream mal configurado (`EDGE_NOT_CONFIGURED` 503), función caída (502/504).
+- **Automático permitido**: rollback de la release del borde (`release_gate.promote()` con el deployer H7).
+- **Rotación del secreto sin corte**: (1) funciones con `FICHAJE_INGRESS_SECRET=<nuevo>` y
+  `FICHAJE_INGRESS_SECRET_PREVIOUS=<actual>`; (2) borde con `<nuevo>`; (3) health y canary en verde;
+  (4) funciones solo con `<nuevo>`. Nunca guardar el secreto en Git, GitHub, variables `VITE_*` ni logs.
+- **Prohibido**: quitar la verificación de firma o abrir CORS para "desbloquear" el servicio.
+- **Recuperación**: health UP y canary PASS a través del borde.
+
 <a id="export-worker-failure"></a>
 ## Fallo del worker de exportación o del firmador — `JOB_FAILED{job=export}`, `EXPORT_BACKLOG`, `EXPORT_LINK_DOWN`
 - **Detección**: `jobs.py export` falla (Storage, verificación, caducidad); invariante `EXPORT_JOB_STATE`
@@ -104,14 +136,17 @@ Comandos (entorno de operación con login técnico que solo hereda el rol de ent
 <a id="backup-stale-failure"></a>
 ## Backup antiguo, fallido, ausente o no verificable — `BACKUP_*`, `DB_BACKUP_NOT_CONFIGURED`
 - **Detección**: `backup_monitor.py` (workflow `backup.yml`: último run, conclusión, artefacto presente,
-  `SHA256SUMS`, `git bundle verify` y restauración de ensayo del bundle, frescura ≤ 26 h). La base de datos
-  informa `NOT_CONFIGURED` mientras el backup PostgreSQL siga bloqueado: nunca verde.
+  `SHA256SUMS`, `git bundle verify` y restauración de ensayo del bundle, frescura ≤ 26 h). Base de datos (H7):
+  `--db-manifest` y `--db-restore`; OK solo si el último backup cifrado es fresco, tiene checksum y **ese mismo
+  backup** se restauró después con `scripts/restore_database.sh`. Sin manifiesto: `NOT_CONFIGURED`, nunca verde.
 - **Impacto**: RPO comprometido. Un upload correcto no demuestra un restore válido.
 - **Automático permitido**: relanzar el workflow de backup de repositorio (`workflow_dispatch`).
-- **Prohibido**: activar `backup_database.sh` sin el cambio aprobado de H7; subir dumps a artefactos.
+- **Prohibido**: forzar `backup_database.sh` saltando una precondición; volcados en claro en disco, logs,
+  artefactos o Drive; la clave privada age junto al backup o en GitHub.
 - **Escalar**: CRITICAL inmediato; `DB_BACKUP_NOT_CONFIGURED` es CRITICAL en producción.
 - **Evidencia**: informe del monitor (run id, conclusión, edad, verificación), sin contenido del backup.
-- **Recuperación**: estado `OK` verificado; para base de datos, solo tras el ensayo cifrado de H7.
+- **Recuperación**: estado `OK` verificado; para base de datos, backup cifrado nuevo y restore aislado de ese
+  backup (procedimiento en `docs/RECOVERY.md`).
 
 <a id="canary-failure"></a>
 ## Canary sintético roto — `CANARY_FAILED`

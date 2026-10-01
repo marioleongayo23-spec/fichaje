@@ -1,0 +1,181 @@
+name: H7 pilot readiness (edge, failure and incident drills, load, encrypted backup and restore)
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: h7-${{ github.ref }}
+  cancel-in-progress: true
+# Every job runs against a local ephemeral Supabase stack, the real Deno functions
+# and the real Cloudflare Pages runtime (workerd through the pinned wrangler of
+# edge/) on loopback, with synthetic tenants and random per-run keys. No secret
+# is used, no remote platform is reached and no artefact is uploaded.
+jobs:
+  edge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix edge
+          python -m pip install cryptography==50.0.1 reportlab==4.4.9 pypdf==6.19.0 'psycopg[binary]==3.2.10'
+      - name: Ingress contract and function type checks
+        run: |
+          python3 -m py_compile tests/integration/h7_support.py
+          deno test supabase/functions/_shared/ingress_test.ts
+          deno check --config supabase/functions/kiosk/deno.json supabase/functions/kiosk/index.ts
+          deno check --config supabase/functions/export-link/deno.json supabase/functions/export-link/index.ts
+      - name: Start isolated local Supabase
+        run: |
+          for attempt in 1 2 3; do
+            if supabase start -x realtime,imgproxy,edge-runtime,logflare,vector,supavisor > /dev/null; then
+              exit 0
+            fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            if [ "$attempt" = 1 ]; then
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=public.ecr.aws
+            else
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io
+            fi
+            printf 'SUPABASE_INTERNAL_IMAGE_REGISTRY=%s\n' "$SUPABASE_INTERNAL_IMAGE_REGISTRY" >> "$GITHUB_ENV"
+            sleep 5
+          done
+      - name: Rebuild from empty database and provision the H5 recovery journal
+        run: |
+          supabase db reset --local --no-seed
+          python3 tests/integration/journal_init.py
+      - name: Same-origin edge, signed ingress, no bypass, SEC-H4-01 behind the proxy and the staging verifier
+        run: python3 tests/integration/h7_edge.py
+      # Faults are injected only into loopback targets of this runner (faults.py refuses anything else).
+      - name: Induced failure drill (release gate, real alert routes, rollback, recovery)
+        run: python3 tests/integration/h7_release.py
+      - name: Incident response drill IR-01
+        run: python3 tests/integration/h7_incident.py
+      - name: Stop local containers
+        if: always()
+        run: supabase stop --no-backup
+
+  load:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix edge
+          python -m pip install cryptography==50.0.1 reportlab==4.4.9 pypdf==6.19.0 'psycopg[binary]==3.2.10'
+      - name: Start isolated local Supabase
+        run: |
+          for attempt in 1 2 3; do
+            if supabase start -x realtime,imgproxy,edge-runtime,logflare,vector,supavisor > /dev/null; then
+              exit 0
+            fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            if [ "$attempt" = 1 ]; then
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=public.ecr.aws
+            else
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io
+            fi
+            printf 'SUPABASE_INTERNAL_IMAGE_REGISTRY=%s\n' "$SUPABASE_INTERNAL_IMAGE_REGISTRY" >> "$GITHUB_ENV"
+            sleep 5
+          done
+      - name: Rebuild from empty database and provision the H5 recovery journal
+        run: |
+          supabase db reset --local --no-seed
+          python3 tests/integration/journal_init.py
+      - name: Pilot load profile (2 companies x 100 employees, 20 concurrent requests, kiosks through the edge)
+        run: python3 tests/integration/h7_load.py
+      - name: Stop local containers
+        if: always()
+        run: supabase stop --no-backup
+
+  recovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix edge
+          python -m pip install cryptography==50.0.1 reportlab==4.4.9 pypdf==6.19.0 'psycopg[binary]==3.2.10'
+          sudo apt-get update
+          sudo apt-get install -y age
+      - name: Start isolated local Supabase
+        run: |
+          for attempt in 1 2 3; do
+            if supabase start -x realtime,imgproxy,edge-runtime,logflare,vector,supavisor > /dev/null; then
+              exit 0
+            fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            if [ "$attempt" = 1 ]; then
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=public.ecr.aws
+            else
+              export SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io
+            fi
+            printf 'SUPABASE_INTERNAL_IMAGE_REGISTRY=%s\n' "$SUPABASE_INTERNAL_IMAGE_REGISTRY" >> "$GITHUB_ENV"
+            sleep 5
+          done
+      - name: Provision the H5 recovery journal
+        run: |
+          supabase db reset --local --no-seed
+          python3 tests/integration/journal_init.py
+      # Encrypted backup (pg_dump | age) into a private runner directory, destruction of
+      # the source, restore into a fresh empty stack, journal replay and validation.
+      # Keys, dumps and ciphertext stay in 0700 temporary directories and are never uploaded.
+      - name: REC-01..03 encrypted backup, loss and isolated restore with the independent journal
+        run: python3 tests/integration/rec.py
+      - name: Stop local containers
+        if: always()
+        run: supabase stop --no-backup

@@ -68,12 +68,16 @@ class LocalDeployer:
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         shutil.copytree(self.source / 'supabase' / 'functions', target / 'functions',
                         ignore=shutil.ignore_patterns('*_test.ts', 'deno.lock'))
+        self.package(target)
         files = sorted(p for p in target.rglob('*') if p.is_file())
         manifest = {'release_id': release_id, 'commit': commit, 'built_at': now_iso(),
                     'files': {str(p.relative_to(target)): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}}
         (target / 'release.json').write_text(json.dumps(manifest, sort_keys=True, indent=1), encoding='utf-8')
         LOG.emit('release-gate', 'release.build', 'success', release_id=release_id, duration_ms=timer.ms)
         return target
+
+    def package(self, target: Path) -> None:
+        """Extra immutable release content (H7 edge deployers add the Pages Function)."""
 
     def stop(self) -> None:
         for process in self.processes:
@@ -88,9 +92,9 @@ class LocalDeployer:
                 os.killpg(process.pid, signal.SIGKILL)
         self.processes = []
 
-    def _spawn(self, release_id: str, name: str, command: list[str], env: dict) -> None:
+    def _spawn(self, release_id: str, name: str, command: list[str], env: dict, cwd: Path | None = None) -> None:
         log = open(self.workdir / 'logs' / f'{release_id}-{name}.log', 'ab')
-        self.processes.append(subprocess.Popen(command, cwd=self.source, env=env, stdout=log, stderr=log, start_new_session=True))
+        self.processes.append(subprocess.Popen(command, cwd=cwd or self.source, env=env, stdout=log, stderr=log, start_new_session=True))
 
     def deploy(self, release_id: str) -> dict:
         """Stops the running release and starts `release_id`. Returns liveness."""

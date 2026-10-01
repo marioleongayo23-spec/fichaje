@@ -4,7 +4,11 @@ Signals come from health, canary, invariants, backup, jobs, journal, release
 and metric reports. Alerts carry only contract enumerations (alert name,
 severity, stable labels), fixed summaries and runbook anchors: never tenant,
 person, record, URL, credential or free text. The reproducible CI sink is a
-local HTTP receiver; PagerDuty/Slack/email are routes to add in H7.
+local HTTP receiver. H7 real routes: CRITICAL → pager (PagerDuty Events API v2,
+trigger/resolve deduplicated by fingerprint), WARNING → ticket (one GitHub issue
+per fingerprint in a private repository, closed on RESOLVED). Credentials are
+read only from environment variable names filled from a secret store; endpoints
+are fixed (a loopback override exists only for the reproducible tests).
 """
 from __future__ import annotations
 
@@ -12,13 +16,15 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import threading
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from opslib import CONTRACT, LOG, OpsError, enum, http_json, now_iso, release_info, write_private  # noqa: E402
+from opslib import CONTRACT, LOG, OpsError, enum, http_json, loopback, now_iso, release_info, write_private  # noqa: E402
 from retry import Operation, RetryPolicy, execute  # noqa: E402
 
 ALERTS = CONTRACT['alerts']
@@ -124,6 +130,8 @@ def evaluate(signals: dict) -> tuple[set[str], list[dict]]:
                 active.append(condition('CLOCK_REGRESSION', component=component))
             if stats['total'] >= THRESHOLDS['min_events_for_rates'] and stats['p95_ms'] >= THRESHOLDS['slow_p95_ms']:
                 active.append(condition('SLOW_OPERATIONS', component=component))
+            if stats.get('kiosk_rate_limited', 0) > 0 or stats.get('kiosk_auth_rejections', 0) >= THRESHOLDS['kiosk_auth_rejections_warning']:
+                active.append(condition('KIOSK_AUTH_ABUSE', component=component))
     return sources, active
 
 
@@ -164,11 +172,131 @@ class Notifier:
                 RetryPolicy(max_attempts=3, base_delay_ms=100, max_delay_ms=500))
 
 
-def notifiers_from_env() -> dict[str, list[Notifier]]:
+def _endpoint(default: str, override_env: str) -> str:
+    """The real provider endpoint, or a loopback receiver for reproducible tests only."""
+    override = os.environ.get(override_env)
+    if override and not loopback(override):
+        raise ValueError('ALERT_ROUTE_CONFIG')
+    return (override or default).rstrip('/')
+
+
+class PagerDutyNotifier:
+    """CRITICAL pager route (PagerDuty Events API v2). FIRING → trigger, RESOLVED →
+    resolve, both with dedup_key fichaje-<fingerprint>, so a retried or repeated
+    notification never pages twice. The routing key comes from a secret store
+    through an environment variable; it is sent only to the provider over TLS
+    and never logged, stored in alert state or put in an exception."""
+    DEFAULT_URL = 'https://events.pagerduty.com/v2/enqueue'
+
+    def __init__(self, routing_key_env: str = 'OPS_PAGERDUTY_ROUTING_KEY'):
+        key = os.environ.get(routing_key_env, '')
+        if not re.fullmatch(r'[A-Za-z0-9]{32}', key):
+            raise ValueError('ALERT_ROUTE_CONFIG')
+        self._key = key
+        self.url = _endpoint(self.DEFAULT_URL, 'OPS_PAGERDUTY_EVENTS_URL')
+
+    def event(self, payload: dict) -> dict:
+        dedup = 'fichaje-' + payload['fingerprint']
+        if payload['status'] == 'RESOLVED':
+            return {'routing_key': self._key, 'event_action': 'resolve', 'dedup_key': dedup}
+        return {'routing_key': self._key, 'event_action': 'trigger', 'dedup_key': dedup, 'payload': {
+            'summary': f"[{payload['environment']}] {payload['alert']}: {payload['summary']}"[:1024],
+            'source': f"fichaje-{payload['environment']}", 'severity': 'critical' if payload['severity'] == 'CRITICAL' else 'warning',
+            'component': payload['source'], 'group': payload['environment'], 'class': payload['alert'],
+            'custom_details': {'labels': payload['labels'], 'context': payload['context'], 'runbook': payload['runbook'],
+                               'release': payload['release'], 'commit': payload['commit'], 'notification_id': payload['notification_id']}}}
+
+    def send(self, payload: dict) -> None:
+        body = json.dumps(self.event(payload), sort_keys=True, separators=(',', ':')).encode()
+        execute(Operation('alerts', 'alert.notify', idempotent=True, mutation=True, payload=body, key=payload['notification_id']),
+                lambda data, _n: http_json('POST', self.url, {}, data, timeout=5),
+                RetryPolicy(max_attempts=3, base_delay_ms=200, max_delay_ms=1000))
+
+
+class GitHubIssueNotifier:
+    """WARNING ticket route: one issue per alert fingerprint in a private GitHub
+    repository. FIRING opens it once (an open issue with the same fingerprint
+    marker is reused), RESOLVED comments and closes it; repeating either is a
+    no-op. Token from an environment variable (fine-grained, Issues read/write
+    on that repository only, kept in the operator's secret store) — never a
+    repository or GitHub Actions secret. Only contract enumerations are written."""
+    DEFAULT_API = 'https://api.github.com'
+
+    def __init__(self, repository: str, token_env: str = 'OPS_GITHUB_TOKEN'):
+        if not re.fullmatch(r'[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}', repository):
+            raise ValueError('ALERT_ROUTE_CONFIG')
+        token = os.environ.get(token_env, '')
+        if not re.fullmatch(r'[A-Za-z0-9_]{20,255}', token):
+            raise ValueError('ALERT_ROUTE_CONFIG')
+        self._token = token
+        self.repository = repository
+        self.api = _endpoint(self.DEFAULT_API, 'OPS_GITHUB_API_URL')
+
+    def _call(self, method: str, path: str, body: dict | None = None):
+        headers = {'Authorization': 'Bearer ' + self._token, 'Accept': 'application/vnd.github+json',
+                   'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'fichaje-ops-alerts'}
+        data = None if body is None else json.dumps(body, sort_keys=True).encode()
+        op = Operation('alerts', 'alert.notify', idempotent=method == 'GET', mutation=method != 'GET', payload=data or b'')
+        return execute(op, lambda payload, _n: http_json(method, self.api + path, headers, payload, timeout=10)[1],
+                       RetryPolicy(max_attempts=3, base_delay_ms=200, max_delay_ms=1000))
+
+    def _open_issue(self, marker: str) -> int | None:
+        for page in (1, 2, 3):
+            issues = self._call('GET', f'/repos/{self.repository}/issues?state=open&per_page=100&page={page}') or []
+            for issue in issues:
+                if 'pull_request' not in issue and marker in str(issue.get('title', '')):
+                    return int(issue['number'])
+            if len(issues) < 100:
+                return None
+        return None
+
+    @staticmethod
+    def body(payload: dict) -> str:
+        rows = [('Estado', payload['status']), ('Alerta', payload['alert']), ('Severidad', payload['severity']),
+                ('Entorno', payload['environment']), ('Resumen', payload['summary']), ('Runbook', payload['runbook']),
+                ('Etiquetas', json.dumps(payload['labels'], sort_keys=True)), ('Contexto', json.dumps(payload['context'], sort_keys=True)),
+                ('Release', payload['release']), ('Commit', payload['commit']), ('Inicio', payload['started_at']),
+                ('Notificación', payload['notification_id'])]
+        return '\n'.join(['Alerta operativa generada por `scripts/ops/alerts.py` (contrato `fichaje.alert.v1`; sin datos personales).', '',
+                          '| Campo | Valor |', '|---|---|', *[f'| {k} | `{v}` |' for k, v in rows]])
+
+    def send(self, payload: dict) -> None:
+        marker = f"[{payload['fingerprint']}]"
+        number = self._open_issue(marker)
+        if payload['status'] == 'FIRING':
+            if number is None:
+                labels = ' '.join(f'{k}={v}' for k, v in sorted(payload['labels'].items()))
+                title = f"[{payload['severity']}][{payload['environment']}] {payload['alert']} {labels} {marker}".replace('  ', ' ')
+                self._call('POST', f'/repos/{self.repository}/issues', {'title': title[:256], 'body': self.body(payload),
+                                                                        'labels': ['fichaje-alert']})
+            return
+        if number is not None:
+            self._call('POST', f'/repos/{self.repository}/issues/{number}/comments', {'body': self.body(payload)})
+            self._call('PATCH', f'/repos/{self.repository}/issues/{number}', {'state': 'closed', 'state_reason': 'completed'})
+
+
+def notifier_for(target: str, environment: str = 'ci'):
+    """OPS_ALERT_ROUTE_* syntax: 'pagerduty', 'github-issues:<owner>/<repo>',
+    'https://…' (generic JSON webhook) and, outside staging/production only,
+    'file:<path>' or a loopback http:// test receiver."""
+    real = environment in ('staging', 'production')
+    if target == 'pagerduty':
+        return PagerDutyNotifier()
+    if target.startswith('github-issues:'):
+        return GitHubIssueNotifier(target.split(':', 1)[1])
+    parsed = urllib.parse.urlparse(target)
+    if parsed.scheme == 'https' and parsed.hostname and not parsed.username and not parsed.password:
+        return Notifier(target)
+    if not real and (target.startswith('file:') or (parsed.scheme == 'http' and loopback(target))):
+        return Notifier(target)
+    raise ValueError('ALERT_ROUTE_CONFIG')
+
+
+def notifiers_from_env(environment: str = 'ci') -> dict[str, list]:
     routes = {}
     for route in ('pager', 'ticket'):
         target = os.environ.get('OPS_ALERT_ROUTE_' + route.upper())
-        routes[route] = [Notifier(target)] if target else []
+        routes[route] = [notifier_for(target, environment)] if target else []
     return routes
 
 
@@ -182,7 +310,7 @@ class AlertEngine:
         if environment not in enum('environments'):
             raise ValueError('INVALID_ENVIRONMENT')
         self.state_path = Path(state_path)
-        self.notifiers = notifiers if notifiers is not None else notifiers_from_env()
+        self.notifiers = notifiers if notifiers is not None else notifiers_from_env(environment)
         self.environment = environment
         if environment == 'production' and any(not self.notifiers.get(route) for routes in CONTRACT['routes'].values() for route in routes):
             raise ValueError('ALERT_ROUTE_MISSING')   # production never evaluates alerts it cannot deliver

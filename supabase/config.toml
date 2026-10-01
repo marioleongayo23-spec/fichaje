@@ -24,10 +24,19 @@ enabled = true
 site_url = "http://127.0.0.1:5173"
 additional_redirect_urls = []
 jwt_expiry = 3600
-enable_signup = false
+# Self-service company onboarding: Auth account creation is public, but no tenant
+# or role is granted by Auth. A verified identity must pass create_organization RPC.
+enable_signup = true
 [auth.email]
 # Email/password provider enabled; public signup remains disabled by auth.enable_signup.
 enable_signup = true
 enable_confirmations = true
 [analytics]
 enabled = false
+# H7: both functions validate every JWT against Auth themselves and refuse any request
+# not signed by the same-origin edge (x-fichaje-edge) before parsing it, validating a JWT
+# or touching SQL; their health probes carry no JWT. Same as PlatformDeployer (--no-verify-jwt).
+[functions.kiosk]
+verify_jwt = false
+[functions.export-link]
+verify_jwt = false

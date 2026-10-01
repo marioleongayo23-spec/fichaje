@@ -35,9 +35,7 @@ los contenedores al terminar. Un check pendiente/fallido bloquea H1.
   transaccionales, bloqueo de organización, autorización tras lock y antes de replay.
   Versionado optimista en empleados/membresías. Una transferencia previa puede repetirse
   por el antiguo OWNER aún activo como ADMIN; no puede iniciar otra.
-- Alta inicial: `private.bootstrap_organization(org_uuid,name,verified_auth_uuid,request_uuid)`
-  solo operador PostgreSQL; NO grant al cliente/service_role, NO signup trigger. Requiere
-  Auth verificado preexistente. Idempotente, auditada, mínimo OWNER validado al commit.
+- Alta inicial: `private.bootstrap_organization(org_uuid,name,verified_auth_uuid,request_uuid)` sigue siendo la primitiva privada sin grant al cliente/service_role. H7 añade `public.create_organization(request_uuid,name)` para onboarding self-service: solo `authenticated`, exige Auth verificado, genera `organization_id` en servidor, crea exactamente la primera organización de una identidad sin membresías y asigna OWNER mediante la primitiva privada. Reintentos con el mismo `request_uuid` reproducen el mismo tenant; el cliente nunca elige rol ni tenant.
 - Invitación: gestor genera token aleatorio de 32 bytes/64 caracteres hex; pasa solo SHA-256
   a `create_invitation`. `accept_invitation` recibe token, ligado a tenant/email verificado/rol,
   TTL 24 h, un uso, revalidación del emisor. No reactiva membresías revocadas. Sin envío email
@@ -275,3 +273,22 @@ proxy se limita el proxy por tenant. Sin metadata TCP confiable falla cerrado.
 Ver SECURITY.md antes de cualquier adaptación de ingress. CI usa secretos efímeros
 y conexiones loopback sintéticas; `deno test supabase/functions/kiosk/network_test.ts`
 verifica canonicalización/HMAC y la integración H4 prueba el limiter y fugas reales.
+
+## H7 — firma de ingreso, despliegue y ensayos de piloto
+Las funciones `kiosk` y `export-link` comparten `functions/_shared/ingress.ts`: con `FICHAJE_INGRESS_SECRET`
+(base64 ≥ 32 bytes; `FICHAJE_INGRESS_SECRET_PREVIOUS` durante la rotación) solo aceptan peticiones firmadas por
+el borde del mismo origen (`x-fichaje-edge`, 60 s, ligada a método, función, ruta y bytes). Sin `KIOSK_PORT` /
+`EXPORT_LINK_PORT` (plataforma) o con `FICHAJE_ENV=staging|production`, el secreto es obligatorio y la función
+no arranca sin él; por eso los arneses locales (H4, H5, E2E, OPS-02) arrancan las funciones con puerto explícito. `config.toml` declara `verify_jwt = false` para ambas: validan cada JWT contra Auth.
+`deno test supabase/functions/_shared/ingress_test.ts` prueba el contrato; `tests/integration/h7_edge.py`
+lo prueba con el runtime real de Pages y comprueba que la URL directa de las funciones no es una entrada.
+
+Ensayos H7 (Supabase local, datos sintéticos; `.github/workflows/h7.yml`):
+- `h7_edge.py`: borde, bypass, SEC-H4-01 tras proxy y `scripts/staging/verify_staging.py` en modo local.
+- `h7_release.py`: fallo inducido con el deployer del borde, alertas, rollback y recuperación.
+- `h7_incident.py`: respuesta a incidentes IR-01 y rotación del secreto de ingreso.
+- `h7_load.py`: perfil de carga del piloto (requiere `npm ci --prefix edge`).
+- `rec.py`: backup cifrado con `age`, pérdida, restore aislado y journal independiente (requiere `age` y Docker).
+
+Despliegue en staging: `docs/STAGING.md` (secretos solo en los stores de Supabase/Cloudflare o custodia del
+operador; nunca en GitHub). No hay proyecto remoto configurado en este repositorio.

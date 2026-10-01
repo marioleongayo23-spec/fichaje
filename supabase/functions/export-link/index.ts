@@ -1,5 +1,10 @@
-// Server-only signer. The service key is used solely after JWT and RPC checks.
+// Server-only export generator + signer. Labour evidence is read only after
+// user authorization; PostgreSQL work runs under the existing minimal
+// fichaje_export_worker role. Storage service credentials never reach clients.
+import postgres from 'postgres';
 import { healthHandler, opsEvent, type ErrorClass, type Outcome } from '../_shared/ops.ts';
+import { INGRESS_HEADER, ingressPolicy, readBounded, routeOf, verifyIngress } from '../_shared/ingress.ts';
+import { packageSnapshot, type EvidenceSnapshot } from './package.ts';
 
 const required = (name: string) => {
   const value = Deno.env.get(name);
@@ -9,15 +14,86 @@ const required = (name: string) => {
 const endpoint = required('SUPABASE_URL');
 const anonKey = required('SUPABASE_ANON_KEY');
 const storageKey = required('SUPABASE_SERVICE_ROLE_KEY');
-const denied = () => new Response(JSON.stringify({ error: 'FORBIDDEN' }), {
-  status: 403, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store',
-    'Pragma': 'no-cache', 'Referrer-Policy': 'no-referrer' },
-});
+const dbUrl = Deno.env.get('SUPABASE_DB_URL') ?? Deno.env.get('EXPORT_DATABASE_URL');
+const database = dbUrl ? postgres(dbUrl, { max: 1, prepare: false, connect_timeout: 5, idle_timeout: 5 }) : null;
+
+// H7: on the platform (no local port) only edge-signed requests are served.
+const listenPort = Deno.env.get('EXPORT_LINK_PORT');
+const ingress = ingressPolicy(k => Deno.env.get(k), !listenPort);
+const signedByEdge = async (request: Request, body: Uint8Array<ArrayBuffer>) => !ingress.required || await verifyIngress(ingress.secrets,
+  request.headers.get(INGRESS_HEADER), request.method, 'export-link', routeOf('export-link', request.method, new URL(request.url).pathname),
+  body, Date.now() / 1000);
+
+const JSON_HEADERS = {
+  'Content-Type': 'application/json', 'Cache-Control': 'no-store',
+  'Pragma': 'no-cache', 'Referrer-Policy': 'no-referrer',
+};
+const denied = () => new Response(JSON.stringify({ error: 'FORBIDDEN' }), { status: 403, headers: JSON_HEADERS });
+const unavailable = () => new Response(JSON.stringify({ error: 'UNAVAILABLE' }), { status: 503, headers: JSON_HEADERS });
 const uuid = (v: unknown): v is string => typeof v === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 
-// OPS-02 readiness: Auth, PostgREST (an anonymous read must reach PostgreSQL
-// and be refused with 42501) and Storage. The service key is never used here.
+async function digest(data: Uint8Array): Promise<string> {
+  const copy = new Uint8Array(data.byteLength);
+  copy.set(data);
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', copy.buffer));
+  return Array.from(hash, (x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+async function storage(method: 'POST' | 'GET' | 'DELETE', path: string, body?: Uint8Array): Promise<Uint8Array> {
+  const encoded = path.split('/').map(encodeURIComponent).join('/');
+  let url = endpoint + '/storage/v1/object/fichaje-evidence/' + encoded;
+  const headers: Record<string, string> = {
+    apikey: storageKey, Authorization: 'Bearer ' + storageKey,
+    'Cache-Control': 'no-store',
+  };
+  let payload: BodyInit | undefined;
+  if (body) {
+    const copy = new Uint8Array(body.byteLength);
+    copy.set(body);
+    payload = copy.buffer;
+  }
+  if (method === 'POST') {
+    headers['Content-Type'] = 'application/zip';
+    headers['x-upsert'] = 'true';
+  } else if (method === 'DELETE') {
+    url = endpoint + '/storage/v1/object/fichaje-evidence';
+    headers['Content-Type'] = 'application/json';
+    payload = JSON.stringify({ prefixes: [path] });
+  }
+  const response = await fetch(url, { method, headers, body: payload, signal: AbortSignal.timeout(15000) });
+  if (!response.ok) { await response.body?.cancel(); throw new Error('STORAGE_ERROR'); }
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+interface Trace { outcome: Outcome; errorClass: ErrorClass }
+interface RequestFields { authorization: string; organizationId: string; jobId: string }
+
+async function validatedFields(request: Request, trace: Trace): Promise<RequestFields | null> {
+  if (request.method !== 'POST' || !request.headers.get('content-type')?.startsWith('application/json')) return null;
+  if (Number(request.headers.get('content-length') || 0) > 1024) return null;
+  const authorization = request.headers.get('authorization') || '';
+  if (!authorization.startsWith('Bearer ')) return null;
+  const bytes = await readBounded(request, 1024);
+  if (!bytes) return null;
+  if (!await signedByEdge(request, bytes)) { trace.errorClass = 'FORBIDDEN'; return null; }
+  let params: unknown;
+  try { params = JSON.parse(new TextDecoder().decode(bytes)); } catch { return null; }
+  if (typeof params !== 'object' || !params) return null;
+  const fields = params as Record<string, unknown>;
+  if (Object.keys(fields).sort().join(',') !== 'job_id,organization_id' ||
+    !uuid(fields.organization_id) || !uuid(fields.job_id)) return null;
+
+  trace.errorClass = 'UNAUTHENTICATED';
+  const auth = await fetch(endpoint + '/auth/v1/user', {
+    headers: { apikey: anonKey, Authorization: authorization }, signal: AbortSignal.timeout(5000),
+  });
+  if (!auth.ok) { await auth.body?.cancel(); return null; }
+  await auth.body?.cancel();
+  return { authorization, organizationId: fields.organization_id, jobId: fields.job_id };
+}
+
+// OPS-02 readiness includes the database dependency used by generation.
 const health = healthHandler('export-link', {
   auth: async () => {
     const res = await fetch(endpoint + '/auth/v1/health', { headers: { apikey: anonKey }, signal: AbortSignal.timeout(2000) });
@@ -35,82 +111,145 @@ const health = healthHandler('export-link', {
     await res.body?.cancel();
     if (!res.ok) throw new Error('STORAGE_UNAVAILABLE');
   },
+  database: async () => {
+    if (!database) throw new Error('DB_UNAVAILABLE');
+    const rows = await database`select 1 as ok`;
+    if (rows[0]?.ok !== 1) throw new Error('DB_UNAVAILABLE');
+  },
 });
 
-interface Trace { outcome: Outcome; errorClass: ErrorClass }
+async function authorize(rpc: 'authorize_export_link' | 'authorize_export_generation', fields: RequestFields): Promise<Response> {
+  return await fetch(endpoint + '/rest/v1/rpc/' + rpc, {
+    method: 'POST',
+    headers: { apikey: anonKey, Authorization: fields.authorization, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_organization_id: fields.organizationId, p_job_id: fields.jobId }),
+    signal: AbortSignal.timeout(5000),
+  });
+}
 
 async function sign(request: Request, trace: Trace): Promise<Response> {
   try {
-    if (request.method !== 'POST' || !request.headers.get('content-type')?.startsWith('application/json')) return denied();
-    if (Number(request.headers.get('content-length') || 0) > 1024) return denied();
-    const authorization = request.headers.get('authorization') || '';
-    if (!authorization.startsWith('Bearer ')) return denied();
-    const body = await request.text();
-    if (body.length > 1024) return denied();
-    const params: unknown = JSON.parse(body);
-    if (typeof params !== 'object' || !params) return denied();
-    const fields = params as Record<string, unknown>;
-    if (Object.keys(fields).sort().join(',') !== 'job_id,organization_id' ||
-      !uuid(fields.organization_id) || !uuid(fields.job_id)) return denied();
-    trace.errorClass = 'UNAUTHENTICATED';
-    const auth = await fetch(endpoint + '/auth/v1/user', { headers: { apikey: anonKey, Authorization: authorization }, signal: AbortSignal.timeout(5000) });
-    if (!auth.ok) return denied();
+    const fields = await validatedFields(request, trace);
+    if (!fields) return denied();
     trace.errorClass = 'FORBIDDEN';
-    const result = await fetch(endpoint + '/rest/v1/rpc/authorize_export_link', {
-      method: 'POST', headers: { apikey: anonKey, Authorization: authorization, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ p_organization_id: fields.organization_id, p_job_id: fields.job_id }),
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!result.ok) return denied();
+    const result = await authorize('authorize_export_link', fields);
+    if (!result.ok) { await result.body?.cancel(); return denied(); }
     const permit = await result.json();
     const path = permit?.path;
     const seconds = permit?.expires_in;
     trace.errorClass = 'INVALID_RESPONSE';
-    if (path !== `${fields.organization_id}/${fields.job_id}.zip` ||
+    if (path !== `${fields.organizationId}/${fields.jobId}.zip` ||
       !Number.isInteger(seconds) || seconds < 1 || seconds > 300) return denied();
+
     trace.errorClass = 'STORAGE_ERROR';
     const signed = await fetch(endpoint + '/storage/v1/object/sign/fichaje-evidence/' + path, {
-      method: 'POST', headers: { apikey: storageKey, Authorization: 'Bearer ' + storageKey,
-        'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: seconds }),
-      signal: AbortSignal.timeout(5000),
+      method: 'POST',
+      headers: { apikey: storageKey, Authorization: 'Bearer ' + storageKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresIn: seconds }), signal: AbortSignal.timeout(5000),
     });
-    if (!signed.ok) return denied();
+    if (!signed.ok) { await signed.body?.cancel(); return unavailable(); }
     const receipt = await signed.json();
-    if (typeof receipt.signedURL !== 'string' || !receipt.signedURL.startsWith('/object/sign/')) return denied();
+    if (typeof receipt.signedURL !== 'string' || !receipt.signedURL.startsWith('/object/sign/')) return unavailable();
     trace.outcome = 'success';
     trace.errorClass = 'NONE';
-    return new Response(JSON.stringify({ url: endpoint + '/storage/v1' + receipt.signedURL, expires_in: seconds }), {
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store',
-        'Pragma': 'no-cache', 'Referrer-Policy': 'no-referrer' },
-    });
+    return new Response(JSON.stringify({ url: endpoint + '/storage/v1' + receipt.signedURL, expires_in: seconds }), { headers: JSON_HEADERS });
   } catch {
-    // Parse errors keep INVALID_INPUT; an unreachable dependency is classified
-    // by the step that failed. The signed URL is never logged.
-    const unreachable: Partial<Record<ErrorClass, ErrorClass>> = { UNAUTHENTICATED: 'AUTH_UNAVAILABLE', FORBIDDEN: 'UPSTREAM_5XX' };
     if (trace.errorClass !== 'INVALID_INPUT') {
       trace.outcome = 'failure';
-      trace.errorClass = unreachable[trace.errorClass] ?? trace.errorClass;
+      if (trace.errorClass === 'UNAUTHENTICATED') trace.errorClass = 'AUTH_UNAVAILABLE';
+      else if (trace.errorClass === 'FORBIDDEN') trace.errorClass = 'UPSTREAM_5XX';
     }
-    return denied();
+    return unavailable();
+  }
+}
+
+async function generate(request: Request, trace: Trace): Promise<Response> {
+  let objectPath: string | null = null;
+  let uploaded = false;
+  try {
+    const fields = await validatedFields(request, trace);
+    if (!fields) return denied();
+
+    trace.errorClass = 'FORBIDDEN';
+    const result = await authorize('authorize_export_generation', fields);
+    if (!result.ok) { await result.body?.cancel(); return denied(); }
+    const permit = await result.json();
+    if (permit?.status === 'READY') {
+      trace.outcome = 'success';
+      trace.errorClass = 'NONE';
+      return new Response(JSON.stringify({ status: 'READY' }), { headers: JSON_HEADERS });
+    }
+    if (permit?.status !== 'PENDING') return denied();
+    if (!database) { trace.errorClass = 'DB_UNAVAILABLE'; return unavailable(); }
+
+    objectPath = `${fields.organizationId}/${fields.jobId}.zip`;
+    trace.errorClass = 'DB_UNAVAILABLE';
+    const status = await database.begin(async (sql) => {
+      await sql.unsafe('set local role fichaje_export_worker');
+      const jobs = await sql.unsafe(
+        "select organization_id,id,status,snapshot from private.export_jobs " +
+        "where organization_id=$1::uuid and id=$2::uuid and status in ('PENDING','READY') " +
+        "and expires_at>clock_timestamp() for update",
+        [fields.organizationId, fields.jobId],
+      );
+      if (jobs.length !== 1) throw new Error('EXPORT_UNAVAILABLE');
+      if (jobs[0].status === 'READY') return 'READY';
+
+      trace.errorClass = 'INTERNAL';
+      const { archive, digest: checksum } = await packageSnapshot(jobs[0].snapshot as EvidenceSnapshot);
+      trace.errorClass = 'STORAGE_ERROR';
+      await storage('POST', objectPath as string, archive);
+      uploaded = true;
+      const downloaded = await storage('GET', objectPath as string);
+      if (await digest(downloaded) !== checksum) throw new Error('EXPORT_VERIFY_FAILED');
+
+      trace.errorClass = 'DB_UNAVAILABLE';
+      const updated = await sql.unsafe(
+        "update private.export_jobs set status='READY',checksum=$1,object_path=$2 " +
+        "where organization_id=$3::uuid and id=$4::uuid and status='PENDING' " +
+        "and expires_at>clock_timestamp() returning id",
+        [checksum, objectPath, fields.organizationId, fields.jobId],
+      );
+      if (updated.length !== 1) throw new Error('EXPORT_EXPIRED');
+      return 'READY';
+    });
+
+    if (status !== 'READY') return unavailable();
+    trace.outcome = 'success';
+    trace.errorClass = 'NONE';
+    return new Response(JSON.stringify({ status: 'READY' }), { headers: JSON_HEADERS });
+  } catch {
+    if (uploaded && objectPath) {
+      try { await storage('DELETE', objectPath); } catch { /* private orphan cleanup is best effort */ }
+    }
+    trace.outcome = 'failure';
+    return unavailable();
   }
 }
 
 // One structured event per request (OBS-01): outcome and stable class only.
 export async function handler(request: Request): Promise<Response> {
   if (request.method === 'GET') {
+    if (!await signedByEdge(request, new Uint8Array(0))) {
+      opsEvent('export-link', 'request.rejected', 'rejected', { error_class: 'FORBIDDEN', stage: 'ingress', status: 403 });
+      return denied();
+    }
     const probe = await health(new URL(request.url).pathname);
     if (probe) return probe;
   }
+
   const started = performance.now();
   const trace: Trace = { outcome: 'rejected', errorClass: 'INVALID_INPUT' };
-  const response = await sign(request, trace);
-  opsEvent('export-link', 'export.link', trace.outcome, { error_class: trace.errorClass,
-    duration_ms: performance.now() - started, status: response.status });
+  const generation = /\/generate\/?$/.test(new URL(request.url).pathname);
+  const response = generation ? await generate(request, trace) : await sign(request, trace);
+  opsEvent('export-link', 'export.link', trace.outcome, {
+    error_class: trace.errorClass, duration_ms: performance.now() - started,
+    status: response.status, stage: generation ? 'generate' : 'sign',
+  });
   return response;
 }
 
 if (import.meta.main) {
-  const port = Deno.env.get('EXPORT_LINK_PORT');
-  if (port) Deno.serve({ hostname: '127.0.0.1', port: Number(port), onListen: () => {} }, handler);
+  if (listenPort) Deno.serve({ hostname: '127.0.0.1', port: Number(listenPort), onListen: () => {} }, handler);
   else Deno.serve(handler);
 }

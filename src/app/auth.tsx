@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Session } from '@supabase/supabase-js';
+import { createClient, type Session } from '@supabase/supabase-js';
 import { ApiError } from '../lib/errors';
 import { clearStoredSession, HUMAN_STORAGE_KEY } from '../lib/storage';
 import { recordRequest } from '../lib/telemetry';
@@ -8,6 +8,7 @@ import { useServices } from './services';
 interface AuthValue {
   session: Session | null; loading: boolean; notice: string | null;
   signIn: (email: string, password: string) => Promise<string | null>;
+  signUp: (email: string, password: string) => Promise<string | null>;
   signOut: (notice?: string) => Promise<void>;
 }
 const AuthContext = createContext<AuthValue | null>(null);
@@ -15,7 +16,14 @@ const AuthContext = createContext<AuthValue | null>(null);
 // Supabase Auth owns the session (persisted under its own storage key and
 // refreshed by the library). Only public credentials exist in the browser.
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { client } = useServices();
+  const { client, config } = useServices();
+  // Registration is intentionally isolated from the persisted human session.
+  // Some Auth environments may return a transient session on sign-up; that
+  // must never switch the app into an authenticated tenant flow before the
+  // user explicitly signs in after confirming the email.
+  const signupClient = useMemo(() => createClient(config.supabase.url, config.supabase.key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  }), [config.supabase.url, config.supabase.key]);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
@@ -46,6 +54,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [client]);
 
+  const signUp = useCallback(async (email: string, password: string) => {
+    if (!navigator.onLine) return 'Sin conexión. No se puede crear la cuenta sin conexión.';
+    const started = performance.now();
+    try {
+      const { error } = await signupClient.auth.signUp({ email: email.trim(), password });
+      recordRequest('auth.sign_in', !error ? null : error.status === 429 ? new ApiError('validation', 'RATE_LIMITED', 429)
+        : error.status ? new ApiError('validation', 'INVALID_INPUT', error.status) : new ApiError('network', 'NETWORK'),
+      false, performance.now() - started);
+      if (!error) {
+        setNotice('Cuenta creada. Revisa tu correo y confirma la dirección antes de iniciar sesión.');
+        return null;
+      }
+      if (error.status === 429) return 'Demasiados intentos. Espera unos minutos antes de volver a intentarlo.';
+      if (!error.status) return 'No hay conexión con el servicio. Inténtalo de nuevo.';
+      return 'No se ha podido crear la cuenta. Revisa los datos o inicia sesión si ya tienes una cuenta.';
+    } catch {
+      return 'No hay conexión con el servicio. Inténtalo de nuevo.';
+    }
+  }, [signupClient]);
+
   // Local sign-out: other devices keep their sessions. If the server cannot be
   // reached, the stored session is still removed from this browser.
   const signOut = useCallback(async (message?: string) => {
@@ -55,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }, [client]);
 
-  const value = useMemo(() => ({ session, loading, notice, signIn, signOut }), [session, loading, notice, signIn, signOut]);
+  const value = useMemo(() => ({ session, loading, notice, signIn, signUp, signOut }), [session, loading, notice, signIn, signUp, signOut]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

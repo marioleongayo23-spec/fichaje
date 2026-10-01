@@ -7,6 +7,11 @@ PostgREST expone lecturas RLS y RPC permitidas. Supabase Edge Function futura so
 kiosco/exportaciones: secretos aislados del bundle; no sustituye autorizaciones en PostgreSQL.
 GitHub Actions valida cambios y permite backup manual de código, sin despliegues.
 
+## Onboarding self-service
+Supabase Auth permite crear la identidad humana y exige confirmación de email. La creación de cuenta por sí sola no crea ninguna fila de negocio.
+Si la identidad verificada no tiene membresías, la UI puede llamar a `public.create_organization(request_id,name)`. La RPC SECURITY DEFINER pertenece al rol técnico mínimo de bootstrap, genera el UUID de organización en servidor y reutiliza `private.bootstrap_organization`; RLS/capabilities siguen acotando la transacción al tenant recién creado.
+Una tabla privada de idempotencia de onboarding conserva solo identidad técnica, request UUID, hash SHA-256 del nombre y organization UUID; el cliente no puede leerla. Reintento del mismo request devuelve el mismo tenant. Tras la primera membresía, nuevas organizaciones solo llegan por los flujos autorizados (p. ej. invitación), no por autoelevación.
+
 ## Multiempresa
 Un proyecto Supabase y esquema compartido para pilotos; no una base por cliente.
 Todas las tablas de negocio llevan organization_id NOT NULL, índices empezando por tenant y
@@ -114,3 +119,26 @@ H1-H5 sin cambios y confirmación solo tras ACK. Service worker de shell públic
 Gateway de kiosco y firmador de exportaciones por rutas del mismo origen (proxy inverso en despliegue,
 decisión H7). El kiosco identifica con código+PIN y el servidor devuelve estado, versión y un
 challenge por acción legal (KIO-H6-01, único cambio backend de H6). Ver `docs/UI_PWA.md`.
+
+## H7 — despliegue de piloto (preparado; staging remoto pendiente)
+```
+navegador/kiosco ─HTTPS─▶ Cloudflare Pages: dist/ + _headers + /gateway/* (Pages Function, edge/gateway.ts)
+                                   │ firma x-fichaje-edge (HMAC, 60 s)
+                                   ▼
+                  Supabase: Edge Functions kiosk/export-link · Auth · PostgREST · Storage privado · PostgreSQL 17
+                                   │ dblink TLS verify-full
+                                   ▼
+                  PostgreSQL independiente del journal de recuperación
+host de operación: health, canary, invariantes, alertas (PagerDuty/GitHub Issues), backup cifrado (age), restore
+```
+- **Mismo origen sin CORS**: la decisión pendiente de H6 se resuelve con una Pages Function en el mismo proyecto
+  que sirve la app; las funciones solo aceptan peticiones firmadas por ella (contrato en `SECURITY.md` H7).
+- **Despliegue**: `scripts/ops/deployers.py` (`PlatformDeployer`: wrangler desde la copia de la release y
+  `supabase functions deploy --no-verify-jwt`), gobernado por `release_gate.promote()` con rollback a la
+  última release sana; ninguna credencial de plataforma pasa por GitHub Actions. Procedimiento en `STAGING.md`.
+- **Alertas reales**: `alerts.py` con adaptadores PagerDuty Events v2 (CRITICAL → página, `dedup_key` =
+  huella) y GitHub Issues (WARNING → ticket), rutas por variables de entorno del host y sin PII.
+- **Backup**: `scripts/backup_database.sh` (pg_dump 17 custom | age, verify-full, fallo cerrado) y
+  `scripts/restore_database.sh` (restore aislado en una transacción); journal en instancia separada.
+- **Carga**: la latencia del kiosco la domina Argon2id (19 MiB, t=2) serializado en cada instancia del gateway;
+  el modelo de concurrencia real de Supabase Edge decide la cifra de staging.

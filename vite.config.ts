@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { defineConfig, loadEnv, type Plugin, type ProxyOptions } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -41,6 +43,45 @@ export function contentSecurityPolicy(env: Record<string, string>): string {
     "object-src 'none'", "base-uri 'self'", "form-action 'self'", "frame-src 'none'"].join('; ');
 }
 
+// H7 Cloudflare Pages static policy. Headers for every static response (the
+// /gateway functions set their own no-store headers): the same CSP plus
+// frame-ancestors (header only), HSTS, no default CORS on static files, no
+// referrer, no powerful features, no indexing, revalidated HTML and immutable
+// hashed assets. The function route table only admits /gateway/*.
+export const PAGES_ROUTES = { version: 1, include: ['/gateway/*'], exclude: [] as string[] };
+
+export function pagesHeaders(env: Record<string, string>): string {
+  return ['/*',
+    '  ! Access-Control-Allow-Origin',
+    '  ! Referrer-Policy',
+    `  Content-Security-Policy: ${contentSecurityPolicy(env)}; frame-ancestors 'none'`,
+    '  Strict-Transport-Security: max-age=31536000',
+    '  X-Frame-Options: DENY',
+    '  Referrer-Policy: no-referrer',
+    '  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()',
+    '  Cross-Origin-Opener-Policy: same-origin',
+    '  Cross-Origin-Resource-Policy: same-origin',
+    '  X-Robots-Tag: noindex, nofollow',
+    '  Cache-Control: no-cache',
+    '/assets/*',
+    '  ! Cache-Control',
+    '  Cache-Control: public, max-age=31536000, immutable',
+    ''].join('\n');
+}
+
+// Written after the bundle, so neither file can enter the service worker precache.
+function pagesPolicy(env: Record<string, string>): Plugin {
+  return {
+    name: 'fichaje-pages-policy',
+    apply: 'build',
+    writeBundle(options) {
+      if (!options.dir) throw new Error('Output directory missing');
+      writeFileSync(join(options.dir, '_headers'), pagesHeaders(env));
+      writeFileSync(join(options.dir, '_routes.json'), JSON.stringify(PAGES_ROUTES) + '\n');
+    },
+  };
+}
+
 function csp(env: Record<string, string>): Plugin {
   return {
     name: 'fichaje-csp',
@@ -79,7 +120,7 @@ function releaseMeta(): Plugin {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   return {
-    plugins: [react(), serviceWorker(), csp(env), releaseMeta()],
+    plugins: [react(), serviceWorker(), csp(env), releaseMeta(), pagesPolicy(env)],
     build: {
       rolldownOptions: {
         input: { index: 'index.html', sw: 'src/pwa/sw.ts' },

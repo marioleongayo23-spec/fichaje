@@ -63,6 +63,10 @@ describe('artefact secret scanner', () => {
         'gh' + 'p_' + 'a1B2'.repeat(9),
         '/object/sign/fichaje-evidence/org/job.zip?' + 'token=' + 'x'.repeat(40),
         'OPS_REPAIR' + '_DSN',
+        'FICHAJE_INGRESS' + '_SECRET',
+        'OPS_PAGERDUTY' + '_ROUTING_KEY',
+        'CLOUDFLARE_API' + '_TOKEN',
+        'sb' + 'p_' + 'a1B2'.repeat(10),
       ];
       for (const [index, shape] of shapes.entries()) {
         writeFileSync(join(dir, `leak-${index}.txt`), shape);
