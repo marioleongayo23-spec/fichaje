@@ -248,6 +248,9 @@ describe('GO-LIVE recovery operator helpers', () => {
     expect(bootstrap).toContain('read -rs STAGING_ADMIN_PASSWORD');
     expect(bootstrap).toContain('read -rs PRODUCTION_ADMIN_PASSWORD');
     expect(bootstrap).toContain('security add-generic-password');
+    expect(bootstrap).toContain('unset AGE_SECRET');
+    expect(bootstrap).toContain('rm -f "$WORK/age-identity.txt" "$WORK/age-full.txt"');
+    expect(bootstrap.indexOf('rm -f "$WORK/age-identity.txt" "$WORK/age-full.txt"')).toBeLessThan(bootstrap.indexOf('FICHAJE_BACKUP_PGSERVICE=fichaje_backup_staging'));
     expect(bootstrap).toContain("select private.verify_journal_entry");
     expect(bootstrap).toContain('fichaje_backup_production');
     expect(bootstrap).toContain('FICHAJE_BACKUP_CA=system');
