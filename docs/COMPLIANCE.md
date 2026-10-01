@@ -67,7 +67,7 @@ Las [plantillas legales](legal/README.md) siguen siendo revisables. Antes de usa
 
 Comprobación adicional previa a producción:
 
-- El Proyecto de Ley 121/000058, que proponía nuevos requisitos de reducción de jornada y registro digital, figura en el Congreso como **rechazado/devuelto** el 10-09-2025. No se incorpora a Fichaje APP como obligación vigente.
+- El Proyecto de Ley 121/000058, que proponía nuevos requisitos de reducción de jornada y registro digital, fue objeto de votación de devolución el 10-09-2025 y figura como **concluido/rechazado** desde el 11-09-2025. No se incorpora a Fichaje APP como obligación vigente.
 - Se mantiene como base general el art. 34.9 del Estatuto de los Trabajadores: registro diario con inicio y finalización, conservación durante cuatro años y disponibilidad.
 - La AEPD mantiene que el registro horario ordinario puede apoyarse en la obligación legal sin consentimiento del trabajador, pero existe deber de información sobre el tratamiento.
 - Los convenios colectivos pueden imponer requisitos adicionales; se revisarán para cada cliente antes del alta cuando sean relevantes.
@@ -78,3 +78,11 @@ Fuentes primarias revisadas el 2026-10-01:
 - https://www.aepd.es/preguntas-frecuentes/3-proteccion-de-datos-en-el-ambito-laboral/FAQ-0311-es-necesario-el-consentimiento-del-trabajador-para-implantar-un-sistema-de-control-horario
 
 Esta revisión sigue sin equivaler a asesoramiento jurídico individualizado ni a certificación.
+
+
+### Norma publicada con entrada en vigor 2026-10-05
+El Real Decreto 723/2026, de 9 de septiembre (BOE-A-2026-19200), publicado el 15-09-2026 y con entrada en vigor el **05-10-2026**, amplía la información que la empresa debe facilitar sobre elementos esenciales y condiciones de trabajo. Su art. 3.2.k incluye la existencia, pautas, criterios y reglas de sistemas algorítmicos o automatizados cuando se usen para tomar decisiones sobre condiciones laborales, entre ellas duración o distribución de jornada.
+
+Fichaje V1 **no toma decisiones laborales automatizadas**: registra acciones iniciadas por personas usuarias, aplica una máquina de estados determinista y permite correcciones decididas por personas gestoras. OPS-02 puede diagnosticar, reintentar operaciones idempotentes, hacer rollback de releases y reconstruir proyecciones desde fuentes inmutables, pero no decide jornada, turnos, salario, productividad, sanciones ni extinción. Si el producto incorporase en el futuro recomendaciones o decisiones automatizadas sobre esas materias, deberá abrirse una revisión jurídica/técnica separada antes de activarlas.
+
+Fuente primaria: https://www.boe.es/diario_boe/txt.php?id=BOE-A-2026-19200
