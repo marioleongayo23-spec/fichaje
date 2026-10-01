@@ -15,6 +15,10 @@ it('keeps CI unprivileged and repository backup scheduled/manual, with no databa
   expect(ciRun).toContain('wrangler pages functions build functions');
   expect(ciRun).toContain('--outdir pages-worker');
   expect(ciRun).toContain('mv pages-upload/index.js pages-upload/_worker.js');
+  const build = ci.jobs.validate.steps.find((s: { name?: string }) => s.name === 'Build');
+  expect(build.env.VITE_SUPABASE_URL).toBe('https://pvfjffeszsedslmwdvgh.supabase.co');
+  expect(build.env.VITE_SUPABASE_PUBLISHABLE_KEY).toMatch(/^sb_publishable_/);
+  expect(JSON.stringify(build.env)).not.toMatch(/sb_secret_|service_role/);
   const upload = ci.jobs.validate.steps.find((s: { uses?: string }) => s.uses === 'actions/upload-artifact@v4');
   expect(upload.with.path).toBe('pages-upload/');
   expect(upload.with.name).toContain('pages-dist-');
