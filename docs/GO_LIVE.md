@@ -24,9 +24,9 @@ El producto funcional ya está cerrado en H7. GO-LIVE solo valida que la operaci
 | GL-02 | Supabase Security Advisor revisado; findings intencionados documentados y sin hallazgos críticos sin resolver | PARTIAL |
 | GL-03 | Producción vacía antes del primer alta y migraciones alineadas con staging | PASS |
 | GL-04 | Build productivo no puede apuntar a staging ni a gateways externos | IMPLEMENTED; pendiente CI |
-| GL-05 | Ruta de alerta real operativa y probada con un evento sintético, sin PII | BLOCKED |
-| GL-06 | Backup DB real cifrado + custodia de clave fuera del destino + restore probado en entorno vacío | BLOCKED |
-| GL-07 | Journal de recuperación independiente operativo y reconciliable | BLOCKED |
+| GL-05 | Ruta de alerta real operativa y probada con un evento sintético, sin PII | PASS — GitHub Issues privado; run 36881276163; issues sintéticos #22/#23 cerrados |
+| GL-06 | Backup DB real cifrado + custodia de clave fuera del destino + restore probado en entorno vacío | PARTIAL — destino privado candidato creado; falta credencial DB, clave age offline y restore real |
+| GL-07 | Journal de recuperación independiente operativo y reconciliable | BLOCKED — diseño validado; la integración no permite aprovisionar de forma segura la credencial SQL entre proyectos |
 | GL-08 | Runbook de incidente con responsable, corte de escrituras, restore/reapertura y contacto de brechas | PARTIAL |
 | GL-09 | Revisión normativa vigente, contrato de encargo/subencargados y documentación de información a plantilla disponibles para el primer cliente | PARTIAL |
 | GL-10 | Control de procedencia de release: branch protection si el plan lo permite o gate equivalente que rechace cualquier SHA que no sea HEAD de `main`, merge de PR y 5/5 checks verdes | IMPLEMENTED; pendiente CI |
@@ -71,3 +71,18 @@ Fuentes: BOE-A-2015-11430; AEPD FAQ 0311; Congreso iniciativa 121/000058.
 ## Salida
 
 GO-LIVE solo pasa cuando todos los gates están acreditados en `CURRENT_STATE.md` con evidencia verificable. Después requiere una orden explícita y posterior del usuario para merge y otra autorización explícita para activar producción real si aún no se hubiera dado.
+
+
+### Evidencia GL-05 — ruta real sin coste
+El run `36881276163` ejecutó el mismo adaptador `GitHubIssueNotifier` con el `GITHUB_TOKEN` efímero de Actions y permiso mínimo `issues: write`. Se probaron en entorno lógico `production`:
+- CRITICAL `APP_DOWN`: issue #22 abierto y cerrado al resolver;
+- WARNING `INVARIANT_WARNING`: issue #23 abierto y cerrado al resolver;
+- ambos con etiqueta `fichaje-alert`, sin datos de empresa, empleado, PIN, email ni payload laboral;
+- no se guarda token propio ni secret de GitHub.
+
+Se corrigieron dos defectos detectados por la prueba real: validación demasiado rígida del formato del token y carrera de consistencia del listado de Issues tras crear/Resolver inmediatamente. La ruta quedó probada después de ambas correcciones.
+
+### Preparación GL-06 — coste 0
+Se creó en el Drive privado existente `Fichaje APP - BACKUP` la carpeta `02 - DB Encrypted Backups` como **destino candidato**, no autorizado todavía para datos reales. El script existente `scripts/backup_database.sh` ya exige `pg_dump | age`, TLS verify-full, ficheros 0600 y ausencia de la clave privada age en el host/destino.
+
+El gate no pasa aún: falta ejecutar un backup del candidato productivo con credencial de solo lectura, custodiar la identidad privada age fuera del destino y restaurar ese backup en un entorno vacío. No se sustituye esta prueba por documentación ni por un checksum.
