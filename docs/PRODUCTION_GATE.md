@@ -23,7 +23,7 @@ una orden expresa del usuario para activar producción / primer cliente real.
 | PRE-05 | Correo transaccional | PARTIAL | SMTP/proveedor aprobado, confirmación e invitaciones probadas sin exponer tokens; SPF/DKIM/DMARC cuando aplique |
 | PRE-06 | Alertas reales y operación | BLOCKED | CRITICAL y WARNING recibidos por rutas reales, RESOLVED probado, canary e invariantes programados |
 | PRE-07 | Backup/restore real | BLOCKED | Backup cifrado activo, destino privado, clave age separada, restore aislado real REC-01..03, RPO/RTO medidos |
-| PRE-08 | Seguridad independiente | BLOCKED | Revisión independiente de RLS/Auth/edge/Storage/dependencias y resolución de hallazgos críticos/altos |
+| PRE-08 | Seguridad independiente | PARTIAL | Revisión independiente de RLS/Auth/edge/Storage/dependencias y resolución de hallazgos críticos/altos |
 | PRE-09 | Ensayo final production-like | BLOCKED | Alta, OWNER/ADMIN/EMPLOYEE, kiosco, ciclo horario, corrección, exportación, aislamiento y fallo/rollback con datos sintéticos |
 | PRE-10 | Autorización primer cliente | BLOCKED | Empresa concreta + convenio revisados; contratos firmados; aprobación expresa del usuario para producción y datos reales |
 
@@ -95,3 +95,23 @@ Limitaciones de Free relevantes para la decisión comercial:
 
 Conclusión: **Pro no es un requisito legal ni un coste por cliente**. Es una decisión de fiabilidad que se
 reevaluará al activar el primer cliente/ingresos. La puerta no puede ocultar las limitaciones de Free.
+
+
+## Revisión automática de seguridad PRE-08 — 2026-10-01
+Supabase Security Advisor ejecutado contra staging:
+- 0 hallazgos CRITICAL/HIGH reportados por el advisor.
+- WARN: 20 RPC `SECURITY DEFINER` ejecutables por `authenticated`. Es un patrón **intencional** del
+  contrato de Fichaje: funciones públicas acotadas, autorización explícita de actor/tenant, propietarios
+  técnicos mínimos, `search_path=''`, RLS/GRANT y suites de abuso/cross-tenant. No se cambia a
+  `SECURITY INVOKER` ni se revoca EXECUTE de forma mecánica porque rompería el API previsto y no
+  resolvería por sí mismo la autorización.
+- WARN: leaked-password protection desactivada. Supabase la ofrece en planes Pro y superiores; mientras
+  se mantenga Free no se declara disponible.
+- El registro self-service exige mínimo 12 caracteres en UI. Antes de producción debe verificarse y fijarse
+  además la política **autoritativa** de Auth del proyecto productivo; el cliente no es control de seguridad.
+- Advisor de rendimiento: 28 FK sin índice de cobertura, 2 índices sin uso y 4 conjuntos de políticas RLS
+  permisivas múltiples. Son avisos de rendimiento; no se modificarán índices/policies sin evidencia de
+  consulta/carga porque correctitud y aislamiento prevalecen.
+
+PRE-08 permanece PARTIAL: falta revisión independiente externa/final del candidato productivo y resolver
+cualquier hallazgo crítico/alto que esa revisión encuentre.
