@@ -50,7 +50,10 @@ owner_only "$PGSERVICEFILE" && owner_only "$PGPASSFILE" || blocked 'PGSERVICEFIL
 owner_only "$FICHAJE_RESTORE_IDENTITY" || blocked 'the age identity must be an owner-only (0600) file'
 identity=$(cd "$(dirname "$FICHAJE_RESTORE_IDENTITY")" && pwd -P)/$(basename "$FICHAJE_RESTORE_IDENTITY")
 [[ $identity != "$source_dir"/* ]] || blocked 'the private key is stored next to the backup'
-grep -q 'BEGIN CERTIFICATE' "$FICHAJE_RESTORE_CA" 2>/dev/null || blocked 'FICHAJE_RESTORE_CA is not a PEM certificate'
+if [[ $FICHAJE_RESTORE_CA != system ]]; then
+  grep -q 'BEGIN CERTIFICATE' "$FICHAJE_RESTORE_CA" 2>/dev/null || blocked 'FICHAJE_RESTORE_CA must be system or a PEM certificate'
+  grep -q 'PRIVATE KEY' "$FICHAJE_RESTORE_CA" 2>/dev/null && blocked 'FICHAJE_RESTORE_CA contains a private key'
+fi
 for tool in age pg_restore psql; do command -v "$tool" >/dev/null || blocked "$tool is not installed"; done
 command -v sha256sum >/dev/null || command -v shasum >/dev/null || blocked 'sha256sum or shasum is not installed'
 cipher="$source_dir/$name.dump.age"
