@@ -28,6 +28,13 @@ def _origin_host(value: str) -> str | None:
     return parsed.hostname
 
 
+def direct_overrides_allowed(functions_url: str | None, kiosk_url: str | None, export_url: str | None) -> bool:
+    """Production direct-function probes are derived from the pinned API origin.
+    Operator-supplied overrides could make the bypass test exercise another
+    environment and therefore are intentionally refused."""
+    return not any((functions_url, kiosk_url, export_url))
+
+
 def allowed(app_url: str, api_url: str) -> bool:
     if os.environ.get('FICHAJE_ENV') != 'production':
         return False
@@ -61,6 +68,9 @@ def main() -> int:
     if not allowed(args.app_url.rstrip('/'), args.api_url.rstrip('/')):
         print('production target is not explicitly pinned', file=sys.stderr)
         return 2
+    if not direct_overrides_allowed(args.functions_url, args.kiosk_direct_url, args.export_link_direct_url):
+        print('production direct-function URLs are derived from the pinned API and cannot be overridden', file=sys.stderr)
+        return 2
     state = Path(args.canary_state)
     try:
         mode = state.stat().st_mode & 0o777
@@ -78,14 +88,8 @@ def main() -> int:
         '--canary-state', str(state),
         '--anon-key-env', args.anon_key_env,
     ]
-    for flag, value in (
-        ('--functions-url', args.functions_url),
-        ('--kiosk-direct-url', args.kiosk_direct_url),
-        ('--export-link-direct-url', args.export_link_direct_url),
-        ('--out', args.out),
-    ):
-        if value:
-            command += [flag, value]
+    if args.out:
+        command += ['--out', args.out]
     result = subprocess.run(command, check=False)
     return result.returncode
 
