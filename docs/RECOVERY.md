@@ -143,3 +143,27 @@ sigue bloqueado; este ensayo no habilita backup ni restore de producción.
 - **BLOCKED para activar**: destino privado definitivo, custodia offline de la identidad age separada del
   destino, host de operación con conexión verify-full a staging, instancia independiente del journal con CA
   utilizable desde la base gestionada (`STAGING.md` §3.4) y ensayo en staging con un segundo proyecto vacío.
+
+
+## GO-LIVE — ruta de recuperación sin coste preparada 2026-10-01
+
+`backup_database.sh` y `restore_database.sh` aceptan ahora tanto las utilidades GNU de Linux como las
+equivalentes estándar de macOS para permisos, tamaño y SHA-256 (`stat` y `shasum -a 256`). No cambia el
+contrato de seguridad: TLS `verify-full`, credenciales en ficheros 0600 fuera del repo, cifrado `age` en
+stream, identidad privada fuera del host/destino de backup y restore en entorno vacío.
+
+Existe una carpeta privada **candidata** `Fichaje APP - BACKUP/02 - DB Encrypted Backups`. No contiene un
+backup DB real y no queda aprobada como subencargado/destino de datos laborales por el mero hecho de existir.
+Antes de usarla con datos reales hay que cerrar la revisión contractual de Google o elegir otro destino
+privado compatible con rclone.
+
+Bloqueos que siguen siendo reales:
+1. credencial PostgreSQL dedicada de solo lectura para `pg_dump`, custodiada fuera de GitHub;
+2. identidad privada `age` en custodia separada del destino;
+3. instancia/journal independiente de recuperación con credencial técnica segura;
+4. primer backup real cifrado y restore del mismo artefacto en un entorno vacío;
+5. validación posterior de RLS/Auth/Storage, replay del journal e invariantes.
+
+La integración de Supabase usada durante GO-LIVE rechazó de forma segura el intento de aprovisionar una
+credencial SQL entre proyectos; no se forzó el control ni se dejó configuración parcial. Por tanto GL-06/07
+siguen sin PASS hasta ejecutar esos pasos por un canal de secretos apropiado.
