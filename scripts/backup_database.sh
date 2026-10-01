@@ -63,8 +63,12 @@ owner_only "$PGPASSFILE" || blocked 'PGPASSFILE must be an owner-only (0600) reg
 grep -q "^\[$FICHAJE_BACKUP_PGSERVICE\]" "$PGSERVICEFILE" || blocked 'service not defined in PGSERVICEFILE'
 if grep -qiE '^[[:space:]]*password[[:space:]]*=' "$PGSERVICEFILE"; then blocked 'passwords belong in PGPASSFILE, not in PGSERVICEFILE'; fi
 ca=$FICHAJE_BACKUP_CA
-[[ -f $ca && -r $ca ]] && grep -q 'BEGIN CERTIFICATE' "$ca" || blocked 'FICHAJE_BACKUP_CA is not a readable PEM certificate'
-if grep -q 'PRIVATE KEY' "$ca"; then blocked 'FICHAJE_BACKUP_CA contains a private key'; fi
+if [[ $ca == system ]]; then
+  :
+else
+  [[ -f $ca && -r $ca ]] && grep -q 'BEGIN CERTIFICATE' "$ca" || blocked 'FICHAJE_BACKUP_CA must be system or a readable PEM certificate'
+  if grep -q 'PRIVATE KEY' "$ca"; then blocked 'FICHAJE_BACKUP_CA contains a private key'; fi
+fi
 for tool in pg_dump psql age; do
   command -v "$tool" >/dev/null || blocked "$tool is not installed"
 done
