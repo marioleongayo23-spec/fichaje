@@ -251,6 +251,11 @@ describe('GO-LIVE recovery operator helpers', () => {
     expect(bootstrap).toContain("select private.verify_journal_entry");
     expect(bootstrap).toContain('fichaje_backup_production');
     expect(bootstrap).toContain('FICHAJE_BACKUP_CA=system');
+    expect(bootstrap).not.toContain('grant pg_read_all_data to fichaje_backup');
+    expect(bootstrap).toContain('revoke pg_read_all_data from fichaje_backup');
+    expect(bootstrap).toContain('grant usage on schema public, private, auth to fichaje_backup');
+    expect(bootstrap).toContain('grant select on all tables in schema public, private to fichaje_backup');
+    expect(bootstrap).toContain('grant select on auth.users, auth.identities to fichaje_backup');
 
     const drill = readFileSync('scripts/go_live_restore_drill.sh', 'utf8');
     expect(drill).toContain('git -C "$ROOT" archive HEAD');
