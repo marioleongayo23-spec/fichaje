@@ -50,6 +50,24 @@ class H8ProvisioningGuard(unittest.TestCase):
         with mock.patch.dict(os.environ, self.pins('production'), clear=True):
             self.assertTrue(canary.Provisioner.allowed(f'https://{PRODUCTION_API}', uri))
             self.assertFalse(canary.Provisioner.allowed(f'https://{PRODUCTION_API}', uri.replace(PRODUCTION_DB, STAGING_DB)))
+            self.assertFalse(canary.Provisioner.allowed(
+                f'https://{PRODUCTION_API}',
+                uri + f'&host={STAGING_DB}'), 'URI query host must not override the pinned authority')
+            self.assertFalse(canary.Provisioner.allowed(
+                f'https://{PRODUCTION_API}',
+                uri.replace('?sslmode=', '?sslmode=verify-full&sslmode=')), 'duplicate sslmode must fail closed')
+            self.assertFalse(canary.Provisioner.allowed(
+                f'https://{PRODUCTION_API}',
+                uri.replace(':5432/', ':6543/')), 'nonstandard target port')
+
+    def test_keyword_dsn_rejects_alternate_target_controls(self):
+        with mock.patch.dict(os.environ, self.pins('production'), clear=True):
+            self.assertFalse(canary.Provisioner.allowed(
+                f'https://{PRODUCTION_API}', PRODUCTION_DSN + f' hostaddr=192.0.2.5'))
+            self.assertFalse(canary.Provisioner.allowed(
+                f'https://{PRODUCTION_API}', PRODUCTION_DSN + ' service=other'))
+            self.assertFalse(canary.Provisioner.allowed(
+                f'https://{PRODUCTION_API}', PRODUCTION_DSN + f' host={STAGING_DB}'))
 
     def test_missing_or_opaque_remote_pins_fail_closed(self):
         with mock.patch.dict(os.environ, {'FICHAJE_ENV': 'production', 'FICHAJE_PRODUCTION_API_HOST': PRODUCTION_API}, clear=True):
