@@ -246,7 +246,7 @@ class Canary:
         return report
 
 
-# --- CI/local provisioning of the synthetic environment ------------------------
+# --- Synthetic operator provisioning (local/staging/production, guarded) --------
 class Provisioner:
     """Creates synthetic tenants/identities. Loopback targets only."""
 
@@ -256,16 +256,53 @@ class Provisioner:
         self.api, self.service, self.dsn, self.gateway = api, service_key, operator_dsn, gateway
 
     @staticmethod
+    def _dsn_settings(operator_dsn: str) -> dict[str, str]:
+        """Parse only authority fields needed by the environment guard.
+        Remote canaries must carry host/sslmode explicitly: an opaque service-only
+        DSN is refused because its actual database target cannot be pinned here."""
+        import shlex
+        from urllib.parse import parse_qs, urlparse
+
+        if operator_dsn.startswith(('postgresql://', 'postgres://')):
+            parsed = urlparse(operator_dsn)
+            query = parse_qs(parsed.query)
+            return {'host': parsed.hostname or '', 'sslmode': query.get('sslmode', [''])[0]}
+        try:
+            tokens = shlex.split(operator_dsn)
+        except ValueError:
+            return {}
+        values: dict[str, str] = {}
+        for token in tokens:
+            if '=' not in token:
+                return {}
+            key, value = token.split('=', 1)
+            if key in ('host', 'sslmode'):
+                values[key] = value
+        return values
+
+    @staticmethod
     def allowed(api_url: str, operator_dsn: str) -> bool:
-        """Loopback (CI/local), or (H7) the explicitly pinned synthetic STAGING project over
-        HTTPS with a verify-full database connection. Production is never a target."""
+        """Loopback (CI/local), or an explicitly pinned synthetic staging/production
+        pair. API and database are pinned independently and TLS verify-full is
+        mandatory so operator credentials cannot provision a different project."""
         if loopback(api_url):
             return '127.0.0.1' in operator_dsn or 'localhost' in operator_dsn
         import os
         from urllib.parse import urlparse
-        host = urlparse(api_url).hostname or ''
-        return (os.environ.get('FICHAJE_ENV') == 'staging' and api_url.startswith('https://') and host != ''
-                and host == os.environ.get('FICHAJE_STAGING_API_HOST', '') and 'sslmode=verify-full' in operator_dsn)
+
+        environment = os.environ.get('FICHAJE_ENV')
+        if environment not in ('staging', 'production'):
+            return False
+        parsed = urlparse(api_url)
+        if parsed.scheme != 'https' or parsed.username or parsed.password or parsed.query or parsed.fragment \
+                or parsed.path not in ('', '/') or not parsed.hostname:
+            return False
+        prefix = 'STAGING' if environment == 'staging' else 'PRODUCTION'
+        api_host = os.environ.get(f'FICHAJE_{prefix}_API_HOST', '')
+        db_host = os.environ.get(f'FICHAJE_{prefix}_DB_HOST', '')
+        dsn = Provisioner._dsn_settings(operator_dsn)
+        return bool(api_host and db_host and parsed.hostname == api_host
+                    and dsn.get('host') == db_host and dsn.get('sslmode') == 'verify-full')
 
     def account(self, label: str) -> dict:
         email = f'canary-{label}-{secrets.token_hex(6)}@example.invalid'
