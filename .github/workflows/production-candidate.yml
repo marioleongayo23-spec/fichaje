@@ -1,0 +1,108 @@
+name: Production Candidate
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact 40-character main SHA to package after all gates pass
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+jobs:
+  gate-and-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_SHA: ${{ inputs.target_sha }}
+    steps:
+      - name: Verify main, merged PR and required gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid target SHA"; exit 2; }
+
+          main_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          test "$TARGET_SHA" = "$main_sha" || {
+            echo "Refusing candidate: target is not current main"
+            exit 2
+          }
+
+          gh api             -H "Accept: application/vnd.github+json"             "repos/$GITHUB_REPOSITORY/commits/$TARGET_SHA/pulls" > /tmp/prs.json
+          jq -e --arg sha "$TARGET_SHA"             '[.[] | select(.merged_at != null and .base.ref == "main" and .merge_commit_sha == $sha)] | length == 1'             /tmp/prs.json > /dev/null || {
+              echo "Refusing candidate: main HEAD is not the merge commit of exactly one merged PR"
+              exit 2
+            }
+
+          gh api             "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$TARGET_SHA&event=push&per_page=100"             > /tmp/runs.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          required = {
+              "CI",
+              "Database H1 + H2 + H3 + H4 + KIO-H6-01 + H5",
+              "E2E H6 (browser, PWA, accessibility)",
+              "OPS-02 observability and resilience gate",
+              "H7 pilot readiness (edge, failure and incident drills, load, encrypted backup and restore)",
+          }
+          payload = json.loads(Path("/tmp/runs.json").read_text())
+          latest = {}
+          for run in payload.get("workflow_runs", []):
+              name = run.get("name")
+              if name not in required:
+                  continue
+              if name not in latest or run.get("created_at", "") > latest[name].get("created_at", ""):
+                  latest[name] = run
+
+          missing = sorted(required - latest.keys())
+          bad = sorted(
+              name for name, run in latest.items()
+              if run.get("status") != "completed" or run.get("conclusion") != "success"
+          )
+          if missing or bad:
+              raise SystemExit(f"Required gates not green; missing={missing}; not_success={bad}")
+          print("Production source gate: PASS")
+          PY
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install
+        run: |
+          npm ci
+          npm ci --prefix edge
+      - name: Build production candidate
+        env:
+          FICHAJE_RELEASE: ${{ inputs.target_sha }}
+          FICHAJE_COMMIT: ${{ inputs.target_sha }}
+          VITE_DEPLOYMENT_TIER: production
+          VITE_SUPABASE_URL: https://bypdviatamosygndeqhh.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_Uh3GSpBDzZmhM1H_dHrfEg_udF8ADWW
+        run: npm run build
+      - name: Secret scan
+        run: npm run scan:secrets
+      - name: Build self-contained Pages candidate
+        run: |
+          rm -rf pages-upload pages-worker
+          cp -R dist pages-upload
+          edge/node_modules/.bin/wrangler pages functions build functions             --outdir pages-worker             --project-directory .             --compatibility-date 2026-09-01
+          test -s pages-worker/index.js
+          cp -R pages-worker/. pages-upload/
+          mv pages-upload/index.js pages-upload/_worker.js
+          test -s pages-upload/_worker.js
+      - name: Upload production candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-candidate-${{ inputs.target_sha }}
+          path: pages-upload/
+          if-no-files-found: error
+          retention-days: 1
