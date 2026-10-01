@@ -208,3 +208,9 @@ Fuentes oficiales de costes/limitaciones consultadas el 2026-10-01:
 - https://www.brevo.com/pricing/
 
 No se han contratado servicios. Precio de dominio y revisiones humanas no puede expresarse como importe exacto sin una elección/presupuesto; cualquier cifra sería inventada.
+
+### Evidencia final de la corrección de gateway
+
+Código validado: `42e99c8cda930f616dcdf4f15af760efbf62cd2d`; CI, Database, E2E H6, OPS-02 y H7 completed/success. Kiosk productivo v5 ACTIVE desplegado después de esos cinco PASS y cinco archivos comparados byte a byte. Export-link v3 conserva los cinco archivos coincidentes con Git. Secretos, etiquetas de release, gateway Cloudflare/readiness firmada y operación completa siguen pendientes; PRE-03 no es PASS.
+
+Auth público y política autoritativa de 12 caracteres verificados por HTTP; RLS cross-tenant/roles probada en transacción sintética revertida. Ningún usuario/tenant/dato de prueba persistió. Advisor productivo repetido: 20 WARN SECURITY DEFINER intencionales; PRE-08 sigue exigiendo revisión independiente.
