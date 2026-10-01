@@ -76,7 +76,10 @@ if [[ "$args" == *"-c"* ]]; then
   fi
   exit 0
 fi
-cat > "$H8_PSQL_CAPTURE"
+payload="$(cat)"
+printf '%s' "$payload" > "$H8_PSQL_CAPTURE"
+first="$(printf '%s\n' "$payload" | head -n 1)"
+if [[ "$first" != '\\set ON_ERROR_STOP on' ]]; then exit 88; fi
 exit 0
 ''')
 
