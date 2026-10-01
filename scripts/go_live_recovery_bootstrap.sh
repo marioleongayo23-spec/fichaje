@@ -136,7 +136,12 @@ begin
   end if;
 end \$bootstrap\$;
 alter role fichaje_backup login bypassrls connection limit 2 valid until 'infinity' password '$password';
-grant pg_read_all_data to fichaje_backup;
+revoke pg_read_all_data from fichaje_backup;
+grant connect on database postgres to fichaje_backup;
+grant usage on schema public, private, auth to fichaje_backup;
+grant select on all tables in schema public, private to fichaje_backup;
+grant select on all sequences in schema public, private to fichaje_backup;
+grant select on auth.users, auth.identities to fichaje_backup;
 alter role fichaje_backup set default_transaction_read_only=on;
 SQL
   if [[ $which == staging ]]; then staging_psql -f "$sql" >/dev/null; else production_psql -f "$sql" >/dev/null; fi
