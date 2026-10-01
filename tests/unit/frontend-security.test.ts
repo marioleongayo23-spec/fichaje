@@ -25,7 +25,7 @@ describe('frontend source guards', () => {
   });
   it('reads only public VITE_ configuration', () => {
     const names = new Set(files.flatMap(({ text }) => text.match(/VITE_[A-Z_]+/g) ?? []));
-    expect([...names].sort()).toEqual(['VITE_EXPORT_LINK_URL', 'VITE_KIOSK_GATEWAY_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'VITE_SUPABASE_URL']);
+    expect([...names].sort()).toEqual(['VITE_DEPLOYMENT_TIER', 'VITE_EXPORT_LINK_URL', 'VITE_KIOSK_GATEWAY_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'VITE_SUPABASE_URL']);
     const example = readFileSync('.env.example', 'utf8').split('\n').filter((l) => /^VITE_/.test(l));
     expect(example.every((line) => /^VITE_[A-Z_]+=(\/[a-z/-]*)?$/.test(line))).toBe(true);
   });
