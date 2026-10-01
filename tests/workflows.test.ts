@@ -148,3 +148,21 @@ it('builds production candidates only from current main merge commits with all r
   expect(run).toContain('npm run scan:secrets');
   expect(run).toContain('production-candidate-');
 });
+
+
+it('keeps the real GO-LIVE GitHub alert probe explicit, synthetic and minimally privileged', () => {
+  const text = readFileSync('.github/workflows/go-live-alert-route.yml', 'utf8');
+  const flow = parse(text);
+  expect(flow.permissions).toEqual({ contents: 'read', issues: 'write' });
+  expect(text).not.toMatch(/\bsecrets\./);
+  expect(flow.jobs['real-github-alert-route'].if).toContain('go-live-alert-test');
+  const run = JSON.stringify(flow.jobs['real-github-alert-route'].steps);
+  expect(run).toContain("environment='production'");
+  expect(run).toContain('OPS_ALERT_ROUTE_PAGER');
+  expect(run).toContain('OPS_ALERT_ROUTE_TICKET');
+  expect(run).toContain('github-issues:');
+  expect(run).toContain('APP_DOWN');
+  expect(run).toContain('INVARIANT_WARNING');
+  expect(run).toContain('state=closed&labels=fichaje-alert');
+  expect(run).not.toMatch(/employee_id|organization_id|email|pin|password/i);
+});
