@@ -295,7 +295,7 @@ en los fichajes concurrentes (`h7_load.py`).
 **Secretos y mínimo privilegio**: tabla de secretos, stores y rotación en `docs/STAGING.md` §2; ninguno en Git,
 GitHub Actions/Secrets, `VITE_*`, artefactos ni logs; distintos por entorno. Escáneres ampliados (nombres de
 variables H7, tokens de plataforma). Login del gateway solo con `fichaje_gateway`; login de backup de solo
-lectura (`pg_read_all_data`, `BYPASSRLS`, `default_transaction_read_only`, TLS obligatorio en `pg_hba`);
+lectura (lectura global `pg_read_all_data`, `BYPASSRLS`, `default_transaction_read_only`, TLS obligatorio en `pg_hba`);
 token de Cloudflare limitado a Pages Edit de una cuenta; token de tickets fine-grained (Issues de un repositorio
 privado). Storage privado, enlaces firmados ≤ 300 s y sin listado anónimo (comprobado por el verificador).
 
