@@ -164,3 +164,20 @@ Conclusión: el proyecto está vacío y separado de `fichaje-staging`, por lo qu
 construir el entorno productivo sin arrastrar datos sintéticos. PRE-03 permanece PARTIAL hasta aplicar
 migraciones desde cero, configurar Auth/Storage/Edge/secrets propios, crear Cloudflare productivo separado
 y superar la verificación production-like. No se ha desplegado código ni creado datos reales.
+
+
+## PRE-03 — esquema productivo aplicado 2026-10-01
+
+Con autorización expresa del usuario para configurar `Fichaje APP` como candidato productivo:
+- 17/17 migraciones de `supabase/migrations` aplicadas en orden sobre la base vacía;
+- el historial de `supabase_migrations.schema_migrations` se normalizó después para conservar exactamente
+  los timestamps/nombres de los archivos Git (el conector había registrado inicialmente timestamps de ejecución);
+- todas las tablas `public` y `private` creadas aparecen con RLS habilitado;
+- bucket `fichaje-evidence` creado como privado, límite 10 MiB y MIME `application/zip`;
+- 0 usuarios Auth, 0 organizaciones, 0 memberships, 0 empleados, 0 fichajes y 0 objetos Storage;
+- URL pública y publishable key propias del proyecto disponibles; no se han copiado credenciales de staging;
+- Security Advisor: únicamente el patrón esperado de 20 RPC `SECURITY DEFINER` intencionales; sin lints
+  adicionales de configuración en este punto.
+
+Pendiente para completar PRE-03: Edge Secrets exclusivos, Auth productivo, login técnico de gateway,
+Edge Functions `kiosk`/`export-link`, Cloudflare productivo separado y verificación production-like.
