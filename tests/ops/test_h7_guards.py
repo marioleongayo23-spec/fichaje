@@ -37,6 +37,7 @@ class H8ProvisioningGuard(unittest.TestCase):
             self.assertFalse(canary.Provisioner.allowed(f'https://{PRODUCTION_API}', STAGING_DSN), 'another API project')
             self.assertFalse(canary.Provisioner.allowed(f'https://{STAGING_API}', PRODUCTION_DSN), 'another database project')
             self.assertFalse(canary.Provisioner.allowed(f'http://{STAGING_API}', STAGING_DSN), 'no API TLS')
+            self.assertFalse(canary.Provisioner.allowed(f'https://{STAGING_API}:8443', STAGING_DSN), 'nonstandard API port')
             self.assertFalse(canary.Provisioner.allowed(f'https://{STAGING_API}', STAGING_DSN.replace('verify-full', 'require')), 'weak DB TLS')
 
     def test_production_is_allowed_only_with_the_production_pair(self):
