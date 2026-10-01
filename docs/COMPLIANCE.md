@@ -61,3 +61,20 @@ Fuentes primarias consultadas mediante lectura web el 2026-09-28:
 Decisiones técnicas propias: originales inmutables y correcciones append-only; borde con ingreso firmado; cifrado age, journal independiente y alertas minimizadas; cuatro años desde el cierre del periodo y extensión de la cadena tras correcciones. Estas decisiones sirven al diseño y a la auditabilidad; la ley no prescribe este stack ni estos mecanismos concretos.
 
 Las [plantillas legales](legal/README.md) siguen siendo revisables. Antes de usar datos reales hacen falta revisión jurídica del caso y convenio, encargo, subencargados/transferencias, información a la plantilla y valoración de riesgos/EIPD cuando corresponda. Esta revisión no certifica cumplimiento ni autoriza el piloto.
+
+
+## Revisión GO-LIVE — 2026-10-01
+
+Comprobación adicional previa a producción:
+
+- El Proyecto de Ley 121/000058, que proponía nuevos requisitos de reducción de jornada y registro digital, figura en el Congreso como **rechazado/devuelto** el 10-09-2025. No se incorpora a Fichaje APP como obligación vigente.
+- Se mantiene como base general el art. 34.9 del Estatuto de los Trabajadores: registro diario con inicio y finalización, conservación durante cuatro años y disponibilidad.
+- La AEPD mantiene que el registro horario ordinario puede apoyarse en la obligación legal sin consentimiento del trabajador, pero existe deber de información sobre el tratamiento.
+- Los convenios colectivos pueden imponer requisitos adicionales; se revisarán para cada cliente antes del alta cuando sean relevantes.
+
+Fuentes primarias revisadas el 2026-10-01:
+- https://www.boe.es/buscar/act.php?id=BOE-A-2015-11430
+- https://www.congreso.es/es/busqueda-de-iniciativas?_iniciativas_id=121%2F000058&_iniciativas_legislatura=XV&_iniciativas_mode=mostrarDetalle
+- https://www.aepd.es/preguntas-frecuentes/3-proteccion-de-datos-en-el-ambito-laboral/FAQ-0311-es-necesario-el-consentimiento-del-trabajador-para-implantar-un-sistema-de-control-horario
+
+Esta revisión sigue sin equivaler a asesoramiento jurídico individualizado ni a certificación.
