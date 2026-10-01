@@ -109,6 +109,8 @@ class H7AlertRoutes(unittest.TestCase):
         with mock.patch.dict(os.environ, {'OPS_GITHUB_TOKEN': ''}):
             with self.assertRaisesRegex(ValueError, 'ALERT_ROUTE_CONFIG'):
                 alerts.notifier_for('github-issues:owner/repo', 'production')
+        with mock.patch.dict(os.environ, {'OPS_GITHUB_TOKEN': 'opaque.token-with_punctuation-1234567890'}):
+            self.assertIsInstance(alerts.notifier_for('github-issues:owner/repo', 'production'), alerts.GitHubIssueNotifier)
         for target in ('github-issues:not a repo', 'file:/tmp/sink.jsonl', 'http://example.com/hook', 'https://user:pw@example.com/x', 'smtp://x'):
             with self.assertRaisesRegex(ValueError, 'ALERT_ROUTE_CONFIG'):
                 alerts.notifier_for(target, 'production')
