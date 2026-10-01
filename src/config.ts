@@ -33,7 +33,12 @@ export function readEndpoint(value: string | undefined, fallback: string): strin
 }
 
 function assertDeploymentBinding(env: AppEnvironment, supabase: SupabaseConfig): void {
-  if (!env.VITE_DEPLOYMENT_TIER) return;
+  if (!env.VITE_DEPLOYMENT_TIER) {
+    if (supabase.url === STAGING_SUPABASE_ORIGIN || supabase.url === PRODUCTION_SUPABASE_ORIGIN) {
+      throw new Error('Deployment tier is required for managed Fichaje Supabase projects');
+    }
+    return;
+  }
   const expected = env.VITE_DEPLOYMENT_TIER === 'production'
     ? PRODUCTION_SUPABASE_ORIGIN
     : STAGING_SUPABASE_ORIGIN;
