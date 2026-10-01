@@ -26,3 +26,30 @@
 |---|---|---|
 | `[[FECHA]]` | Región de Supabase `[[REGIÓN]]` | `[[…]]` |
 | `[[FECHA]]` | Destino de backups `[[…]]` | `[[…]]` |
+
+
+## Verificación PREPROD-01 — 2026-10-01
+
+Supabase documenta que la región elegida determina dónde se almacena el dato primario del proyecto y
+advierte que una región general "Europe" puede desplegar incluso en Londres o Zúrich. Para producción de
+Fichaje se exigirá una **región específica situada en un Estado miembro de la UE**; no se usará una región
+general ambigua. Staging está actualmente en `eu-west-1` (Irlanda), pero producción tendrá su propia decisión
+y evidencia.
+
+Fuente oficial de regiones:
+https://supabase.com/docs/guides/platform/regions
+
+El DPA de Supabase indica que, cuando el cliente dirige el tratamiento a una región específica, los datos
+cubiertos se almacenan y procesan primariamente allí, sujeto a las excepciones contractuales y a
+subencargados/transferencias. Cloudflare opera una red global y su DPA contempla transferencias y
+subprocesamiento; por tanto no se documentará el borde como "solo UE" salvo que un producto/configuración
+contratada lo garantice expresamente.
+
+Fuentes:
+- https://supabase.com/legal/customer-resources/data-processing-addendum
+- https://www.cloudflare.com/cloudflare-customer-dpa/
+- https://www.cloudflare.com/gdpr/subprocessors/cloudflare-services/
+
+Estado PRE-02/PRE-03: PARTIAL/BLOCKED. La arquitectura puede fijar el dato primario de Supabase en UE, pero
+faltan la cuenta/entorno productivo, entidad contratante, proveedor de backup/journal y aceptación contractual
+antes de usar datos reales.
