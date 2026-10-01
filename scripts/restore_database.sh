@@ -79,7 +79,7 @@ fk_check="do \$fk\$ declare c record; n bigint; begin
 started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 set +e
 {
-  printf '%s\n' '\\set ON_ERROR_STOP on' 'BEGIN;' 'SET LOCAL session_replication_role = replica;' 'SET LOCAL statement_timeout = 0;'
+  printf '%s\n' '\set ON_ERROR_STOP on' 'BEGIN;' 'SET LOCAL session_replication_role = replica;' 'SET LOCAL statement_timeout = 0;'
   [[ -n $tables ]] && printf 'TRUNCATE %s;\n' "$tables"
   if age --decrypt --identity "$FICHAJE_RESTORE_IDENTITY" -- "$cipher" 2>/dev/null \
       | pg_restore --data-only --no-owner --no-acl --file=- 2>/dev/null; then
