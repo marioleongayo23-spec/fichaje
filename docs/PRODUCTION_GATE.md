@@ -18,7 +18,7 @@ una orden expresa del usuario para activar producción / primer cliente real.
 |---|---|---|---|
 | PRE-01 | Base normativa vigente y convenio aplicable | PARTIAL | Revisión con fuentes primarias en fecha de alta; art. 34.9 ET, RGPD/LOPDGDD y convenio/empresa concreta |
 | PRE-02 | Paquete legal comercial | PARTIAL | Encargo art. 28, subencargados, transferencias/localización, información empleados, derechos, incidentes, baja y retención completados sin marcadores |
-| PRE-03 | Entorno de producción aislado | BLOCKED | Supabase + Cloudflare separados de staging; región UE; secretos distintos; cero datos sintéticos heredados |
+| PRE-03 | Entorno de producción aislado | PARTIAL | Supabase + Cloudflare separados de staging; región UE; secretos distintos; cero datos sintéticos heredados |
 | PRE-04 | Dominio y protección de borde | BLOCKED | Dominio definitivo, TLS/HSTS, CSP, WAF/rate limits verificados; sin bypass de edge |
 | PRE-05 | Correo transaccional | PARTIAL | SMTP/proveedor aprobado, confirmación e invitaciones probadas sin exponer tokens; SPF/DKIM/DMARC cuando aplique |
 | PRE-06 | Alertas reales y operación | PARTIAL | CRITICAL y WARNING recibidos por rutas reales, RESOLVED probado, canary e invariantes programados |
@@ -142,3 +142,25 @@ Se puede ejecutar un ensayo remoto de backup/restore con datos sintéticos y un 
 se autorice infraestructura, pero eso no resuelve por sí solo el backup diario productivo. PRE-07 permanece
 BLOCKED hasta disponer de host de operación fiable o aprobar una alternativa gestionada (por ejemplo Pro)
 antes de introducir el primer dato real.
+
+
+## PRE-03 — candidato Supabase reactivado 2026-10-01
+
+Autorización expresa del usuario recibida para reactivar exclusivamente el proyecto existente `Fichaje APP`.
+
+Resultado:
+- project ref: `bypdviatamosygndeqhh`;
+- región: `eu-west-1` (Irlanda);
+- organización Supabase: plan Free;
+- estado tras restore: `ACTIVE_HEALTHY`;
+- migraciones: 0;
+- tablas de aplicación en `public`/`private`: 0;
+- usuarios Auth: 0;
+- objetos Storage: 0;
+- Edge Functions: 0;
+- Security Advisor: 0 lints en el proyecto vacío.
+
+Conclusión: el proyecto está vacío y separado de `fichaje-staging`, por lo que es candidato válido para
+construir el entorno productivo sin arrastrar datos sintéticos. PRE-03 permanece PARTIAL hasta aplicar
+migraciones desde cero, configurar Auth/Storage/Edge/secrets propios, crear Cloudflare productivo separado
+y superar la verificación production-like. No se ha desplegado código ni creado datos reales.
