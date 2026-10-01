@@ -18,7 +18,7 @@ Contrato de puerta: `docs/PRODUCTION_GATE.md`
 - PRE-05 correo transaccional: PARTIAL — Brevo Free seleccionado como candidato 0 €; pendiente dominio, DPA/alta, SPF/DKIM/DMARC y prueba real.
 - PRE-06 alertas reales: BLOCKED — arnés probado, rutas reales no activadas.
 - PRE-07 backup/restore real: BLOCKED — implementación probada localmente, backup gestionado y restore aislado reales no activados.
-- PRE-08 seguridad independiente: BLOCKED — pendiente revisión externa/independiente final.
+- PRE-08 seguridad independiente: PARTIAL — Supabase Advisor sin hallazgos críticos nuevos; 20 SECURITY DEFINER intencionales y HIBP Pro-only documentados. Falta revisión externa/independiente del candidato productivo.
 - PRE-09 ensayo production-like: BLOCKED — se ejecutará sin datos reales cuando exista entorno candidato.
 - PRE-10 primer cliente: BLOCKED — requiere empresa concreta, convenio, contratos y autorización expresa posterior.
 
