@@ -257,27 +257,55 @@ class Provisioner:
 
     @staticmethod
     def _dsn_settings(operator_dsn: str) -> dict[str, str]:
-        """Parse only authority fields needed by the environment guard.
-        Remote canaries must carry host/sslmode explicitly: an opaque service-only
-        DSN is refused because its actual database target cannot be pinned here."""
+        """Return effective remote target fields or {} when the target can be
+        redirected/obscured. H8 intentionally supports only a single explicit
+        PostgreSQL host and the postgres database for remote provisioning."""
         import shlex
-        from urllib.parse import parse_qs, urlparse
+        from urllib.parse import parse_qs, unquote, urlparse
 
         if operator_dsn.startswith(('postgresql://', 'postgres://')):
             parsed = urlparse(operator_dsn)
-            query = parse_qs(parsed.query)
-            return {'host': parsed.hostname or '', 'sslmode': query.get('sslmode', [''])[0]}
+            query = parse_qs(parsed.query, keep_blank_values=True)
+            # libpq accepts connection parameters in the URI query and they can
+            # override the authority (notably host/hostaddr). Refuse every
+            # target-affecting query override rather than trying to guess
+            # libpq precedence.
+            forbidden = {'host', 'hostaddr', 'port', 'dbname', 'user', 'password', 'service'}
+            if forbidden.intersection(query):
+                return {}
+            modes = query.get('sslmode', [])
+            if len(modes) != 1:
+                return {}
+            try:
+                port = parsed.port
+            except ValueError:
+                return {}
+            database = unquote(parsed.path.lstrip('/'))
+            if port not in (None, 5432) or database != 'postgres':
+                return {}
+            return {'host': parsed.hostname or '', 'sslmode': modes[0], 'dbname': database,
+                    'port': str(port or 5432)}
+
         try:
             tokens = shlex.split(operator_dsn)
         except ValueError:
             return {}
         values: dict[str, str] = {}
+        seen: set[str] = set()
         for token in tokens:
             if '=' not in token:
                 return {}
             key, value = token.split('=', 1)
-            if key in ('host', 'sslmode'):
+            key = key.lower()
+            if key in seen and key in ('host', 'hostaddr', 'port', 'dbname', 'sslmode', 'service'):
+                return {}
+            seen.add(key)
+            if key in ('hostaddr', 'service'):
+                return {}
+            if key in ('host', 'port', 'dbname', 'sslmode'):
                 values[key] = value
+        if values.get('dbname') != 'postgres' or values.get('port', '5432') != '5432':
+            return {}
         return values
 
     @staticmethod
