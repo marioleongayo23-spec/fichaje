@@ -17,7 +17,7 @@ una orden expresa del usuario para activar producción / primer cliente real.
 | ID | Control | Estado inicial | Evidencia exigida |
 |---|---|---|---|
 | PRE-01 | Base normativa vigente y convenio aplicable | PARTIAL | Revisión con fuentes primarias en fecha de alta; art. 34.9 ET, RGPD/LOPDGDD y convenio/empresa concreta |
-| PRE-02 | Paquete legal comercial | BLOCKED | Encargo art. 28, subencargados, transferencias/localización, información empleados, derechos, incidentes, baja y retención completados sin marcadores |
+| PRE-02 | Paquete legal comercial | PARTIAL | Encargo art. 28, subencargados, transferencias/localización, información empleados, derechos, incidentes, baja y retención completados sin marcadores |
 | PRE-03 | Entorno de producción aislado | BLOCKED | Supabase + Cloudflare separados de staging; región UE; secretos distintos; cero datos sintéticos heredados |
 | PRE-04 | Dominio y protección de borde | BLOCKED | Dominio definitivo, TLS/HSTS, CSP, WAF/rate limits verificados; sin bypass de edge |
 | PRE-05 | Correo transaccional | BLOCKED | SMTP/proveedor aprobado, confirmación e invitaciones probadas sin exponer tokens; SPF/DKIM/DMARC cuando aplique |
@@ -52,3 +52,10 @@ documentar coste/beneficio y solicitar autorización expresa.
 - Sin producción hasta PRE-01..PRE-10 y autorización posterior.
 - Sin secretos en GitHub.
 - Cambios mínimos y tests obligatorios.
+
+
+## Avance 2026-10-01
+- PRE-01: baseline estatal/AEPD verificada; falta convenio de cliente concreto.
+- PRE-02: DPA y fuentes oficiales de subencargados de Supabase/Cloudflare verificadas; faltan entidad
+  contratante de Fichaje, proveedores aún no elegidos, completar marcadores y revisión jurídica independiente.
+- PRE-03: se fija como requisito región específica de la UE para Supabase producción; entorno aún no creado.
