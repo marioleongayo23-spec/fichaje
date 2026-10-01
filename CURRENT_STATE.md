@@ -14,10 +14,10 @@ Contrato de puerta: `docs/PRODUCTION_GATE.md`
 - PRE-01 normativa/convenio: PARTIAL — base estatal y AEPD revisadas el 2026-10-01; el convenio se valida por cliente concreto.
 - PRE-02 paquete legal/comercial: PARTIAL — DPA/subencargados principales verificados; faltan identidad contractual de Fichaje, proveedores pendientes, marcadores y revisión jurídica independiente antes de datos reales.
 - PRE-03 producción aislada: BLOCKED — candidato Supabase `Fichaje APP` identificado en `eu-west-1` e INACTIVE; Cloudflare solo tiene `fichaje-staging`. No se ha reactivado/creado producción.
-- PRE-04 dominio/borde: BLOCKED — no hay dominio definitivo/WAF de producción.
+- PRE-04 dominio/borde: BLOCKED — Pages productivo puede ser 0 €, pero no hay dominio propio; WAF/rate limits de zona requieren ese dominio.
 - PRE-05 correo transaccional: PARTIAL — Brevo Free seleccionado como candidato 0 €; pendiente dominio, DPA/alta, SPF/DKIM/DMARC y prueba real.
-- PRE-06 alertas reales: BLOCKED — arnés probado, rutas reales no activadas.
-- PRE-07 backup/restore real: BLOCKED — implementación probada localmente, backup gestionado y restore aislado reales no activados.
+- PRE-06 alertas reales: PARTIAL — PagerDuty Free + GitHub Issues seleccionados como rutas 0 €; cuentas/tokens y prueba real aún no activados.
+- PRE-07 backup/restore real: BLOCKED — Free exige exportación externa; falta host de operación fiable para backup diario cifrado. Ensayo remoto sintético puede hacerse aparte, pero no sustituye operación diaria.
 - PRE-08 seguridad independiente: PARTIAL — Supabase Advisor sin hallazgos críticos nuevos; 20 SECURITY DEFINER intencionales y HIBP Pro-only documentados. Falta revisión externa/independiente del candidato productivo.
 - PRE-09 ensayo production-like: BLOCKED — se ejecutará sin datos reales cuando exista entorno candidato.
 - PRE-10 primer cliente: BLOCKED — requiere empresa concreta, convenio, contratos y autorización expresa posterior.
