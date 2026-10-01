@@ -1,25 +1,26 @@
 # CURRENT_STATE — 2026-10-01
 
-## HITO 7 — validación sintética final completa; pendiente aprobación del usuario
+## HITO 7 — aprobado e integrado
 
-**ESTADO ACTUAL: READY FOR USER APPROVAL.** No se declara PASS ni se hace merge sin una aprobación expresa posterior del usuario.
+**ESTADO ACTUAL: PASS.** HITO 7 fue aprobado expresamente por el usuario el 2026-10-01 e integrado en `main` mediante PR #15.
 
 Repositorio: `marioleongayo23-spec/fichaje`  
-Rama: `astra/hito-7-piloto-comercial`  
-PR: #15  
-HEAD de código validado: `98e814ffafc32b3fa8c892908fbcbff97e58fc42`
+Rama histórica: `astra/hito-7-piloto-comercial`  
+PR: #15 — MERGED  
+HEAD final del PR validado: `137e4ab4d813585b3a4663e0dd9bac5bbc12be0c`  
+Merge commit en `main`: `01c80f3afc34bb602f28c90be1ae096fd073b81e`
 
 ### Gates del HEAD validado
 
 Los cinco workflows obligatorios terminaron `completed/success` sobre el mismo HEAD:
 
-- CI: run `36825086874`.
-- Database H1 + H2 + H3 + H4 + KIO-H6-01 + H5: run `36825086849`.
-- E2E H6: run `36825086880`.
-- OPS-02: run `36825086857`.
-- H7: run `36825086858`.
+- CI: run `36830693034`.
+- Database H1 + H2 + H3 + H4 + KIO-H6-01 + H5: run `36830692909`.
+- E2E H6: run `36830692919`.
+- OPS-02: run `36830692714`.
+- H7: run `36830692776`.
 
-El último cambio de código fue únicamente de empaquetado para Direct Upload: el build final incorpora la configuración pública de Supabase durante Vite y el Worker compilado de Cloudflare Pages. No se añadieron secretos ni datos reales.
+El HEAD final del PR solo añadió la evidencia consolidada de `CURRENT_STATE.md` sobre el código desplegado y validado `98e814ffafc32b3fa8c892908fbcbff97e58fc42`; los cinco gates volvieron a terminar PASS. No se añadieron secretos ni datos reales.
 
 ### Staging desplegado
 
@@ -94,14 +95,12 @@ El navegador de automatización no permite reabrir el historial de descargas ni 
 
 ### Hitos anteriores
 
-HITO 0, OPS-01, HITO 1, HITO 2, HITO 3, HITO 4, HITO 5, HITO 6 y OPS-02 están aprobados e integrados en `main`.
+HITO 0, OPS-01, HITO 1, HITO 2, HITO 3, HITO 4, HITO 5, HITO 6, OPS-02 y HITO 7 están aprobados e integrados en `main`.
 
 El detalle histórico completo permanece en el historial Git y en `docs/`; este archivo queda deliberadamente reducido al estado operativo actual.
 
-### Pendiente único de HITO 7
+### HITO 7 cerrado
 
-**Revisión y aprobación expresa del usuario sobre la app desplegada.**
+No quedan tareas pendientes dentro de HITO 7.
 
-No hacer merge de PR #15 hasta una orden explícita posterior del tipo: `HITO 7 aprobado, haz merge`.
-
-Después de H7 existe una puerta separada previa al primer cliente real / producción: alertas reales, estrategia de backup/restore definitiva, respuesta a incidentes, revisión legal/seguridad y autorización expresa de producción. Esa puerta no bloquea H7 sintético y cualquier gasto futuro requiere autorización.
+La siguiente fase es una puerta separada previa al primer cliente real / producción: alertas reales, estrategia de backup/restore definitiva, respuesta a incidentes, revisión legal/seguridad y autorización expresa de producción. No se inicia por este merge y cualquier gasto futuro requiere autorización expresa.
