@@ -35,6 +35,7 @@ jobs:
         env:
           FICHAJE_RELEASE: ${{ github.event.pull_request.head.sha || github.sha }}
           FICHAJE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          VITE_DEPLOYMENT_TIER: staging
           VITE_SUPABASE_URL: https://pvfjffeszsedslmwdvgh.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_jx_GYNBHI21Z8j7_rI18Qg_zE9MgO-R
         run: npm run build
