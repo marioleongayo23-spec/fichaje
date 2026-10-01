@@ -6,9 +6,9 @@ import { classifySql, healthHandler, opsEvent, type ErrorClass, type Operation, 
 import { INGRESS_HEADER, ingressPolicy, routeOf, verifyIngress } from '../_shared/ingress.ts';
 
 const env = (key: string) => { const value = Deno.env.get(key); if (!value) throw new Error('CONFIG_REQUIRED'); return value; };
-const authURL = env('KIOSK_AUTH_URL');
-const apiKey = env('KIOSK_ANON_KEY');
-const provisionKey = env('KIOSK_AUTH_PROVISION_KEY'); // Auth admin provisioning only, NEVER database access.
+const authURL = Deno.env.get('KIOSK_AUTH_URL') ?? env('SUPABASE_URL');
+const apiKey = Deno.env.get('KIOSK_ANON_KEY') ?? env('SUPABASE_ANON_KEY');
+const provisionKey = Deno.env.get('KIOSK_AUTH_PROVISION_KEY') ?? env('SUPABASE_SERVICE_ROLE_KEY'); // Auth admin provisioning only, NEVER database access.
 const pepper = Uint8Array.from(atob(env('KIOSK_PEPPER')), c => c.charCodeAt(0));
 const networkSecret = Uint8Array.from(atob(env('KIOSK_NETWORK_SECRET')), c => c.charCodeAt(0));
 if (networkSecret.length < 32 || btoa(String.fromCharCode(...networkSecret)) === btoa(String.fromCharCode(...pepper))) throw new Error('CONFIG_REQUIRED');
