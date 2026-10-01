@@ -79,6 +79,11 @@ AGE_RECIPIENT="$(age-keygen -y "$WORK/age-identity.txt")"
 [[ $AGE_RECIPIENT == age1* ]] || blocked 'age recipient derivation failed'
 printf '%s\n' "$AGE_RECIPIENT" > "$STATE/age-recipient.txt"
 chmod 600 "$STATE/age-recipient.txt"
+# From this point the backup side keeps only the public recipient. The private
+# identity remains in macOS Keychain and is materialized again only by the
+# isolated restore drill.
+unset AGE_SECRET
+rm -f "$WORK/age-identity.txt" "$WORK/age-full.txt"
 
 # 1) Archive in the independent staging project. Password appears only in this owner-only temp SQL file.
 ARCHIVE_SQL="$WORK/archive.sql"; chmod 600 "$ARCHIVE_SQL"
