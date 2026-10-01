@@ -91,9 +91,9 @@ begin
   end if;
   if not exists(select 1 from pg_roles where rolname='fichaje_archive_writer') then
     create role fichaje_archive_writer nologin noinherit nobypassrls;
-    grant fichaje_archive_writer to postgres;
   end if;
 end \$bootstrap\$;
+grant fichaje_archive_writer to postgres;
 alter role fichaje_archive_connection login noinherit valid until 'infinity' password '$ARCHIVE_PASSWORD';
 SQL
 staging_psql -f "$ARCHIVE_SQL" >/dev/null
@@ -120,7 +120,7 @@ create user mapping for fichaje_journal server fichaje_recovery
   options(user 'fichaje_archive_connection.$STAGING_REF',password '$ARCHIVE_PASSWORD');
 SQL
 production_psql -f "$WIRE_SQL" >/dev/null
-JOURNAL_TEST="$(production_psql -XAtq -c "set local role fichaje_retention_operator; select private.verify_journal_entry(gen_random_uuid(),gen_random_uuid(),'PURGE','{}'::jsonb)")" || blocked 'journal dblink test failed'
+JOURNAL_TEST="$(production_psql -XAtq -c "begin; set local role fichaje_retention_operator; select private.verify_journal_entry(gen_random_uuid(),gen_random_uuid(),'PURGE','{}'::jsonb); rollback")" || blocked 'journal dblink test failed'
 [[ $JOURNAL_TEST == f ]] || blocked 'journal verification returned an unexpected result'
 
 # 3) Dedicated read-only backup logins in staging and production.
