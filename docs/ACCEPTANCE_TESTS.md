@@ -146,7 +146,7 @@ Antes del **primer cliente real / producción**, habrá una puerta operativa sep
 | GL-07 | Journal independiente disponible y replay/reconciliación probados |
 | GL-08 | Simulacro de incidente con corte, recuperación y reapertura documentados |
 | GL-09 | Revisión legal vigente y kit contractual/informativo listo para el primer cliente |
-| GL-10 | `main` protegido por PR + checks; push directo no permitido |
+| GL-10 | La release productiva solo puede generarse desde el HEAD de `main` que sea merge de PR y tenga los cinco gates verdes; branch protection se usa solo si el plan la permite |
 | GL-11 | Cloudflare productivo separado de staging y verificado end-to-end |
 | GL-12 | Autorización expresa posterior para producción real |
 
