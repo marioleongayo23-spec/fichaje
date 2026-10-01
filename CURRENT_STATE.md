@@ -25,9 +25,9 @@ Lectura de solo estado el 2026-10-01:
 Staging `pvfjffeszsedslmwdvgh` tiene la misma migración. No se han introducido clientes ni datos reales.
 
 ### Security Advisor
-Ambos proyectos muestran 20 warnings por RPC `SECURITY DEFINER` ejecutables por `authenticated`. Son funciones deliberadamente expuestas como RPC de servidor y **no se consideran cerradas por el mero warning**: su aceptación depende de los GRANT, comprobaciones actor/tenant, RLS y suites ya existentes.
+Revisión remota del 2026-10-01: producción muestra exactamente 20 WARN `authenticated_security_definer_function_executable`, correspondientes al catálogo intencional de RPC autenticadas y cubiertos por GRANT/guards/RLS/suites H1–H7. No hay hallazgo CRITICAL ni warning adicional en el candidato productivo. **GL-02 PASS**.
 
-Staging mostró además `auth_leaked_password_protection` desactivado; el candidato productivo no mostró ese warning en la revisión realizada.
+Staging muestra los mismos 20 WARN y además `auth_leaked_password_protection` desactivado; ese hardening de staging no se confunde con el estado del candidato productivo.
 
 ### Cambio GO-LIVE implementado
 Se añadió binding explícito de entorno:
@@ -47,17 +47,19 @@ Se mantiene como base general el art. 34.9 ET y la orientación AEPD sobre base 
 ### Gates pendientes
 Definidos en `docs/GO_LIVE.md`. Bloqueos reales actuales:
 - ruta de alerta real: **PASS** (run `36881276163`; CRITICAL #22 y WARNING #23 abiertos/cerrados por el adaptador real);
-- backup DB real cifrado y restore remoto: **PARTIAL**; existe destino privado candidato `02 - DB Encrypted Backups`, pero faltan credencial DB de solo lectura, identidad age offline y restore real;
-- journal independiente operativo: **BLOCKED**; el diseño permite una instancia separada, pero la integración bloqueó de forma segura el aprovisionamiento de la credencial SQL y no dejó cambios parciales;
+- backup DB real cifrado y restore: **PARTIAL**; destino privado candidato creado y helpers seguros listos; falta ejecutar el bootstrap/drill local con credenciales introducidas de forma oculta;
+- journal independiente operativo: **BLOCKED**; el bootstrap seguro está listo. Tras expirar el intento por navegador se verificó directamente que no quedó ningún rol/esquema journal en staging ni foreign server/user mapping en producción;
 - simulacro operativo final;
 - kit legal/contractual final para cliente real: proveedores principales, región y transferencias revisados a 2026-10-01; pendiente completar entidad jurídica de Fichaje, SMTP/destino backup definitivo y datos/convenio del primer cliente;
-- control de procedencia de release: implementado en `production-candidate.yml`, pendiente de CI;
+- control de procedencia de release: **PASS de contrato/CI** en `production-candidate.yml`;
 - despliegue Cloudflare productivo separado y verificado;
 - autorización expresa posterior de producción.
 
 Supabase Free no aporta backups automáticos gestionados; su documentación recomienda dumps/exportaciones off-site para Free. No se contratará Pro/PITR ni otro servicio sin autorización expresa.
 
-Los scripts de backup/restore DB quedaron portables entre Linux y macOS manteniendo TLS verify-full, permisos 0600/0700, cifrado age en stream y separación de la clave privada. La ejecución real sigue bloqueada por custodia de credenciales y restore remoto, no por el código.
+Los scripts de backup/restore DB quedaron portables entre Linux y macOS y aceptan el trust store del sistema para Supabase manteniendo TLS `verify-full`, permisos 0600/0700, cifrado age en stream y separación de la clave privada.
+
+Se añadieron `scripts/go_live_recovery_bootstrap.sh` y `scripts/go_live_restore_drill.sh`: contraseñas introducidas ocultas localmente, credenciales técnicas generadas fuera de GitHub, identidad age en macOS Keychain, journal producción→staging separado, logins de backup read-only, backup remoto sintético cifrado y restore exacto en Supabase local desechable. Falta su ejecución real; el código no sustituye esa evidencia.
 
 Revisión de proveedores: Supabase productivo `eu-west-1` corresponde a Irlanda según documentación vigente; DPA y lista de subencargados revisados. Cloudflare dispone de DPA/SCC, pero Pages/Workers procesa globalmente por defecto salvo controles adicionales de Data Localization Suite. La documentación comercial ya no promete residencia UE total en el borde.
 
@@ -71,5 +73,7 @@ Revisión de proveedores: Supabase productivo `eu-west-1` corresponde a Irlanda 
 GitHub Free no permite protected branches/rulesets en repositorios privados. Se implementó un control compensatorio gratuito: el workflow manual `Production Candidate` rechaza cualquier SHA que no sea el HEAD actual de `main`, merge commit de un PR y 5/5 gates verdes, y solo entonces empaqueta el build productivo fijado al Supabase `bypdviatamosygndeqhh`.
 
 GL-05 quedó probado de extremo a extremo con GitHub Issues privado y token efímero de Actions. La prueba real detectó y corrigió dos defectos del adaptador (formato opaco del token y cierre inmediato tras creación); el run `36881276163` terminó `success` y dejó #22/#23 cerrados como evidencia.
+
+Cloudflare: el acceso por navegador conectado llegó a la pantalla de login; no se inspeccionó ni modificó la cuenta. GL-11 sigue BLOCKED hasta disponer de sesión autenticada.
 
 No declarar PASS hasta que todos los GL-01..12 estén acreditados.
