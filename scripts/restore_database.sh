@@ -26,7 +26,18 @@ umask 077
 
 blocked() { printf 'BLOCKED: restore refused: %s\n' "$1" >&2; exit 2; }
 failed() { printf 'FAILED: %s\n' "$1" >&2; exit 1; }
-owner_only() { [[ -f $1 && ! -L $1 && $(stat -c '%a %u' -- "$1") == "600 $(id -u)" ]]; }
+stat_mode_uid() {
+  if stat -c '%a %u' "$1" >/dev/null 2>&1; then stat -c '%a %u' "$1"
+  else stat -f '%Lp %u' "$1" 2>/dev/null
+  fi
+}
+sha256_file() {
+  if command -v sha256sum >/dev/null; then sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum >/dev/null; then shasum -a 256 "$1" | awk '{print $1}'
+  else blocked 'sha256sum or shasum is not installed'
+  fi
+}
+owner_only() { [[ -f $1 && ! -L $1 && $(stat_mode_uid "$1") == "600 $(id -u)" ]]; }
 
 [[ $# -eq 2 ]] || blocked 'usage: restore_database.sh <backup-directory> <backup-name>'
 source_dir=$(cd "$1" 2>/dev/null && pwd -P) || blocked 'backup directory not found'
@@ -40,14 +51,16 @@ owner_only "$FICHAJE_RESTORE_IDENTITY" || blocked 'the age identity must be an o
 identity=$(cd "$(dirname "$FICHAJE_RESTORE_IDENTITY")" && pwd -P)/$(basename "$FICHAJE_RESTORE_IDENTITY")
 [[ $identity != "$source_dir"/* ]] || blocked 'the private key is stored next to the backup'
 grep -q 'BEGIN CERTIFICATE' "$FICHAJE_RESTORE_CA" 2>/dev/null || blocked 'FICHAJE_RESTORE_CA is not a PEM certificate'
-for tool in age pg_restore psql sha256sum; do command -v "$tool" >/dev/null || blocked "$tool is not installed"; done
+for tool in age pg_restore psql; do command -v "$tool" >/dev/null || blocked "$tool is not installed"; done
+command -v sha256sum >/dev/null || command -v shasum >/dev/null || blocked 'sha256sum or shasum is not installed'
 cipher="$source_dir/$name.dump.age"
 manifest="$source_dir/$name.manifest.json"
 [[ -f $cipher && -f $manifest && -f $cipher.sha256 ]] || blocked 'backup files missing (ciphertext, checksum or manifest)'
 field() { sed -nE "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"?([^\",}]*)\"?.*/\1/p" "$manifest"; }
 [[ $(field schema) == fichaje.db-backup.v1 && $(field result) == success && $(field encrypted) == true ]] || blocked 'manifest is not a successful encrypted backup'
-(cd "$source_dir" && sha256sum --status -c -- "$name.dump.age.sha256") || failed 'CHECKSUM_MISMATCH (ciphertext altered or incomplete; nothing decrypted)'
-[[ $(sha256sum -- "$cipher" | cut -d' ' -f1) == "$(field ciphertext_sha256)" ]] || failed 'CHECKSUM_MISMATCH (manifest)'
+checksum_expected=$(awk 'NR==1 {print $1}' "$cipher.sha256")
+[[ -n $checksum_expected && $(sha256_file "$cipher") == "$checksum_expected" ]] || failed 'CHECKSUM_MISMATCH (ciphertext altered or incomplete; nothing decrypted)'
+[[ $(sha256_file "$cipher") == "$(field ciphertext_sha256)" ]] || failed 'CHECKSUM_MISMATCH (manifest)'
 
 conninfo="service=$FICHAJE_RESTORE_PGSERVICE sslmode=verify-full sslrootcert=$FICHAJE_RESTORE_CA application_name=fichaje-restore connect_timeout=15"
 psql_q() { psql "$conninfo" -XAtq -v ON_ERROR_STOP=1 -c "$1"; }
