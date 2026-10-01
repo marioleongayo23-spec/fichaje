@@ -62,7 +62,7 @@ const health = healthHandler('kiosk-gateway', {
     await res.body?.cancel();
     if (!res.ok) throw new Error('AUTH_UNAVAILABLE');
   },
-  database: async () => { await gatewayTx(async tx => { await tx`select 1`; }); },
+  database: async () => { await gatewayTx(async tx => { await tx.unsafe('select 1'); }); },
 });
 interface Trace { operation: Operation; outcome: Outcome; errorClass: ErrorClass; stage: string; requestId?: unknown }
 const ACTIONS = ['CLOCK_IN','BREAK_START','BREAK_END','CLOCK_OUT'];
