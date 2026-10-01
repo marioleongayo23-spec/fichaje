@@ -79,3 +79,19 @@ No se crea cuenta todavía. PRE-05 sigue PARTIAL hasta disponer de dominio de en
 SPF/DKIM/DMARC y prueba real de confirmación/recuperación. Alternativas evaluadas: Resend Free (3.000/mes,
 100/día) dispone de DPA/SCC, pero declara almacenamiento de datos de cliente en EE. UU., lo que añade análisis
 de transferencia innecesario para la primera opción.
+
+
+## Coste Supabase para producción — 2026-10-01
+La documentación vigente permite dos proyectos activos en Free; un proyecto pausado no cuenta contra el límite.
+Por tanto, staging + el candidato `Fichaje APP` podrían coexistir a 0 € si el segundo se reactiva.
+
+Limitaciones de Free relevantes para la decisión comercial:
+- Supabase puede pausar proyectos de baja actividad tras una ventana de 7 días; actividad real/monitorización
+  suele evitarlo, pero Free no ofrece garantía de no-pausa.
+- Los backups gestionados descargables no están incluidos; PRE-07 debe satisfacerse con el pipeline externo
+  cifrado/restore ya diseñado mientras se permanezca en Free.
+- Pro empieza en 25 USD/mes por organización, no por cliente, e incluye no-pausa por inactividad y backups
+  diarios de 7 días. No se contrata en PREPROD-01 sin autorización expresa.
+
+Conclusión: **Pro no es un requisito legal ni un coste por cliente**. Es una decisión de fiabilidad que se
+reevaluará al activar el primer cliente/ingresos. La puerta no puede ocultar las limitaciones de Free.
