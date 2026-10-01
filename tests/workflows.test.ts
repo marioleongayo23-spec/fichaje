@@ -122,3 +122,29 @@ it('gates H7 on every pull request with the edge, failure, incident, load and en
   // The operator's staging verifier runs for real inside the edge suite, against the local staging shape.
   expect(readFileSync('tests/integration/h7_edge.py', 'utf8')).toContain("'scripts' / 'staging' / 'verify_staging.py'");
 });
+
+
+it('builds production candidates only from current main merge commits with all required gates green', () => {
+  const text = readFileSync('.github/workflows/production-candidate.yml', 'utf8');
+  const flow = parse(text);
+  expect(Object.keys(flow.on)).toEqual(['workflow_dispatch']);
+  expect(flow.permissions).toEqual({ contents: 'read', actions: 'read', 'pull-requests': 'read' });
+  expect(text).not.toMatch(/\bsecrets\./);
+  const run = JSON.stringify(flow.jobs['gate-and-package'].steps);
+  expect(run).toContain('target is not current main');
+  expect(run).toContain('merge commit of exactly one merged PR');
+  for (const gate of [
+    'CI',
+    'Database H1 + H2 + H3 + H4 + KIO-H6-01 + H5',
+    'E2E H6 (browser, PWA, accessibility)',
+    'OPS-02 observability and resilience gate',
+    'H7 pilot readiness (edge, failure and incident drills, load, encrypted backup and restore)',
+  ]) expect(run).toContain(gate);
+  const build = flow.jobs['gate-and-package'].steps.find((s: { name?: string }) => s.name === 'Build production candidate');
+  expect(build.env.VITE_DEPLOYMENT_TIER).toBe('production');
+  expect(build.env.VITE_SUPABASE_URL).toBe('https://bypdviatamosygndeqhh.supabase.co');
+  expect(build.env.VITE_SUPABASE_PUBLISHABLE_KEY).toMatch(/^sb_publishable_/);
+  expect(JSON.stringify(build.env)).not.toMatch(/sb_secret_|service_role/);
+  expect(run).toContain('npm run scan:secrets');
+  expect(run).toContain('production-candidate-');
+});
