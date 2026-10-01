@@ -37,6 +37,8 @@ class ProductionVerifyGuardTest(unittest.TestCase):
             self.assertFalse(verify.allowed(f'https://{APP}', 'https://abcdefghijklmnopqrst.supabase.co'))
             self.assertFalse(verify.allowed(f'http://{APP}', f'https://{API}'))
             self.assertFalse(verify.allowed(f'https://{APP}/path', f'https://{API}'))
+            self.assertFalse(verify.allowed(f'https://{APP}:8443', f'https://{API}'))
+            self.assertFalse(verify.allowed(f'https://{APP}', f'https://{API}:8443'))
         with mock.patch.dict(os.environ, {'FICHAJE_ENV': 'production'}, clear=True):
             self.assertFalse(verify.allowed(f'https://{APP}', f'https://{API}'))
 
