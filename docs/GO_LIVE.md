@@ -21,15 +21,15 @@ El producto funcional ya está cerrado en H7. GO-LIVE solo valida que la operaci
 | ID | Gate | Estado inicial |
 |---|---|---|
 | GL-01 | CI, DB, E2E, OPS-02 y H7 verdes en el HEAD candidato | PENDING |
-| GL-02 | Supabase Security Advisor revisado; findings intencionados documentados y sin hallazgos críticos sin resolver | PARTIAL |
+| GL-02 | Supabase Security Advisor revisado; findings intencionados documentados y sin hallazgos críticos sin resolver | PASS — producción: 20 WARN intencionados de RPC `SECURITY DEFINER`, 0 hallazgos críticos/adicionales |
 | GL-03 | Producción vacía antes del primer alta y migraciones alineadas con staging | PASS |
-| GL-04 | Build productivo no puede apuntar a staging ni a gateways externos | IMPLEMENTED; pendiente CI |
+| GL-04 | Build productivo no puede apuntar a staging ni a gateways externos | PASS — contrato cubierto por unitarios y CI |
 | GL-05 | Ruta de alerta real operativa y probada con un evento sintético, sin PII | PASS — GitHub Issues privado; run 36881276163; issues sintéticos #22/#23 cerrados |
-| GL-06 | Backup DB real cifrado + custodia de clave fuera del destino + restore probado en entorno vacío | PARTIAL — destino privado candidato creado; falta credencial DB, clave age offline y restore real |
-| GL-07 | Journal de recuperación independiente operativo y reconciliable | BLOCKED — diseño validado; la integración no permite aprovisionar de forma segura la credencial SQL entre proyectos |
-| GL-08 | Runbook de incidente con responsable, corte de escrituras, restore/reapertura y contacto de brechas | PARTIAL |
+| GL-06 | Backup DB real cifrado + custodia de clave fuera del destino + restore probado en entorno vacío | PARTIAL — bootstrap/drill seguro listo; falta ejecutarlo con credenciales introducidas localmente |
+| GL-07 | Journal de recuperación independiente operativo y reconciliable | BLOCKED — bootstrap seguro listo; remoto verificado sin cambios parciales; falta ejecutarlo localmente |
+| GL-08 | Runbook de incidente con responsable, corte de escrituras, restore/reapertura y contacto de brechas | IMPLEMENTED; pendiente H7 del HEAD final |
 | GL-09 | Revisión normativa vigente, contrato de encargo/subencargados y documentación de información a plantilla disponibles para el primer cliente | PARTIAL |
-| GL-10 | Control de procedencia de release: branch protection si el plan lo permite o gate equivalente que rechace cualquier SHA que no sea HEAD de `main`, merge de PR y 5/5 checks verdes | IMPLEMENTED; pendiente CI |
+| GL-10 | Control de procedencia de release: branch protection si el plan lo permite o gate equivalente que rechace cualquier SHA que no sea HEAD de `main`, merge de PR y 5/5 checks verdes | PASS — workflow + contrato unitario verdes en CI |
 | GL-11 | Deploy final de Cloudflare separado de staging, con CSP/HSTS/gateway firmado y release verificable | BLOCKED |
 | GL-12 | Autorización expresa del usuario para activar producción | BLOCKED |
 
@@ -86,3 +86,24 @@ Se corrigieron dos defectos detectados por la prueba real: validación demasiado
 Se creó en el Drive privado existente `Fichaje APP - BACKUP` la carpeta `02 - DB Encrypted Backups` como **destino candidato**, no autorizado todavía para datos reales. El script existente `scripts/backup_database.sh` ya exige `pg_dump | age`, TLS verify-full, ficheros 0600 y ausencia de la clave privada age en el host/destino.
 
 El gate no pasa aún: falta ejecutar un backup del candidato productivo con credencial de solo lectura, custodiar la identidad privada age fuera del destino y restaurar ese backup en un entorno vacío. No se sustituye esta prueba por documentación ni por un checksum.
+
+
+### Evidencia GL-02 — Security Advisor productivo
+Revisión remota el 2026-10-01 sobre `bypdviatamosygndeqhh`: el Advisor de seguridad devuelve únicamente 20 avisos `authenticated_security_definer_function_executable`. Corresponden al catálogo público intencional de RPC que implementa autorización servidor (alta de organización, membresías/empleados, fichaje, correcciones, evidencias y exportación). Su exposición no se acepta por el warning: queda respaldada por los GRANT mínimos, guards de actor/tenant, RLS y las suites H1–H7. No apareció ningún hallazgo CRITICAL ni el aviso de protección de contraseñas filtradas que sí sigue presente en staging.
+
+Referencia de remediación del Advisor para revisar cambios futuros: https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable
+
+### Preparación GL-06/07 — bootstrap local sin secretos en chat/GitHub
+`scripts/go_live_recovery_bootstrap.sh` y `scripts/go_live_restore_drill.sh` convierten los últimos pasos de recuperación en un procedimiento reproducible sin copiar credenciales al chat ni al repositorio:
+
+1. las contraseñas de los dos proyectos Supabase se introducen ocultas en Terminal;
+2. las credenciales técnicas se generan localmente y se guardan solo en ficheros 0600;
+3. la identidad privada `age` queda en macOS Keychain y el destino de backup solo conoce el recipient público;
+4. producción se conecta por `dblink` TLS `verify-full` al journal del proyecto separado de staging, con un login que solo puede invocar `journal.prepare/verify`;
+5. se crea un login de backup de solo lectura en cada proyecto;
+6. se hace un backup cifrado del staging remoto, que contiene únicamente datos sintéticos;
+7. el segundo script restaura exactamente ese ciphertext en un Supabase local desechable con TLS y valida Auth/datos/RLS/inmutabilidad.
+
+El intento previo mediante navegador expiró antes de completar. Una comprobación posterior directa confirmó **cero cambios parciales**: staging no tenía roles/esquema `journal` y producción no tenía foreign server/user mapping. No se presume ningún paso ejecutado.
+
+Este diseño usa el proyecto staging como persistencia independiente del backup/restauración de producción para mantener coste 0. Riesgo residual: ambos proyectos dependen del mismo proveedor Supabase; una pérdida simultánea de cuenta/proveedor excede esta garantía y deberá reevaluarse cuando ingresos/riesgo justifiquen un journal en proveedor/cuenta independiente.
