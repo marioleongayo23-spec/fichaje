@@ -40,6 +40,12 @@ class ProductionVerifyGuardTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {'FICHAJE_ENV': 'production'}, clear=True):
             self.assertFalse(verify.allowed(f'https://{APP}', f'https://{API}'))
 
+    def test_direct_function_overrides_are_always_refused(self):
+        self.assertTrue(verify.direct_overrides_allowed(None, None, None))
+        self.assertFalse(verify.direct_overrides_allowed('https://other.invalid/functions/v1', None, None))
+        self.assertFalse(verify.direct_overrides_allowed(None, 'https://other.invalid/kiosk', None))
+        self.assertFalse(verify.direct_overrides_allowed(None, None, 'https://other.invalid/export-link'))
+
     def test_staging_environment_cannot_run_production_verifier(self):
         env = self.env()
         env['FICHAJE_ENV'] = 'staging'
