@@ -22,7 +22,9 @@ jobs:
           node-version: '24'
           cache: npm
       - name: Install
-        run: npm ci
+        run: |
+          npm ci
+          npm ci --prefix edge
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -36,11 +38,20 @@ jobs:
         run: npm run build
       - name: Secret scan of build output
         run: npm run scan:secrets
+      - name: Build self-contained Pages upload
+        run: |
+          rm -rf pages-upload
+          cp -R dist pages-upload
+          edge/node_modules/.bin/wrangler pages functions build functions \
+            --outfile pages-upload/_worker.js \
+            --project-directory . \
+            --compatibility-date 2026-09-01
+          test -s pages-upload/_worker.js
       - name: Upload Pages build artifact
         uses: actions/upload-artifact@v4
         with:
           name: pages-dist-${{ github.event.pull_request.head.sha || github.sha }}
-          path: dist/
+          path: pages-upload/
           if-no-files-found: error
           retention-days: 1
       - name: OPS-02 operational contract unit tests
