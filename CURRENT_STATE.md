@@ -1,5 +1,33 @@
 # CURRENT_STATE — 2026-10-01
 
+## PREPROD-01 — puerta previa al primer cliente real / producción
+
+**ESTADO ACTUAL: BLOCKED / EN EJECUCIÓN.** HITO 7 está cerrado. PREPROD-01 se ha iniciado por autorización del usuario, pero no autoriza producción, datos reales ni gasto.
+
+Repositorio: `marioleongayo23-spec/fichaje`  
+Rama: `astra/preprod-01-primer-cliente`  
+PR: pendiente de abrir  
+Contrato de puerta: `docs/PRODUCTION_GATE.md`
+
+### Estado inicial PRE-01..10
+
+- PRE-01 normativa/convenio: PARTIAL — base estatal y AEPD revisadas el 2026-10-01; el convenio se valida por cliente concreto.
+- PRE-02 paquete legal/comercial: BLOCKED — plantillas existen, requieren completar marcadores y revisión jurídica independiente antes de datos reales.
+- PRE-03 producción aislada: BLOCKED — no se ha creado producción.
+- PRE-04 dominio/borde: BLOCKED — no hay dominio definitivo/WAF de producción.
+- PRE-05 correo transaccional: BLOCKED — no hay proveedor SMTP productivo aprobado.
+- PRE-06 alertas reales: BLOCKED — arnés probado, rutas reales no activadas.
+- PRE-07 backup/restore real: BLOCKED — implementación probada localmente, backup gestionado y restore aislado reales no activados.
+- PRE-08 seguridad independiente: BLOCKED — pendiente revisión externa/independiente final.
+- PRE-09 ensayo production-like: BLOCKED — se ejecutará sin datos reales cuando exista entorno candidato.
+- PRE-10 primer cliente: BLOCKED — requiere empresa concreta, convenio, contratos y autorización expresa posterior.
+
+### Política de coste
+
+0 € mientras sea compatible con la puerta. No contratar dominio, SMTP, plan Pro, segundo entorno, backup gestionado ni revisión profesional sin autorización expresa y justificación.
+
+### HITO 7
+
 ## HITO 7 — aprobado e integrado
 
 **ESTADO ACTUAL: PASS.** HITO 7 fue aprobado expresamente por el usuario el 2026-10-01 e integrado en `main` mediante PR #15.
