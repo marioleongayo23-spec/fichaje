@@ -322,8 +322,12 @@ class Provisioner:
         if environment not in ('staging', 'production'):
             return False
         parsed = urlparse(api_url)
-        if parsed.scheme != 'https' or parsed.username or parsed.password or parsed.query or parsed.fragment \
-                or parsed.path not in ('', '/') or not parsed.hostname:
+        try:
+            api_port = parsed.port
+        except ValueError:
+            return False
+        if parsed.scheme != 'https' or api_port not in (None, 443) or parsed.username or parsed.password \
+                or parsed.query or parsed.fragment or parsed.path not in ('', '/') or not parsed.hostname:
             return False
         prefix = 'STAGING' if environment == 'staging' else 'PRODUCTION'
         api_host = os.environ.get(f'FICHAJE_{prefix}_API_HOST', '')
