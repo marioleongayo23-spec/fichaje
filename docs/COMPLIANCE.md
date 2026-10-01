@@ -61,3 +61,28 @@ Fuentes primarias consultadas mediante lectura web el 2026-09-28:
 Decisiones técnicas propias: originales inmutables y correcciones append-only; borde con ingreso firmado; cifrado age, journal independiente y alertas minimizadas; cuatro años desde el cierre del periodo y extensión de la cadena tras correcciones. Estas decisiones sirven al diseño y a la auditabilidad; la ley no prescribe este stack ni estos mecanismos concretos.
 
 Las [plantillas legales](legal/README.md) siguen siendo revisables. Antes de usar datos reales hacen falta revisión jurídica del caso y convenio, encargo, subencargados/transferencias, información a la plantilla y valoración de riesgos/EIPD cuando corresponda. Esta revisión no certifica cumplimiento ni autoriza el piloto.
+
+
+## PREPROD-01 — revisión normativa 2026-10-01
+
+Fuentes primarias verificadas para abrir la puerta previa al primer cliente real:
+
+- Estatuto de los Trabajadores, art. 34.9, BOE-A-2015-11430:
+  https://www.boe.es/buscar/act.php?id=BOE-A-2015-11430
+- RGPD, especialmente arts. 28 y 32:
+  https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=es
+- AEPD, FAQ sobre control horario:
+  https://www.aepd.es/preguntas-frecuentes/3-proteccion-de-datos-en-el-ambito-laboral/FAQ-0311-es-necesario-el-consentimiento-del-trabajador-para-implantar-un-sistema-de-control-horario
+- Como evidencia de que la negociación colectiva puede concretar el registro en 2026:
+  III Convenio de centros y servicios veterinarios, BOE-A-2026-19605:
+  https://www.boe.es/diario_boe/txt.php?id=BOE-A-2026-19605
+  y Convenio de seguros/reaseguros, BOE-A-2026-16077:
+  https://www.boe.es/buscar/doc.php?id=BOE-A-2026-16077
+
+Conclusión operativa para PREPROD-01: el producto conserva como baseline inicio/fin diarios, conservación mínima
+de cuatro años y disponibilidad; el tratamiento ordinario se apoya en obligación legal y exige información.
+La empresa cliente sigue tratándose como responsable y Fichaje como encargado, sujeto a contrato del art. 28
+y medidas del art. 32. El convenio/empresa concreta puede añadir reglas sobre pausas, trabajo efectivo,
+incidencias, flexibilidad, accesibilidad y entrega; por eso PRE-01 se completa por cliente antes de producción.
+
+Esta revisión no certifica el producto ni sustituye revisión jurídica independiente. No autoriza datos reales.

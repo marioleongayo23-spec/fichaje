@@ -65,7 +65,7 @@ El Proveedor notificará a la Empresa **sin dilación indebida** (art. 33.2 RGPD
 en ese momento, por `[[CANAL DE NOTIFICACIÓN]]`.
 
 ## 6. Localización
-Datos en la región `[[REGIÓN UE DEL PROYECTO SUPABASE]]`. Ver [LOCALIZACION_TRANSFERENCIAS.md](LOCALIZACION_TRANSFERENCIAS.md).
+Datos primarios del candidato Supabase en `eu-west-1` (Irlanda, UE). La contratación y el inventario de transferencias deben validarse antes del primer cliente. Ver [LOCALIZACION_TRANSFERENCIAS.md](LOCALIZACION_TRANSFERENCIAS.md).
 
 ## 7. Transferencias internacionales
 Solo con garantías del capítulo V RGPD (decisión de adecuación, cláusulas contractuales tipo u otra garantía
@@ -80,11 +80,13 @@ objetivos técnicos, no garantías.
 `[[LEY Y JURISDICCIÓN]]`.
 
 ## 10. Devolución y supresión al finalizar
-Ver [BAJA_CLIENTE.md](BAJA_CLIENTE.md): exportación completa firmada con digest SHA-256, entrega con recibo,
+Ver [BAJA_CLIENTE.md](BAJA_CLIENTE.md): exportación completa con manifiesto de integridad SHA-256 (no firma electrónica cualificada), entrega con recibo,
 supresión en base activa en `[[PLAZO]]` y desaparición de las copias cifradas por rotación (35 días, decisión
 técnica), con certificado de supresión.
 
-## Anexo I — Medidas técnicas y organizativas (estado verificado en H1–H7)
+## Anexo I — Medidas técnicas y organizativas
+
+H1–H7 acreditan implementación y pruebas sintéticas. La activación remota de backup/journal, guardia y candidato completo sigue pendiente en PREPROD-01; este anexo no afirma que dichas operaciones estén activas.
 | Medida | Implementación (evidencia en `CURRENT_STATE.md`) |
 |---|---|
 | Aislamiento por empresa | `organization_id` + RLS forzada en todas las tablas; pruebas cruzadas de dos empresas × tres roles |
@@ -93,8 +95,8 @@ técnica), con certificado de supresión.
 | Hora del servidor | El cliente nunca fija la hora del fichaje |
 | Kiosco sin email | Código + PIN Argon2id con pepper externo, límites 5/30/60, challenge de un uso |
 | Cifrado en tránsito | TLS en el borde (HSTS) y verify-full en conexiones técnicas a PostgreSQL |
-| Copias | Backup lógico cifrado con age (clave privada custodiada aparte), restauración ensayada |
-| Recuperación | Journal independiente de bajas, retenciones y purgas; restore aislado con verificación previa |
+| Copias | Pipeline de backup lógico cifrado con age y restore ensayado en CI; custodia, destino y ensayo del candidato pendientes PRE-07 |
+| Recuperación | Journal independiente de bajas, retenciones y purgas implementado; instancia remota y restore del candidato pendientes PRE-07 |
 | Observabilidad sin datos personales | Eventos por lista blanca, alertas sin PII, canaries sintéticos |
 | Minimización | Sin biometría, fotos ni geolocalización; IP de red solo como HMAC por empresa |
 | Retención | Purga laboral autorizada al vencer plazos, legal holds, manifiestos |

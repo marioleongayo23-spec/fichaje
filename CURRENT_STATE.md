@@ -1,5 +1,54 @@
 # CURRENT_STATE — 2026-10-01
 
+## PREPROD-01 — puerta previa al primer cliente real / producción
+
+**ESTADO ACTUAL: BLOCKED / EN EJECUCIÓN.** HITO 7 está cerrado. PREPROD-01 se ha iniciado por autorización del usuario, autoriza configurar y desplegar el candidato productivo exclusivamente sintético. No autoriza clientes/datos reales, gasto ni merge.
+
+Repositorio: `marioleongayo23-spec/fichaje`  
+Rama: `astra/preprod-01-primer-cliente`  
+PR: #16 — OPEN  
+Contrato de puerta: `docs/PRODUCTION_GATE.md`
+
+### Estado inicial PRE-01..10
+
+- PRE-01 normativa/convenio: PARTIAL — base estatal y AEPD revisadas el 2026-10-01; el convenio se valida por cliente concreto.
+- PRE-02 paquete legal/comercial: PARTIAL — DPA/subencargados principales verificados; faltan identidad contractual de Fichaje, proveedores pendientes, marcadores y revisión jurídica independiente antes de datos reales.
+- PRE-03 producción aislada: PARTIAL — Supabase `Fichaje APP` está `ACTIVE_HEALTHY` en `eu-west-1`; 17/17 migraciones del repo aplicadas y su historial corregido para coincidir exactamente con los timestamps de Git; bucket `fichaje-evidence` privado creado. Sigue con 0 usuarios Auth, 0 organizaciones, 0 empleados, 0 fichajes y 0 objetos Storage. Edge Functions/secretos/Auth productivos y Cloudflare productivo aún pendientes.
+- PRE-04 dominio/borde: BLOCKED — Pages productivo puede ser 0 €, pero no hay dominio propio; WAF/rate limits de zona requieren ese dominio.
+- PRE-05 correo transaccional: PARTIAL — Brevo Free seleccionado como candidato 0 €; pendiente dominio, DPA/alta, SPF/DKIM/DMARC y prueba real.
+- PRE-06 alertas reales: PARTIAL — PagerDuty Free + GitHub Issues seleccionados como rutas 0 €; cuentas/tokens y prueba real aún no activados.
+- PRE-07 backup/restore real: BLOCKED — Free exige exportación externa; falta host de operación fiable para backup diario cifrado. Ensayo remoto sintético puede hacerse aparte, pero no sustituye operación diaria.
+- PRE-08 seguridad independiente: PARTIAL — Supabase Advisor sin hallazgos críticos nuevos; 20 SECURITY DEFINER intencionales y HIBP Pro-only documentados. Falta revisión externa/independiente del candidato productivo.
+- PRE-09 ensayo production-like: BLOCKED — se ejecutará sin datos reales cuando exista entorno candidato.
+- PRE-10 primer cliente: BLOCKED — requiere empresa concreta, convenio, contratos y autorización expresa posterior.
+
+
+### Verificación de continuidad PREPROD-01 — 2026-10-01
+
+- HEAD inicial verificado: `52f345cdd47b72f0b6ea3ac3172b16a3acc23571`; sus cinco workflows están completed/success.
+- Supabase candidato `bypdviatamosygndeqhh`: ACTIVE_HEALTHY, eu-west-1; historial de 17 migraciones coincide con Git. Recuento real: 0 usuarios Auth, organizaciones, empleados, fichajes y objetos Storage.
+- RLS + FORCE RLS en todas las tablas public/private. Anon: 0 permisos de tablas y 0 SECURITY DEFINER de negocio ejecutables. Gateway: 0 permisos de tablas, únicamente cinco entrypoints privados. Export worker: solo SELECT directo de export_jobs, sin escritura ni lectura directa de eventos.
+- Roles gateway/export/monitor: NOLOGIN, NOINHERIT, NOSUPERUSER, NOCREATEROLE y NOBYPASSRLS. SET LOCAL ROLE probado en transacciones remotas revertidas, con acceso directo a empleados/estado/eventos denegado.
+- Advisor productivo: 20 avisos SECURITY DEFINER intencionales; no son una auditoría independiente. No revocar ni ampliar permisos mecánicamente.
+- Comparación inicial: export-link v3 coincidía byte a byte con el HEAD inicial; kiosk v4 difería en index.ts. Tras los cinco workflows completed/success del commit `42e99c8cda930f616dcdf4f15af760efbf62cd2d`, kiosk se redesplegó como v5 ACTIVE y sus cinco archivos coinciden byte a byte con ese código validado. La etiqueta de release/commit del secret store sigue sin verificar; código coincidente no acredita configuración operativa.
+- Defecto detectado en el HEAD inicial: authenticate y record abrían db.begin sin SET LOCAL ROLE. Se corrigen para usar gatewayTx. La integración H4 incorpora guards de prueba dentro de las dos funciones SQL reales que rechazan llamadas sin role=fichaje_gateway; las suites Auth/PIN/challenge/fichaje existentes ejercitan esas rutas.
+- Ingress remoto sin firma: GET de health/live y health/ready de ambas funciones devuelve 403 y no-store. Esta evidencia no prueba secretos exclusivos, FICHAJE_ENV, readiness firmada ni el frontend productivo.
+- Cloudflare: el navegador permanece en verificación de seguridad tras una recarga; no se creó ni desplegó Pages productivo.
+- Gestión de secretos Supabase: apertura rechazada por revisión automática de permisos; el conector no expone configuración de secretos/Auth. No se han leído valores ni rotado/configurado secretos por esta sesión.
+- Auth público remoto: email y signup habilitados, confirmación obligatoria, anonymous/social desactivados. Signup con contraseña sintética de 11 caracteres rechazado con 422 weak_password y mínimo de 12. Secure email change, CAPTCHA, Site URL/redirecciones y SMTP quedan sin verificar por el bloqueo de configuración privada.
+- RLS remota ejercitada con dos empresas exclusivamente sintéticas en una transacción revertida: OWNER/ADMIN aislados, EMPLOYEE solo su ficha, RPC cross-tenant 42501, dispositivo sin directorio y anon sin lectura. Recuento posterior de Auth/organizaciones/empleados/fichajes/Storage = 0. No sustituye Auth HTTP, Storage/edge funcional ni el ensayo PRE-09.
+- Monitor mínimo en transacción READ ONLY: health UP, 0 deadlocks, 0 esperas de lock; sin filas de invariantes en el candidato vacío. No equivale a programación ni entrega de alertas PRE-06.
+- Journal `fichaje_recovery`: no existe. Sin host/destino/custodia/journal no hay backup diario ni restore del candidato; RPO/RTO productivos no medidos.
+- Todos los controles siguen PARTIAL/BLOCKED. PRE-09 no ejecutado; PRE-10 requiere cliente, contratos y autorización posterior.
+- La corrección debe superar CI, Database, E2E H6, OPS-02 y H7 del mismo HEAD antes de desplegar. La evidencia final vinculante son los runs del HEAD actual del PR #16; los PASS del HEAD inicial no validan un commit posterior.
+- Sin datos reales, gasto, nuevo hito/rama/PR ni merge.
+
+### Política de coste
+
+0 € mientras sea compatible con la puerta. No contratar dominio, SMTP, plan Pro, segundo entorno, backup gestionado ni revisión profesional sin autorización expresa y justificación.
+
+### HITO 7
+
 ## HITO 7 — aprobado e integrado
 
 **ESTADO ACTUAL: PASS.** HITO 7 fue aprobado expresamente por el usuario el 2026-10-01 e integrado en `main` mediante PR #15.
