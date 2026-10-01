@@ -6,7 +6,7 @@
 
 Repositorio: `marioleongayo23-spec/fichaje`  
 Rama: `astra/go-live-produccion`  
-PR: pendiente de apertura
+PR: #18 — OPEN
 
 ### Base heredada
 HITO 0, OPS-01, HITO 1, HITO 2, HITO 3, HITO 4, HITO 5, HITO 6, OPS-02 y HITO 7 están aprobados e integrados en `main`.
@@ -38,7 +38,9 @@ Se añadió binding explícito de entorno:
 Hay tests unitarios para impedir cruce staging/prod y endpoints externos en producción.
 
 ### Revisión legal 2026-10-01
-Se verificó con fuentes primarias que el Proyecto de Ley 121/000058 sobre reducción de jornada y garantía del registro digital fue rechazado/devuelto por el Congreso el 10-09-2025. No se trata como obligación vigente.
+Se verificó con fuentes primarias que el Proyecto de Ley 121/000058 fue sometido a devolución el 10-09-2025 y figura concluido/rechazado desde el 11-09-2025. No se trata como obligación vigente.
+
+También se incorporó el Real Decreto 723/2026, publicado el 15-09-2026 y con entrada en vigor el 05-10-2026. Fichaje V1 queda expresamente fuera de la toma automatizada de decisiones laborales: registra hechos y ejecuta reglas deterministas, sin decidir jornada, turnos, salario, productividad, sanciones ni extinción.
 
 Se mantiene como base general el art. 34.9 ET y la orientación AEPD sobre base legal/deber de información. El convenio aplicable de cada cliente sigue siendo una comprobación previa al alta.
 
@@ -49,7 +51,7 @@ Definidos en `docs/GO_LIVE.md`. Bloqueos reales actuales:
 - journal independiente operativo;
 - simulacro operativo final;
 - kit legal/contractual final para cliente real;
-- branch protection/ruleset de `main`;
+- control de procedencia de release: implementado en `production-candidate.yml`, pendiente de CI;
 - despliegue Cloudflare productivo separado y verificado;
 - autorización expresa posterior de producción.
 
@@ -61,5 +63,7 @@ Supabase Free no aporta backups automáticos gestionados; su documentación reco
 - 0 gasto nuevo autorizado.
 - No se han añadido secretos a GitHub.
 - No se ha activado producción.
+
+GitHub Free no permite protected branches/rulesets en repositorios privados. Se implementó un control compensatorio gratuito: el workflow manual `Production Candidate` rechaza cualquier SHA que no sea el HEAD actual de `main`, merge commit de un PR y 5/5 gates verdes, y solo entonces empaqueta el build productivo fijado al Supabase `bypdviatamosygndeqhh`.
 
 No declarar PASS hasta que todos los GL-01..12 estén acreditados.
