@@ -40,3 +40,7 @@ enabled = false
 verify_jwt = false
 [functions.export-link]
 verify_jwt = false
+
+# Stripe user routes authenticate through the signed edge; the direct webhook verifies Stripe-Signature.
+[functions.billing]
+verify_jwt = false
