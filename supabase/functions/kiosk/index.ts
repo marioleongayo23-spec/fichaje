@@ -6,9 +6,9 @@ import { classifySql, healthHandler, opsEvent, type ErrorClass, type Operation, 
 import { INGRESS_HEADER, ingressPolicy, routeOf, verifyIngress } from '../_shared/ingress.ts';
 
 const env = (key: string) => { const value = Deno.env.get(key); if (!value) throw new Error('CONFIG_REQUIRED'); return value; };
-const authURL = env('KIOSK_AUTH_URL');
-const apiKey = env('KIOSK_ANON_KEY');
-const provisionKey = env('KIOSK_AUTH_PROVISION_KEY'); // Auth admin provisioning only, NEVER database access.
+const authURL = Deno.env.get('KIOSK_AUTH_URL') ?? env('SUPABASE_URL');
+const apiKey = Deno.env.get('KIOSK_ANON_KEY') ?? env('SUPABASE_ANON_KEY');
+const provisionKey = Deno.env.get('KIOSK_AUTH_PROVISION_KEY') ?? env('SUPABASE_SERVICE_ROLE_KEY'); // Auth admin provisioning only, NEVER database access.
 const pepper = Uint8Array.from(atob(env('KIOSK_PEPPER')), c => c.charCodeAt(0));
 const networkSecret = Uint8Array.from(atob(env('KIOSK_NETWORK_SECRET')), c => c.charCodeAt(0));
 if (networkSecret.length < 32 || btoa(String.fromCharCode(...networkSecret)) === btoa(String.fromCharCode(...pepper))) throw new Error('CONFIG_REQUIRED');
@@ -21,8 +21,12 @@ for (const secret of ingress.secrets) {
   const value = btoa(String.fromCharCode(...secret));
   if (value === btoa(String.fromCharCode(...pepper)) || value === btoa(String.fromCharCode(...networkSecret))) throw new Error('CONFIG_REQUIRED');
 }
-const db = postgres(env('KIOSK_DATABASE_URL'), { max: 8, prepare: false, onnotice: () => {}, debug: false,
+const db = postgres(Deno.env.get('KIOSK_DATABASE_URL') ?? env('SUPABASE_DB_URL'), { max: 8, prepare: false, onnotice: () => {}, debug: false,
   connection: { application_name: 'kiosk-gateway', statement_timeout: 10000, lock_timeout: 5000, idle_in_transaction_session_timeout: 10000 } });
+const gatewayTx = <T>(work: (tx: Tx) => Promise<T>) => db.begin(async tx => {
+  await tx.unsafe('set local role fichaje_gateway');
+  return await work(tx);
+});
 const enc = new TextEncoder();
 const random = (n: number) => crypto.getRandomValues(new Uint8Array(n));
 const b64 = (v: Uint8Array) => btoa(String.fromCharCode(...v));
@@ -45,10 +49,10 @@ const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-
 type Tx = postgres.TransactionSql;
 async function identity(tx: Tx, id: string) { await tx.unsafe("select set_config('request.jwt.claim.sub',$1,true)",[id]); }
 async function preflight(id: string, org: string, req: string, op: string, payload: postgres.JSONValue) {
-  return await db.begin(async tx => { await identity(tx,id); const [r] = await tx.unsafe('select private.kiosk_admin_prepare($1::uuid,$2::uuid,$3,$4::jsonb) as r',[org,req,op,tx.json(payload)]); return r.r; });
+  return await gatewayTx(async tx => { await identity(tx,id); const [r] = await tx.unsafe('select private.kiosk_admin_prepare($1::uuid,$2::uuid,$3,$4::jsonb) as r',[org,req,op,tx.json(payload)]); return r.r; });
 }
 async function apply(id: string, org: string, req: string, op: string, payload: postgres.JSONValue, data: postgres.JSONValue) {
-  return await db.begin(async tx => { await identity(tx,id); const [r] = await tx.unsafe('select private.kiosk_admin_apply($1::uuid,$2::uuid,$3,$4::jsonb,$5::jsonb) as r',[org,req,op,tx.json(payload),tx.json(data)]); return r.r; });
+  return await gatewayTx(async tx => { await identity(tx,id); const [r] = await tx.unsafe('select private.kiosk_admin_apply($1::uuid,$2::uuid,$3,$4::jsonb,$5::jsonb) as r',[org,req,op,tx.json(payload),tx.json(data)]); return r.r; });
 }
 
 // OPS-02: liveness and bounded, cached readiness of the two dependencies.
@@ -58,7 +62,7 @@ const health = healthHandler('kiosk-gateway', {
     await res.body?.cancel();
     if (!res.ok) throw new Error('AUTH_UNAVAILABLE');
   },
-  database: async () => { await db`select 1`; },
+  database: async () => { await gatewayTx(async tx => { await tx.unsafe('select 1'); }); },
 });
 interface Trace { operation: Operation; outcome: Outcome; errorClass: ErrorClass; stage: string; requestId?: unknown }
 const ACTIONS = ['CLOCK_IN','BREAK_START','BREAK_END','CLOCK_OUT'];
@@ -177,7 +181,7 @@ async function handle(req: Request, info: Deno.ServeHandlerInfo, trace: Trace): 
       // the database stores only their hashes, one per legal action it offers.
       const tokens = [hex(random(32)), hex(random(32))];
       const hashes = await Promise.all(tokens.map(digest));
-      const result = await db.begin(async tx => {
+      const result = await gatewayTx(async tx => {
         await identity(tx,id);
         const [r] = await tx.unsafe('select private.kiosk_auth_begin($1::uuid,$2::uuid,$3,$4) as r',[org,device,body.code as string,network]);
         const a = r.r;
@@ -201,7 +205,7 @@ async function handle(req: Request, info: Deno.ServeHandlerInfo, trace: Trace): 
     if (!['CLOCK_IN','BREAK_START','BREAK_END','CLOCK_OUT'].includes(action) || !Number.isSafeInteger(expected) || expected < 0) return fail();
     if (typeof body.challenge !== 'string' || !/^[0-9a-f]{64}$/.test(body.challenge)) return fail();
     const tokenHash = await digest(body.challenge); body.challenge = '';
-    const result = await db.begin(async tx => {
+    const result = await gatewayTx(async tx => {
       await identity(tx,id);
       const [r] = await tx.unsafe('select private.kiosk_record($1::uuid,$2::uuid,$3::public.time_action,$4::bigint,$5::uuid,$6) as r',[org,device,action,expected,request,tokenHash]);
       return r.r;
