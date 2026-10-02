@@ -10,7 +10,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-import psycopg
 
 NAME_RE = re.compile(r"^fichaje-db-\d{8}T\d{6}Z-[0-9a-f]{8}$")
 PRIVATE_KEY_MARKER = b"AGE-SECRET-KEY-1"
@@ -133,10 +132,23 @@ def connection_info() -> str:
     )
 
 
+def _driver():
+    try:
+        import psycopg
+    except ModuleNotFoundError as exc:
+        raise VaultError("PSYCOPG_NOT_INSTALLED") from exc
+    return psycopg
+
+
 def upload(directory: str | Path, name: str) -> None:
     artifacts = load_package(directory, name)
     conninfo = connection_info()
-    with psycopg.connect(conninfo) as conn:
+    psycopg = _driver()
+    try:
+        conn_ctx = psycopg.connect(conninfo)
+    except psycopg.Error as exc:
+        raise VaultError(f"VAULT_DB_ERROR:{exc.__class__.__name__}") from exc
+    with conn_ctx as conn:
         with conn.cursor() as cur:
             for artifact in artifacts:
                 cur.execute(
@@ -174,7 +186,12 @@ def upload(directory: str | Path, name: str) -> None:
 
 def purge() -> None:
     conninfo = connection_info()
-    with psycopg.connect(conninfo) as conn:
+    psycopg = _driver()
+    try:
+        conn_ctx = psycopg.connect(conninfo)
+    except psycopg.Error as exc:
+        raise VaultError(f"VAULT_DB_ERROR:{exc.__class__.__name__}") from exc
+    with conn_ctx as conn:
         with conn.cursor() as cur:
             cur.execute("select backup_vault.purge_expired()")
             count = int(cur.fetchone()[0])
@@ -194,9 +211,6 @@ def main(argv: list[str]) -> int:
     except VaultError as exc:
         print(f"BLOCKED: {exc}", file=sys.stderr)
         return 2
-    except psycopg.Error as exc:
-        print(f"FAILED: VAULT_DB_ERROR:{exc.__class__.__name__}", file=sys.stderr)
-        return 1
 
 
 if __name__ == "__main__":
