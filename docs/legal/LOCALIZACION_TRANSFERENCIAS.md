@@ -9,7 +9,7 @@
 | Supabase PostgreSQL/Auth/Storage/Edge | `eu-west-1`, West EU (Irlanda) | Producción candidata; solo datos sintéticos hasta GO-09/10 |
 | Journal de recuperación Neon | `aws-eu-central-1`, Frankfurt | Independiente del primario y del backup; GO-07 PASS |
 | Cloudflare Pages/borde | Red global; requests procesadas en el borde | No se usa como archivo de registros laborales |
-| Backup DB age | Google My Drive privado; clave age separada | Técnico GO-07 PASS; **no aprobado para datos reales** por falta de DPA aplicable acreditado |
+| Backup DB age | Neon proyecto separado `fichaje-backups`, `aws-eu-central-1` Frankfurt; vault PostgreSQL privado; clave age separada | GO-07/GO-09 PASS de readiness; SHA/tamaño/inmutabilidad y rotación 35 días verificadas |
 | Backup de repositorio | Google My Drive privado | Sin datos personales laborales por contrato de OPS-01 |
 
 ## Garantías verificadas
@@ -23,9 +23,10 @@
   https://neon.com/platform-terms
   https://www.databricks.com/legal/dpa
   https://www.databricks.com/legal/data-transfer-addendum
-- **Google:** el Cloud Data Processing Addendum está documentado para clientes Google Workspace/Cloud
-  Identity. La cuenta usada hoy por el backup DB es My Drive personal y no se acredita como cuenta Workspace;
-  no se extrapola ese CDPA.
+- **Google:** My Drive personal no se usa como destino de futuros backups laborales; se mantiene únicamente
+  para código/evidencia sintética sin datos de empleados.
+- **Neon/Databricks backup vault:** el segundo proyecto `fichaje-backups` queda bajo el mismo Product Specific
+  Schedule/DPA verificado para Neon, pero es un recurso distinto del journal. La clave age no se almacena allí.
 
 ## Medidas complementarias
 TLS `verify-full` en conexiones técnicas, backups cifrados age con identidad privada fuera del destino,
@@ -37,5 +38,5 @@ IP de kiosco solo como HMAC por empresa y alertas sin PII.
 |---|---|
 | 2026-10-02 | Supabase productivo fijado a `eu-west-1` (Irlanda). |
 | 2026-10-02 | Journal independiente fijado a Neon `aws-eu-central-1` (Frankfurt), TLS `verify-full`. |
-| 2026-10-02 | My Drive personal aceptado solo para la evidencia sintética de GO-07; **prohibido para datos reales** hasta DPA aplicable o migración. |
-| 2026-10-02 | Cloudflare R2 identificado como candidato de backup con free tier, pero no se activa su suscripción de uso medido sin autorización expresa. |
+| 2026-10-02 | My Drive personal queda solo para evidencia sintética/código y **prohibido para futuros backups laborales**. |
+| 2026-10-02 | Backup laboral migrado a proyecto Neon Free separado `fichaje-backups` en Frankfurt; Cloudflare R2 descartado por requerir suscripción de uso medido. |

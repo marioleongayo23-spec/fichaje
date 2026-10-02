@@ -181,3 +181,29 @@ solo con datos sintéticos:
 es un My Drive personal y contiene solo el backup cifrado del candidato sintético. No se autoriza almacenar
 datos reales allí hasta que GO-09 acredite un contrato/DPA aplicable o se migre a un destino aprobado.
 La identidad age privada permanece separada del destino.
+
+
+## H8 — vault offsite definitivo sin coste (2026-10-02)
+El backup de base de datos para datos laborales **no depende de Google Drive personal**. La copia H8 verificada
+se migró a un segundo proyecto Neon Free distinto del journal:
+
+- proyecto `fichaje-backups` (`orange-heart-83052077`), `aws-eu-central-1` Frankfurt;
+- almacenamiento acreditado: PostgreSQL privado, schema `backup_vault`, separado de Supabase productivo y
+  del proyecto Neon `fichaje-recovery`; no comparte credenciales de aplicación;
+- `fichaje-db-20261002T100304Z-2af8ca8e.dump.age` (30.980 bytes), checksum y manifest se transfirieron byte
+  a byte desde la copia ya ensayada; Neon recalculó SHA-256 y tamaño para los tres objetos, todos MATCH;
+- la cabecera `age-encryption.org/v1`, el SHA/tamaño del manifest, la migración
+  `20260930000200` y el TLS de origen `verify-full` se verificaron dentro del vault;
+- no aparece `AGE-SECRET-KEY-1` en ningún payload; la identidad age privada permanece fuera del proveedor;
+- UPDATE y TRUNCATE están bloqueados; DELETE ordinario y borrado antes de 35 días fallan cerrado.
+  `backup_vault.purge_expired()` es la única ruta de rotación, solo para filas ≥35 días y con
+  `backup_vault.purge_log`.
+
+La copia histórica en My Drive contiene únicamente evidencia sintética H8 y no es destino autorizado de futuros
+backups laborales. El repositorio puede seguir respaldándose allí porque su contrato operativo prohíbe datos
+de empleados.
+
+Riesgo residual aceptado para V1 sin coste: backup y journal están en **proyectos Neon distintos** bajo la misma
+familia de proveedor. Son recursos/bases separados y el backup continúa cifrado con clave fuera de Neon, pero
+existe riesgo correlacionado de indisponibilidad del proveedor. Antes de prometer RTO/RPO comercial o aumentar
+criticidad se reevaluará un segundo proveedor offsite.

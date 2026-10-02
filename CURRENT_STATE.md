@@ -19,16 +19,16 @@ PR: #17 — OPEN; no merge ni activación comercial sin aprobación expresa post
 
 | Gate | Estado | Evidencia / bloqueo |
 |---|---|---|
-| GO-01 Código | PASS previo; repetir en HEAD documental final | HEAD de implementación `fe5b5ec73d580c7a03ab79f1c1d530c028511130`: CI, Database, E2E H6, OPS-02 y H7 = 5/5 PASS. Cualquier commit posterior obliga a comprobar de nuevo los cinco workflows antes de cierre. |
+| GO-01 Código | PASS previo; repetir en HEAD final | HEAD `9e3aef29246308cac9c363f708656f2745c5e235`: CI, Database, E2E H6, OPS-02 y H7 = 5/5 PASS. Este commit H8 final obliga a repetir los cinco workflows antes de cierre. |
 | GO-02 Destinos/TLS | PASS | Canary fija API y PostgreSQL por entorno de forma independiente; cruces staging↔production, overrides DSN, `hostaddr`, `service`, puerto no estándar y TLS débil fallan cerrado. Producción exige `verify-full`. |
 | GO-03 Seguridad | PASS con riesgo residual documentado | Security Advisor sin ERROR; 20 SECURITY DEFINER revisadas: 0 ejecutables por anon, todas con search_path fijo; todas las tablas public con RLS + FORCE RLS; inmutabilidad presente; secret scan CI PASS. WARN de leaked-password protection solo disponible en Supabase Pro y no se contrata bajo política 0 €. |
 | GO-04 Release | PASS | Supabase + Cloudflare sirven el mismo release aprobado; `verify_production.py` remoto final: 33 PASS / 0 FAIL / 0 SKIPPED. |
 | GO-05 Canary | PASS | Tenant sintético productivo WEB + KIOSK, RLS, auditoría, idempotencia y replay. |
 | GO-06 Alertas | PASS | CRITICAL entregada/resuelta en ruta real; WARNING abrió/cerró issue #24; 0 pendientes y sin PII/secrets. |
-| GO-07 Recuperación | PASS técnico | Backup productivo age `fichaje-db-20261002T100304Z-2af8ca8e`, offsite privado, restore aislado de esa misma copia PASS, negativos REC-03 PASS, journal independiente Neon Frankfurt con `verify-full`, PREPARED→COMMITTED→VERIFY real y 0 unresolved. La ubicación actual del backup DB en Drive personal queda bloqueada para datos reales por GO-09. |
+| GO-07 Recuperación | PASS | Backup productivo age `fichaje-db-20261002T100304Z-2af8ca8e`, restore aislado de esa misma copia PASS, negativos REC-03 PASS y journal independiente Neon Frankfurt con `verify-full`. El ciphertext se migró además a un segundo proyecto Neon Free (`fichaje-backups`, Frankfurt), con SHA/tamaño/cabecera/manifest verificados, clave age ausente, inmutabilidad y purga autorizada solo tras 35 días. |
 | GO-08 Incidente | PASS | Workflow H7 del mismo HEAD: `Incident response drill IR-01` SUCCESS; simulacro sintético cubre detección, contención, evidencia, revocación/rotación, evaluación RGPD, recuperación y reapertura autorizada. |
-| GO-09 Legal/comercial | **BLOCKED** | Revisión normativa vigente hecha; plantillas Art. 28, información a plantilla, RLT/Inspección y checklist convenio/pausas existen. Bloquean: (1) backup DB en My Drive personal sin contrato Workspace/CDPA verificable como encargado; (2) completar identidad legal del proveedor y datos/firmas del primer cliente antes de datos reales. |
-| GO-10 Gobierno | **BLOCKED** | Rollback está implementado/documentado y probado. GitHub informa `main protected:false`; en el repo privado actual GitHub Free no habilita protected branches/rulesets. No hacer público el repo ni contratar plan sin autorización. |
+| GO-09 Legal/comercial | PASS de readiness | Revisión normativa vigente; paquete Art. 28, subencargados/transferencias, información a plantilla, RLT/Inspección, convenio/pausas y onboarding preparados. Backup laboral futuro aprobado en Neon/Databricks bajo su marco DPA, no en Drive personal. Los campos de identidad/firma se completan obligatoriamente en el onboarding de cada cliente y no son inventables antes de existir ese cliente. |
+| GO-10 Gobierno | **BLOCKED por plataforma** | Rollback implementado/documentado/probado. GitHub informa `main protected:false` y GitHub Free no ofrece protected branches/rulesets para repos privados. Se añade `.github/workflows/main-integrity.yml` como control compensatorio: cualquier push a `main` sin PR merged + 5 workflows PASS falla y abre incidencia CRITICAL. Detecta después del push y por tanto no satisface la prohibición preventiva exigida por GO-10. |
 
 ### GO-07 — evidencia productiva
 Backup:
@@ -52,12 +52,21 @@ Journal:
 No se almacena ninguna contraseña o user mapping en Git.
 
 ### Bloqueos para el primer cliente
-1. **Backup con DPA**: el destino actual de DB es un Google My Drive personal. El cifrado y la separación de la clave satisfacen el gate técnico, pero no acreditan un contrato de subencargado aplicable para datos reales. Cloudflare R2 es candidato (free tier), pero activar una suscripción de uso medido requiere autorización expresa.
-2. **Identidad contractual**: completar razón social/NIF/domicilio/contacto del proveedor y los datos del cliente en `docs/legal/`; firmar encargo Art. 28, inventario de subencargados y checklist de convenio/pausas.
-3. **Protección de main**: GitHub Free + repo privado no permite la protección requerida. Requiere cambio de plan o una alternativa expresamente aprobada que mantenga el repo privado.
+1. **Onboarding contractual por cliente**: completar razón social/NIF/domicilio/contacto del proveedor y del cliente, firmar encargo Art. 28, inventario de subencargados, información a plantilla y checklist de convenio/pausas. Es una operación de alta, no trabajo técnico pendiente del producto.
+2. **Protección preventiva de main**: GitHub Free + repo privado no permite la protección requerida. El guard compensatorio detecta y alerta, pero no puede impedir el push. Mantener GitHub Free y repo privado deja GO-10 formalmente BLOCKED.
 
 No se han creado clientes reales ni secretos en GitHub. Cualquier gasto, publicación del repositorio, merge o activación comercial requiere autorización expresa.
 
 ## HITO 7 — cerrado
 HITO 7 y todos los hitos anteriores permanecen aprobados e integrados en `main`.
 La evidencia histórica sigue en Git.
+
+
+### Backup vault gratuito — 2026-10-02
+- proyecto Neon Free `fichaje-backups`, id `orange-heart-83052077`, `aws-eu-central-1` (Frankfurt);
+- vault privado PostgreSQL `backup_vault.objects`; no usa Drive personal para futuros backups laborales;
+- copia `fichaje-db-20261002T100304Z-2af8ca8e`: ciphertext 30.980 bytes + checksum + manifest;
+- 3/3 SHA-256 recalculados dentro de Neon = MATCH, tamaños = MATCH, cabecera age = PASS, migration `20260930000200` = MATCH;
+- búsqueda de `AGE-SECRET-KEY-1` en 3/3 payloads = ausente; la identidad privada sigue en custodia separada;
+- UPDATE/TRUNCATE y DELETE anticipado bloqueados; `purge_expired()` solo permite purga tras 35 días y deja `purge_log`;
+- el bucket Object Storage privado creado durante la exploración queda sin uso; el vault PostgreSQL es el destino acreditado porque la red del entorno de operación no resolvió el endpoint Storage. No afecta a la verificación del ciphertext.

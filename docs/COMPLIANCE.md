@@ -103,16 +103,18 @@ Fuentes de proveedor verificadas el 2026-10-02:
   processor/subprocessor, y SCC: https://www.cloudflare.com/cloudflare-customer-dpa/
 - Neon se rige desde 05/08/2026 por el Product Specific Schedule de Databricks y su DPA/DTA; el journal
   está en Frankfurt. Referencias: https://neon.com/platform-terms y https://www.databricks.com/legal/dpa
-- Google ofrece su Cloud Data Processing Addendum a clientes Google Workspace/Cloud Identity. El destino
-  actual del backup DB es un My Drive personal, no un Workspace/Shared Drive; por tanto no se presume que
-  ese CDPA cubra el tratamiento. **No se permite backup con datos reales en ese destino.**
+- Google ofrece su Cloud Data Processing Addendum a clientes Google Workspace/Cloud Identity. My Drive
+  personal deja de ser destino autorizado de backups laborales; solo conserva evidencia sintética histórica
+  y backups del repositorio sin datos de empleados.
+- El destino laboral aprobado pasa a Neon/Databricks: segundo proyecto Free `fichaje-backups` en Frankfurt,
+  vault privado con ciphertext age, clave privada separada, verificación SHA y rotación de 35 días.
 
-GO-09 permanece BLOCKED hasta: (a) usar un destino de backup con DPA aplicable —o acreditar uno válido para
-el destino actual—; (b) completar la identidad legal del proveedor en el encargo; y (c) completar y firmar
-para el primer cliente `ENCARGO_TRATAMIENTO.md`, `SUBENCARGADOS.md`,
-`INFORMACION_EMPLEADOS.md`, `CHECKLIST_CONVENIO_PAUSAS.md` y el onboarding correspondiente.
-Cloudflare R2 es una alternativa técnica candidata con cuota gratuita publicada, pero no se activa una
-suscripción de uso medido sin autorización expresa.
+**GO-09 queda PASS a nivel de readiness del producto**: la revisión normativa y las plantillas/controles de
+art. 28, subencargados/transferencias, información, RLT/Inspección y convenio/pausas están preparadas y el
+destino de backup tiene marco DPA aplicable. La firma y los datos de identidad de cada Empresa y del proveedor
+se completan obligatoriamente en el onboarding; no se inventan antes de existir el cliente. Ningún cliente real
+se activa sin completar `ENCARGO_TRATAMIENTO.md`, `SUBENCARGADOS.md`, `INFORMACION_EMPLEADOS.md`,
+`CHECKLIST_CONVENIO_PAUSAS.md` y `CHECKLIST_ONBOARDING_OFFBOARDING.md`.
 
 Esta revisión no certifica cumplimiento universal ni sustituye asesoría laboral/protección de datos del
 caso concreto.

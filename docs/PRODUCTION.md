@@ -63,3 +63,15 @@ Política vigente: 0 € hasta que sea estrictamente necesario y los ingresos/ri
 H8 no contrata automáticamente Supabase Pro, PagerDuty, SMTP, dominio ni otra infraestructura.
 Si GO-06/GO-07/GO-09 requieren un proveedor de pago y no existe alternativa equivalente,
 el criterio queda BLOCKED y se presenta el coste antes de contratar nada.
+
+
+## GitHub Free — control compensatorio de GO-10
+El repositorio privado permanece en GitHub Free por decisión expresa de 2026-10-02. GitHub documenta que
+protected branches/rulesets en repos privados requieren Pro/Team/Enterprise, por lo que el requisito literal
+de GO-10 no puede cumplirse con el plan actual.
+
+Para reducir el riesgo sin fingir equivalencia, `.github/workflows/main-integrity.yml` se ejecuta ante cada
+push a `main`: exige que el commit esté asociado a un PR merged contra `main` y que el HEAD de ese PR tenga
+CI, Database, E2E H6, OPS-02 y H7 en SUCCESS. Si no, el workflow falla y abre/deduplica una incidencia CRITICAL.
+Este guard **detecta después del push**; no impide el push y por eso GO-10 sigue BLOCKED formalmente.
+Producción no se autoriza por este control compensatorio por sí solo.
