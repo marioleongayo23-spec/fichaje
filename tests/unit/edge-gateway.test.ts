@@ -38,7 +38,7 @@ beforeAll(async () => {
 afterAll(() => { server.closeAllConnections(); server.close(); });
 
 const env = (): EdgeEnv => ({ FICHAJE_KIOSK_UPSTREAM: `${base}/functions/v1/kiosk`, FICHAJE_EXPORT_LINK_UPSTREAM: `${base}/functions/v1/export-link`,
-  FICHAJE_INGRESS_SECRET: secret });
+  FICHAJE_BILLING_UPSTREAM: `${base}/functions/v1/billing`, FICHAJE_INGRESS_SECRET: secret });
 const post = (path: string, body: string, headers: Record<string, string> = {}) => new Request(APP + path, {
   method: 'POST', body, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer synthetic.jwt.value', ...headers } });
 
@@ -57,8 +57,12 @@ describe('H7 edge gateway', () => {
     expect(resolveRoute('/gateway/export-link')).toMatchObject({ component: 'export-link', route: 'sign', limit: 1024, suffix: '' });
     expect(resolveRoute('/gateway/export-link/generate')).toMatchObject({ component: 'export-link', route: 'generate', limit: 1024, suffix: '/generate' });
     expect(resolveRoute('/gateway/export-link/health/live')).toMatchObject({ route: 'health/live', method: 'GET' });
+    expect(resolveRoute('/gateway/billing/checkout')).toMatchObject({ component: 'billing', route: 'checkout', method: 'POST', limit: 1024 });
+    expect(resolveRoute('/gateway/billing/portal')).toMatchObject({ component: 'billing', route: 'portal', method: 'POST', limit: 1024 });
+    expect(resolveRoute('/gateway/billing/sync')).toMatchObject({ component: 'billing', route: 'sync', method: 'POST', limit: 1024 });
+    expect(resolveRoute('/gateway/billing/health/ready')).toMatchObject({ component: 'billing', route: 'health/ready', method: 'GET' });
     for (const bad of ['/gateway/kiosk', '/gateway/kiosk/debug', '/gateway/kiosk/record/extra', '/gateway/export-link/sign', '/gateway/other',
-      '/gateway/kiosk/Record', '/gateway/kiosk/../record', '/rest/v1/rpc/x', '/gateway/kiosk/health']) {
+      '/gateway/kiosk/Record', '/gateway/kiosk/../record', '/gateway/billing', '/gateway/billing/webhook', '/rest/v1/rpc/x', '/gateway/kiosk/health']) {
       expect(resolveRoute(bad), bad).toBeNull();
     }
     expect(upstreamBase('https://ref.supabase.co/functions/v1/kiosk/')).toBe('https://ref.supabase.co/functions/v1/kiosk');
@@ -98,11 +102,16 @@ describe('H7 edge gateway', () => {
     expect((await handleGateway(new Request(APP + '/gateway/export-link/health/ready'), env())).status).toBe(200);
     expect((await handleGateway(post('/gateway/export-link', '{"organization_id":"a","job_id":"b"}'), env())).status).toBe(200);
     expect((await handleGateway(post('/gateway/export-link/generate', '{"organization_id":"a","job_id":"b"}'), env())).status).toBe(200);
-    expect(seen.map((s) => s.url)).toEqual(['/functions/v1/export-link/health/ready', '/functions/v1/export-link', '/functions/v1/export-link/generate']);
+    expect((await handleGateway(new Request(APP + '/gateway/billing/health/ready'), env())).status).toBe(200);
+    expect((await handleGateway(post('/gateway/billing/checkout', '{"organization_id":"00000000-0000-4000-8000-000000000001","request_id":"00000000-0000-4000-8000-000000000002"}'), env())).status).toBe(200);
+    expect(seen.map((s) => s.url)).toEqual(['/functions/v1/export-link/health/ready', '/functions/v1/export-link', '/functions/v1/export-link/generate',
+      '/functions/v1/billing/health/ready', '/functions/v1/billing/checkout']);
     const now = Math.floor(Date.now() / 1000);
     expect(await verifyIngress([secretBytes], String(seen[0].headers['x-fichaje-edge']), 'GET', 'export-link', 'health/ready', new Uint8Array(0), now)).toBe(true);
     expect(await verifyIngress([secretBytes], String(seen[1].headers['x-fichaje-edge']), 'POST', 'export-link', 'sign', new Uint8Array(seen[1].body), now)).toBe(true);
     expect(await verifyIngress([secretBytes], String(seen[2].headers['x-fichaje-edge']), 'POST', 'export-link', 'generate', new Uint8Array(seen[2].body), now)).toBe(true);
+    expect(await verifyIngress([secretBytes], String(seen[3].headers['x-fichaje-edge']), 'GET', 'billing', 'health/ready', new Uint8Array(0), now)).toBe(true);
+    expect(await verifyIngress([secretBytes], String(seen[4].headers['x-fichaje-edge']), 'POST', 'billing', 'checkout', new Uint8Array(seen[4].body), now)).toBe(true);
   });
 
   it('rejects before contacting the upstream: route, method, query, origin, media type, size and configuration', async () => {
@@ -120,9 +129,11 @@ describe('H7 edge gateway', () => {
       [post('/gateway/kiosk/record', 'x'.repeat(8193)), 413],
       [post('/gateway/export-link', 'x'.repeat(1025)), 413],
       [post('/gateway/export-link/generate', 'x'.repeat(1025)), 413],
+      [post('/gateway/billing/checkout', 'x'.repeat(1025)), 413],
       [post('/gateway/kiosk/record', '{}'), 503, { ...env(), FICHAJE_INGRESS_SECRET: undefined }],
       [post('/gateway/kiosk/record', '{}'), 503, { ...env(), FICHAJE_INGRESS_SECRET: Buffer.alloc(16).toString('base64') }],
       [post('/gateway/kiosk/record', '{}'), 503, { ...env(), FICHAJE_KIOSK_UPSTREAM: 'http://ref.supabase.co/functions/v1/kiosk' }],
+      [post('/gateway/billing/checkout', '{}'), 503, { ...env(), FICHAJE_BILLING_UPSTREAM: undefined }],
     ];
     for (const [request, status, custom] of cases) {
       const response = await handleGateway(request, custom ?? env());
