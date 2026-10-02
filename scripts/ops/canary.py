@@ -438,6 +438,7 @@ class Provisioner:
                 i.to_bytes((i.bit_length() + 7) // 8, 'big')).decode().rstrip('=')
             plan['kiosk'] = {
                 'device_id': uid(), 'provision_request': uid(), 'reset_request': uid(),
+                'expires_at': (datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),
                 'employee': employee_plan(),
                 'jwk': {'kty': 'RSA', 'n': enc(numbers.n), 'e': enc(numbers.e),
                         'alg': 'RSA-OAEP-256', 'ext': True},
@@ -498,7 +499,7 @@ class Provisioner:
             receipt = self.gateway.post('provision', owner_token, {
                 'organization_id': org, 'request_id': kiosk_plan['provision_request'],
                 'device_id': kiosk_plan['device_id'], 'name': 'Canary sintético',
-                'expires_at': (datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),
+                'expires_at': kiosk_plan['expires_at'],
                 'delivery_key': kiosk_plan['jwk']}, 'kiosk.provision', None, mutation=True)
             access = json.loads(open_(receipt['delivery']))
             kiosk_employee, code = self.employee(
