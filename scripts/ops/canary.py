@@ -248,7 +248,7 @@ class Canary:
 
 # --- Synthetic operator provisioning (local/staging/production, guarded) --------
 class Provisioner:
-    """Creates synthetic tenants/identities. Loopback targets only."""
+    """Creates synthetic tenants/identities on loopback or explicitly pinned remote targets."""
 
     def __init__(self, api: Api, service_key: str, operator_dsn: str, gateway: Gateway | None):
         if not self.allowed(api.url, operator_dsn):
@@ -330,89 +330,206 @@ class Provisioner:
                 or parsed.query or parsed.fragment or parsed.path not in ('', '/') or not parsed.hostname:
             return False
         prefix = 'STAGING' if environment == 'staging' else 'PRODUCTION'
+        other = 'PRODUCTION' if prefix == 'STAGING' else 'STAGING'
         api_host = os.environ.get(f'FICHAJE_{prefix}_API_HOST', '')
         db_host = os.environ.get(f'FICHAJE_{prefix}_DB_HOST', '')
+        other_api = os.environ.get(f'FICHAJE_{other}_API_HOST', '')
+        other_db = os.environ.get(f'FICHAJE_{other}_DB_HOST', '')
+        # A copied staging pin must never become a valid production pin (or vice
+        # versa). Compare the configured environments as well as the selected
+        # target so Auth and PostgreSQL cannot silently split across projects.
+        if (other_api and api_host == other_api) or (other_db and db_host == other_db):
+            return False
         dsn = Provisioner._dsn_settings(operator_dsn)
         return bool(api_host and db_host and parsed.hostname == api_host
                     and dsn.get('host') == db_host and dsn.get('sslmode') == 'verify-full')
 
-    def account(self, label: str) -> dict:
-        email = f'canary-{label}-{secrets.token_hex(6)}@example.invalid'
-        password = secrets.token_urlsafe(32)
-        _, user = http_json('POST', self.api.url + '/auth/v1/admin/users', {'apikey': self.service, 'Authorization': 'Bearer ' + self.service},
+    def account(self, label: str, planned: dict | None = None) -> dict:
+        planned = planned or {'email': f'canary-{label}-{secrets.token_hex(6)}@example.invalid',
+                              'password': secrets.token_urlsafe(32)}
+        email, password = planned['email'], planned['password']
+        # A production retry may arrive after Auth committed but the HTTP
+        # response was lost. The operator DB is already required for
+        # provisioning, so reconcile the stable synthetic email before
+        # attempting another create.
+        import psycopg
+        with psycopg.connect(self.dsn) as connection:
+            existing = connection.execute(
+                'select id::text from auth.users where lower(email)=lower(%s) order by created_at limit 1',
+                (email,)).fetchone()
+        if existing:
+            return {'id': str(existing[0]), 'email': email, 'password': password}
+        _, user = http_json('POST', self.api.url + '/auth/v1/admin/users',
+                            {'apikey': self.service, 'Authorization': 'Bearer ' + self.service},
                             json.dumps({'email': email, 'password': password, 'email_confirm': True}).encode())
         return {'id': user['id'], 'email': email, 'password': password}
 
-    def bootstrap(self, org: str, owner_id: str) -> str:
+    def bootstrap(self, org: str, owner_id: str, request_id: str | None = None) -> str:
         import psycopg
         with psycopg.connect(self.dsn) as connection:
-            connection.execute('select private.bootstrap_organization(%s,%s,%s,%s)', (org, 'Canary sintético OPS-02', owner_id, uid()))
-            return str(connection.execute('select id from public.memberships where organization_id=%s and auth_user_id=%s', (org, owner_id)).fetchone()[0])
+            connection.execute('select private.bootstrap_organization(%s,%s,%s,%s)',
+                               (org, 'Canary sintético OPS-02', owner_id, request_id or uid()))
+            return str(connection.execute(
+                'select id from public.memberships where organization_id=%s and auth_user_id=%s',
+                (org, owner_id)).fetchone()[0])
 
     def rpc(self, name, token, args):
         return self.api.rpc(name, token, args, 'rpc.other', mutation=True, key=None)
 
-    def employee(self, org: str, owner: str, membership: str | None, policy: str) -> tuple[str, str]:
-        employee, code = uid(), 'canary-' + secrets.token_hex(4)
-        self.rpc('manage_employee', owner, {'p_organization_id': org, 'p_request_id': uid(), 'p_employee_id': employee, 'p_expected_version': 0,
-                 'p_code': code, 'p_display_name': 'Canary sintético', 'p_membership_id': membership, 'p_active': True})
-        self.rpc('assign_work_policy', owner, {'p_organization_id': org, 'p_request_id': uid(), 'p_employee_id': employee, 'p_policy_id': policy})
+    def employee(self, org: str, owner: str, membership: str | None, policy: str,
+                 planned: dict | None = None) -> tuple[str, str]:
+        planned = planned or {'id': uid(), 'code': 'canary-' + secrets.token_hex(4),
+                              'manage_request': uid(), 'assign_request': uid()}
+        employee, code = planned['id'], planned['code']
+        self.rpc('manage_employee', owner, {'p_organization_id': org, 'p_request_id': planned['manage_request'],
+                 'p_employee_id': employee, 'p_expected_version': 0, 'p_code': code,
+                 'p_display_name': 'Canary sintético', 'p_membership_id': membership, 'p_active': True})
+        self.rpc('assign_work_policy', owner, {'p_organization_id': org, 'p_request_id': planned['assign_request'],
+                 'p_employee_id': employee, 'p_policy_id': policy})
         return employee, code
 
-    def reset_pin(self, owner: str, org: str, employee: str, kiosk: dict) -> str:
+    def reset_pin(self, owner: str, org: str, employee: str, kiosk: dict,
+                  request_id: str | None = None) -> str:
         from cryptography.hazmat.primitives import hashes, serialization
         from cryptography.hazmat.primitives.asymmetric import padding
-        reset = self.gateway.post('reset', owner, {'organization_id': org, 'request_id': uid(), 'employee_id': employee,
-                                  'delivery_key': kiosk['jwk']}, 'kiosk.reset', None, mutation=True)
+        reset = self.gateway.post('reset', owner, {'organization_id': org, 'request_id': request_id or uid(),
+                                  'employee_id': employee, 'delivery_key': kiosk['jwk']},
+                                  'kiosk.reset', None, mutation=True)
         key = serialization.load_pem_private_key(kiosk['private_key'].encode(), password=None)
         return key.decrypt(base64.b64decode(reset['delivery']), padding.OAEP(mgf=padding.MGF1(hashes.SHA256()),
                                                                            algorithm=hashes.SHA256(), label=None)).decode()
 
-    def provision(self) -> dict:
-        from cryptography.hazmat.primitives.asymmetric import rsa, padding
-        from cryptography.hazmat.primitives import hashes, serialization
-        owner, worker, control_owner = self.account('owner'), self.account('worker'), self.account('control')
-        org, control_org = uid(), uid()
-        self.bootstrap(org, owner['id'])
-        control_membership = self.bootstrap(control_org, control_owner['id'])
-        owner_token = self.api.token(owner['email'], owner['password'])
-        invitation = secrets.token_hex(32)
-        self.rpc('create_invitation', owner_token, {'p_organization_id': org, 'p_request_id': uid(), 'p_email': worker['email'],
-                 'p_role': 'EMPLOYEE', 'p_token_hash': hashlib.sha256(invitation.encode()).hexdigest()})
-        worker_token = self.api.token(worker['email'], worker['password'])
-        membership = self.rpc('accept_invitation', worker_token, {'p_organization_id': org, 'p_request_id': uid(), 'p_token': invitation})['id']
-        policy = self.rpc('create_work_policy', owner_token, {'p_organization_id': org, 'p_request_id': uid(), 'p_timezone': 'Europe/Madrid',
-                          'p_break_counts_as_work': False})['id']
-        employee, _ = self.employee(org, owner_token, membership, policy)
-        control_token = self.api.token(control_owner['email'], control_owner['password'])
-        control_policy = self.rpc('create_work_policy', control_token, {'p_organization_id': control_org, 'p_request_id': uid(),
-                                  'p_timezone': 'Atlantic/Canary', 'p_break_counts_as_work': True})['id']
-        control_employee, _ = self.employee(control_org, control_token, control_membership, control_policy)
-        self.rpc('record_time_event', control_token, {'p_organization_id': control_org, 'p_request_id': uid(), 'p_employee_id': control_employee,
-                 'p_action': 'CLOCK_IN', 'p_expected_version': 0})
-        state = {'synthetic': True, 'tenant': {'org': org, 'owner': {'email': owner['email'], 'password': owner['password']},
-                                               'worker': {'email': worker['email'], 'password': worker['password']},
-                                               'membership': membership, 'employee': employee, 'policy': policy},
-                 'control': {'org': control_org, 'employee': control_employee}}
+    def plan(self) -> dict:
+        """Create all random material before the first remote mutation.
+
+        The CLI persists this owner-only plan first. Re-running with the same
+        state file therefore reuses identities, tenant UUIDs and idempotency
+        request IDs instead of creating another synthetic production tenant.
+        """
+        operation_id = secrets.token_hex(8)
+
+        def account_plan(label: str) -> dict:
+            return {'email': f'canary-{label}-{operation_id}@example.invalid',
+                    'password': secrets.token_urlsafe(32)}
+
+        def employee_plan() -> dict:
+            return {'id': uid(), 'code': 'canary-' + secrets.token_hex(4),
+                    'manage_request': uid(), 'assign_request': uid()}
+
+        plan = {
+            'schema': 'fichaje.canary-provision.v1',
+            'operation_id': operation_id,
+            'accounts': {label: account_plan(label) for label in ('owner', 'worker', 'control')},
+            'org': uid(),
+            'control_org': uid(),
+            'invitation': secrets.token_hex(32),
+            'requests': {
+                'bootstrap': uid(), 'control_bootstrap': uid(), 'invitation_create': uid(),
+                'invitation_accept': uid(), 'policy': uid(), 'control_policy': uid(), 'control_clock': uid(),
+            },
+            'employees': {'web': employee_plan(), 'control': employee_plan()},
+        }
         if self.gateway is not None:
+            from cryptography.hazmat.primitives.asymmetric import rsa
+            from cryptography.hazmat.primitives import serialization
             key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
             numbers = key.public_key().public_numbers()
-            b64 = lambda i: base64.urlsafe_b64encode(i.to_bytes((i.bit_length() + 7) // 8, 'big')).decode().rstrip('=')  # noqa: E731
-            jwk = {'kty': 'RSA', 'n': b64(numbers.n), 'e': b64(numbers.e), 'alg': 'RSA-OAEP-256', 'ext': True}
-            open_ = lambda c: key.decrypt(base64.b64decode(c), padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)).decode()  # noqa: E731
-            device = uid()
-            receipt = self.gateway.post('provision', owner_token, {'organization_id': org, 'request_id': uid(), 'device_id': device,
-                                        'name': 'Canary sintético', 'expires_at': (datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),
-                                        'delivery_key': jwk}, 'kiosk.provision', None, mutation=True)
+            enc = lambda i: base64.urlsafe_b64encode(  # noqa: E731
+                i.to_bytes((i.bit_length() + 7) // 8, 'big')).decode().rstrip('=')
+            plan['kiosk'] = {
+                'device_id': uid(), 'provision_request': uid(), 'reset_request': uid(),
+                'employee': employee_plan(),
+                'jwk': {'kty': 'RSA', 'n': enc(numbers.n), 'e': enc(numbers.e),
+                        'alg': 'RSA-OAEP-256', 'ext': True},
+                'private_key': key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                                 serialization.NoEncryption()).decode(),
+            }
+        return plan
+
+    def provision(self, plan: dict | None = None) -> dict:
+        from cryptography.hazmat.primitives.asymmetric import padding
+        from cryptography.hazmat.primitives import hashes, serialization
+        plan = plan or self.plan()
+        check(plan.get('schema') == 'fichaje.canary-provision.v1', 'provision-plan')
+        owner = self.account('owner', plan['accounts']['owner'])
+        worker = self.account('worker', plan['accounts']['worker'])
+        control_owner = self.account('control', plan['accounts']['control'])
+        org, control_org = plan['org'], plan['control_org']
+        self.bootstrap(org, owner['id'], plan['requests']['bootstrap'])
+        control_membership = self.bootstrap(control_org, control_owner['id'], plan['requests']['control_bootstrap'])
+        owner_token = self.api.token(owner['email'], owner['password'])
+        invitation = plan['invitation']
+        self.rpc('create_invitation', owner_token, {
+            'p_organization_id': org, 'p_request_id': plan['requests']['invitation_create'],
+            'p_email': worker['email'], 'p_role': 'EMPLOYEE',
+            'p_token_hash': hashlib.sha256(invitation.encode()).hexdigest()})
+        worker_token = self.api.token(worker['email'], worker['password'])
+        membership = self.rpc('accept_invitation', worker_token, {
+            'p_organization_id': org, 'p_request_id': plan['requests']['invitation_accept'],
+            'p_token': invitation})['id']
+        policy = self.rpc('create_work_policy', owner_token, {
+            'p_organization_id': org, 'p_request_id': plan['requests']['policy'],
+            'p_timezone': 'Europe/Madrid', 'p_break_counts_as_work': False})['id']
+        employee, _ = self.employee(org, owner_token, membership, policy, plan['employees']['web'])
+        control_token = self.api.token(control_owner['email'], control_owner['password'])
+        control_policy = self.rpc('create_work_policy', control_token, {
+            'p_organization_id': control_org, 'p_request_id': plan['requests']['control_policy'],
+            'p_timezone': 'Atlantic/Canary', 'p_break_counts_as_work': True})['id']
+        control_employee, _ = self.employee(
+            control_org, control_token, control_membership, control_policy, plan['employees']['control'])
+        self.rpc('record_time_event', control_token, {
+            'p_organization_id': control_org, 'p_request_id': plan['requests']['control_clock'],
+            'p_employee_id': control_employee, 'p_action': 'CLOCK_IN', 'p_expected_version': 0})
+        state = {
+            'synthetic': True,
+            'operation_id': plan['operation_id'],
+            'tenant': {'org': org, 'owner': {'email': owner['email'], 'password': owner['password']},
+                       'worker': {'email': worker['email'], 'password': worker['password']},
+                       'membership': membership, 'employee': employee, 'policy': policy},
+            'control': {'org': control_org, 'employee': control_employee},
+        }
+        if self.gateway is not None:
+            check(isinstance(plan.get('kiosk'), dict), 'provision-plan')
+            kiosk_plan = plan['kiosk']
+            key = serialization.load_pem_private_key(kiosk_plan['private_key'].encode(), password=None)
+            open_ = lambda c: key.decrypt(  # noqa: E731
+                base64.b64decode(c), padding.OAEP(mgf=padding.MGF1(hashes.SHA256()),
+                                                  algorithm=hashes.SHA256(), label=None)).decode()
+            receipt = self.gateway.post('provision', owner_token, {
+                'organization_id': org, 'request_id': kiosk_plan['provision_request'],
+                'device_id': kiosk_plan['device_id'], 'name': 'Canary sintético',
+                'expires_at': (datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),
+                'delivery_key': kiosk_plan['jwk']}, 'kiosk.provision', None, mutation=True)
             access = json.loads(open_(receipt['delivery']))
-            kiosk_employee, code = self.employee(org, owner_token, None, policy)
-            pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
-            state['kiosk'] = {'device_id': device, 'device_email': access['email'], 'device_password': access['password'],
-                              'employee': kiosk_employee, 'code': code, 'jwk': jwk, 'private_key': pem}
-            state['kiosk']['pin'] = self.reset_pin(owner_token, org, kiosk_employee, state['kiosk'])
+            kiosk_employee, code = self.employee(
+                org, owner_token, None, policy, kiosk_plan['employee'])
+            state['kiosk'] = {
+                'device_id': kiosk_plan['device_id'], 'device_email': access['email'],
+                'device_password': access['password'], 'employee': kiosk_employee, 'code': code,
+                'jwk': kiosk_plan['jwk'], 'private_key': kiosk_plan['private_key']}
+            state['kiosk']['pin'] = self.reset_pin(
+                owner_token, org, kiosk_employee, state['kiosk'], kiosk_plan['reset_request'])
         LOG.emit('canary', 'canary.provision', 'success')
         return state
 
+
+def provision_resumable(provisioner: Provisioner, path: Path) -> dict:
+    """Persist the complete synthetic plan before any mutation and reuse it on retry."""
+    if path.exists():
+        saved = json.loads(path.read_text(encoding='utf-8'))
+        if saved.get('synthetic') is True:
+            return saved
+        check(saved.get('status') == 'PROVISIONING'
+              and isinstance(saved.get('plan'), dict)
+              and saved['plan'].get('schema') == 'fichaje.canary-provision.v1',
+              'provision-state')
+        plan = saved['plan']
+    else:
+        plan = provisioner.plan()
+        write_private(path, json.dumps({'status': 'PROVISIONING', 'plan': plan}, sort_keys=True))
+    state = provisioner.provision(plan)
+    write_private(path, json.dumps(state))
+    return state
 
 if __name__ == '__main__':
     import os
@@ -428,9 +545,11 @@ if __name__ == '__main__':
     gateway = Gateway(args.gateway_url) if args.gateway_url else None
     path = Path(args.state)
     if args.command == 'provision':
-        state = Provisioner(api, os.environ['SUPABASE_SERVICE_ROLE_KEY'], os.environ['OPS_OPERATOR_DSN'], gateway).provision()
-        write_private(path, json.dumps(state))
-        print(json.dumps({'status': 'PROVISIONED'}))
+        provisioner = Provisioner(api, os.environ['SUPABASE_SERVICE_ROLE_KEY'],
+                                  os.environ['OPS_OPERATOR_DSN'], gateway)
+        already = path.exists()
+        state = provision_resumable(provisioner, path)
+        print(json.dumps({'status': 'ALREADY_PROVISIONED' if already and state.get('synthetic') else 'PROVISIONED'}))
         sys.exit(0)
     state = json.loads(path.read_text(encoding='utf-8'))
     canary = Canary(state, api, gateway)
