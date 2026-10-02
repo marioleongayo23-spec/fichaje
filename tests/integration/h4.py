@@ -35,6 +35,24 @@ def main():
     import h1 as h
     sql, rpc, uid, check = h.sql, h.rpc, h.uid, h.check
     initial = h.checks
+    # Test-only guards inside the real database entrypoints observe SET LOCAL ROLE,
+    # even though SECURITY DEFINER changes current_user inside their bodies.
+    # Missing role reduction must fail before authentication or recording runs.
+    sql(r"""
+    do $guard$ declare target regprocedure; definition text; guarded text;
+    begin
+      foreach target in array array[
+        'private.kiosk_auth_begin(uuid,uuid,text,text)'::regprocedure,
+        'private.kiosk_record(uuid,uuid,public.time_action,bigint,uuid,text)'::regprocedure
+      ] loop
+        definition := pg_get_functiondef(target);
+        guarded := regexp_replace(definition, '[[:<:]]BEGIN[[:>:]]',
+          'BEGIN IF current_setting(''role'') <> ''fichaje_gateway'' THEN RAISE EXCEPTION ''GATEWAY_ROLE_REQUIRED''; END IF;', 'i');
+        if guarded = definition then raise exception 'guard insertion failed'; end if;
+        execute guarded;
+      end loop;
+    end $guard$;
+    """)
     password = secrets.token_hex(32)
     # NOLOGIN gateway holds only entrypoint EXECUTE/USAGE. The ephemeral login
     # inherits that single role, with no table privileges or bypass. PG17 captures
