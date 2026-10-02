@@ -1,28 +1,41 @@
-# Localización de datos y transferencias internacionales — PLANTILLA REVISABLE
+# Localización de datos y transferencias internacionales — PREPRODUCCIÓN H8
 
-> H7, 2026-09-28. Decisión técnica documentada; la verificación contractual de cada proveedor está pendiente.
+> Revisión 2026-10-02. Se separa ubicación técnica de garantía jurídica: alojar el dato en la UE no elimina
+> por sí solo posibles accesos/transferencias por soporte, afiliadas o subprocesadores.
 
-## Localización (decisión técnica)
-| Componente | Ubicación objetivo | Verificación pendiente |
+## Localización técnica actual
+| Componente | Ubicación / tratamiento | Estado |
 |---|---|---|
-| PostgreSQL, Auth, Storage, Edge Functions (Supabase) | Región UE `[[REGIÓN]]` fijada al crear el proyecto (no se puede cambiar después) | Confirmar región en el panel y en el contrato |
-| Backups cifrados de base de datos | Destino privado en la UE `[[DESTINO]]`; la clave privada age en custodia separada `[[CUSTODIA]]` | Contrato del destino; prueba de restauración trimestral |
-| Journal de recuperación | Instancia PostgreSQL independiente en la UE `[[INSTANCIA]]` | Persistencia y custodia independientes del backup |
-| Frontend y borde (Cloudflare Pages) | Red global; sin almacenamiento de registros laborales | Configuración de logs/analítica del proveedor |
+| Supabase PostgreSQL/Auth/Storage/Edge | `eu-west-1`, West EU (Irlanda) | Producción candidata; solo datos sintéticos hasta GO-09/10 |
+| Journal de recuperación Neon | `aws-eu-central-1`, Frankfurt | Independiente del primario y del backup; GO-07 PASS |
+| Cloudflare Pages/borde | Red global; requests procesadas en el borde | No se usa como archivo de registros laborales |
+| Backup DB age | Google My Drive privado; clave age separada | Técnico GO-07 PASS; **no aprobado para datos reales** por falta de DPA aplicable acreditado |
+| Backup de repositorio | Google My Drive privado | Sin datos personales laborales por contrato de OPS-01 |
 
-## Transferencias (arts. 44–49 RGPD)
-- Un proveedor con sede o acceso desde fuera del EEE puede implicar transferencia aunque los datos se alojen en
-  la UE (p. ej., soporte remoto o subencargados). Para cada proveedor documentar la garantía aplicable:
-  decisión de adecuación (p. ej., Marco de Privacidad de Datos UE-EE. UU. si la entidad está certificada),
-  cláusulas contractuales tipo o normas corporativas vinculantes.
-- **Estado de la certificación y de las garantías: `[[VERIFICAR EN LA FUENTE OFICIAL A LA FECHA DE FIRMA]]`.**
-  No se ha podido consultar desde el entorno de H7.
-- Medidas complementarias técnicas ya implementadas: cifrado en tránsito (TLS, verify-full en conexiones
-  técnicas), backups cifrados con clave fuera del proveedor, minimización (sin biometría/geolocalización, IP de
-  kiosco solo como HMAC por empresa), alertas y telemetría sin datos personales.
+## Garantías verificadas
+- **Supabase:** DPA v1 01/08/2026; el DPA declara que, cuando el cliente fija una región, Covered Data se
+  almacena y procesa primariamente allí salvo las excepciones contractuales. Incorpora SCC de la Decisión
+  (UE) 2021/914 para transferencias aplicables.
+  https://supabase.com/legal/customer-resources/data-processing-addendum
+- **Cloudflare:** DPA v6.4 03/04/2026 y SCC para transferencias EEE/UK/Suiza.
+  https://www.cloudflare.com/cloudflare-customer-dpa/
+- **Neon/Databricks:** Product Specific Schedule Neon + DPA/DTA Databricks; lista de subprocesadores vigente.
+  https://neon.com/platform-terms
+  https://www.databricks.com/legal/dpa
+  https://www.databricks.com/legal/data-transfer-addendum
+- **Google:** el Cloud Data Processing Addendum está documentado para clientes Google Workspace/Cloud
+  Identity. La cuenta usada hoy por el backup DB es My Drive personal y no se acredita como cuenta Workspace;
+  no se extrapola ese CDPA.
 
-## Registro de decisiones
-| Fecha | Decisión | Responsable |
-|---|---|---|
-| `[[FECHA]]` | Región de Supabase `[[REGIÓN]]` | `[[…]]` |
-| `[[FECHA]]` | Destino de backups `[[…]]` | `[[…]]` |
+## Medidas complementarias
+TLS `verify-full` en conexiones técnicas, backups cifrados age con identidad privada fuera del destino,
+originales y correcciones inmutables/append-only, minimización sin biometría/fotos/geolocalización,
+IP de kiosco solo como HMAC por empresa y alertas sin PII.
+
+## Decisiones H8
+| Fecha | Decisión |
+|---|---|
+| 2026-10-02 | Supabase productivo fijado a `eu-west-1` (Irlanda). |
+| 2026-10-02 | Journal independiente fijado a Neon `aws-eu-central-1` (Frankfurt), TLS `verify-full`. |
+| 2026-10-02 | My Drive personal aceptado solo para la evidencia sintética de GO-07; **prohibido para datos reales** hasta DPA aplicable o migración. |
+| 2026-10-02 | Cloudflare R2 identificado como candidato de backup con free tier, pero no se activa su suscripción de uso medido sin autorización expresa. |

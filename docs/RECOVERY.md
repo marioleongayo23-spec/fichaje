@@ -157,3 +157,27 @@ en ROLLBACK y FAIL.
 Para GO-07 sigue siendo obligatorio restaurar **la misma copia cifrada real** en un objetivo
 aislado antes de afirmar que el backup operativo es recuperable. El arreglo anterior no
 convierte por sí solo el backup de producción en PASS.
+
+
+## H8 — GO-07 productivo PASS (2026-10-02)
+La evidencia H7 anterior es histórica. En H8 se activó y verificó la recuperación del candidato productivo
+solo con datos sintéticos:
+
+- backup age real `fichaje-db-20261002T100304Z-2af8ca8e`, conexión PostgreSQL `verify-full`, rol de solo
+  lectura, sin dump plano y sin clave privada en el host ni en el destino;
+- copia offsite privada descargada de nuevo y validada por SHA-256;
+- restore **de esa misma copia** en PostgreSQL aislado: 17 migraciones, target vacío, migration match,
+  wrong-key/tamper negativos, restore/data/inmutabilidad PASS; clave eliminada y target destruido;
+- journal independiente en Neon Free, `aws-eu-central-1` (Frankfurt), base `fichaje_recovery`.
+  Los roles del archive se crearon por SQL para evitar la membresía `neon_superuser` que Neon concede a
+  roles creados por Console/API: connection LOGIN mínimo, writer NOLOGIN, ambos sin BYPASSRLS, FORCE RLS,
+  ejecución limitada a `journal.prepare`/`journal.verify` y triggers de inmutabilidad;
+- producción usa un foreign server sin credencial en Git, con host Neon directo, `sslmode=verify-full` y
+  `sslrootcert=system`. Prueba real: PREPARED `d94988fa-5111-47c5-8fa5-18cc30dccc17`, XID 1482 confirmado
+  `committed` en el outbox fuente, finalización COMMITTED en el archive y
+  `private.verify_journal_entry(...)=true`; 0 PREPARED sin resolver.
+
+**Separación técnica vs. puerta comercial:** GO-07 técnico es PASS. El destino offsite actual del backup DB
+es un My Drive personal y contiene solo el backup cifrado del candidato sintético. No se autoriza almacenar
+datos reales allí hasta que GO-09 acredite un contrato/DPA aplicable o se migre a un destino aprobado.
+La identidad age privada permanece separada del destino.

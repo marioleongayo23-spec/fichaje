@@ -1,4 +1,4 @@
-# Cumplimiento — base de diseño revisada 2026-09-21; revisión H7 2026-09-28; preproducción 2026-10-01
+# Cumplimiento — base de diseño revisada 2026-09-21; revisión H7 2026-09-28; preproducción 2026-10-01; revisión H8 2026-10-02
 No es certificación de producto ni validación jurídica del piloto. H0 no procesa datos reales.
 
 ## Base normativa consultada
@@ -84,3 +84,35 @@ Esta comprobación no es certificación jurídica ni sustituye la revisión de c
 antes del alta real hay que cerrar convenio/pausas, información a plantilla, representantes
 cuando corresponda, subencargados/transferencias, derechos y valoración de riesgos/EIPD según
 el caso. No se promete que cualquier configuración de cliente sea conforme por defecto.
+
+
+## Revisión HITO 8 — 2026-10-02
+Se volvió a contrastar el régimen vigente antes de autorizar datos reales. El art. 34.9 ET consolidado sigue
+exigiendo registro diario con hora concreta de inicio y fin, conservación durante cuatro años y disponibilidad
+para persona trabajadora, representación legal e Inspección; la organización/documentación se remite al cauce
+de negociación/acuerdo o decisión empresarial previa consulta previsto por el propio artículo. La AEPD mantiene
+para el control horario ordinario la base de obligación legal (art. 6.1.c RGPD), no consentimiento, con deber
+de información. No se encontró en las fuentes oficiales revisadas una norma general publicada que sustituya
+ese régimen; esta comprobación debe repetirse en cada alta.
+
+Fuentes de proveedor verificadas el 2026-10-02:
+- Supabase publica DPA v1 (01/08/2026), integrado en sus Terms, con Supabase Pte. Ltd como proveedor,
+  lista de subencargados, tratamiento regional cuando se selecciona región y CCT/SCC para transferencias:
+  https://supabase.com/legal/customer-resources/data-processing-addendum
+- Cloudflare publica DPA v6.4 (03/04/2026), aplicable a acuerdos self-service cuando actúa como
+  processor/subprocessor, y SCC: https://www.cloudflare.com/cloudflare-customer-dpa/
+- Neon se rige desde 05/08/2026 por el Product Specific Schedule de Databricks y su DPA/DTA; el journal
+  está en Frankfurt. Referencias: https://neon.com/platform-terms y https://www.databricks.com/legal/dpa
+- Google ofrece su Cloud Data Processing Addendum a clientes Google Workspace/Cloud Identity. El destino
+  actual del backup DB es un My Drive personal, no un Workspace/Shared Drive; por tanto no se presume que
+  ese CDPA cubra el tratamiento. **No se permite backup con datos reales en ese destino.**
+
+GO-09 permanece BLOCKED hasta: (a) usar un destino de backup con DPA aplicable —o acreditar uno válido para
+el destino actual—; (b) completar la identidad legal del proveedor en el encargo; y (c) completar y firmar
+para el primer cliente `ENCARGO_TRATAMIENTO.md`, `SUBENCARGADOS.md`,
+`INFORMACION_EMPLEADOS.md`, `CHECKLIST_CONVENIO_PAUSAS.md` y el onboarding correspondiente.
+Cloudflare R2 es una alternativa técnica candidata con cuota gratuita publicada, pero no se activa una
+suscripción de uso medido sin autorización expresa.
+
+Esta revisión no certifica cumplimiento universal ni sustituye asesoría laboral/protección de datos del
+caso concreto.
