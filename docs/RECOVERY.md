@@ -207,3 +207,19 @@ Riesgo residual aceptado para V1 sin coste: backup y journal están en **proyect
 familia de proveedor. Son recursos/bases separados y el backup continúa cifrado con clave fuera de Neon, pero
 existe riesgo correlacionado de indisponibilidad del proveedor. Antes de prometer RTO/RPO comercial o aumentar
 criticidad se reevaluará un segundo proveedor offsite.
+
+
+### Operación reproducible del vault
+El uploader versionado es `scripts/ops/backup_vault.py`. En un host de operador ya autorizado, después de
+`backup_database.sh`:
+
+```
+python scripts/ops/backup_vault.py upload <backup_dir> <backup_name>
+python scripts/ops/backup_vault.py purge
+```
+
+Requiere `FICHAJE_BACKUP_VAULT_PGSERVICE`, `PGSERVICEFILE`, `PGPASSFILE` y
+`FICHAJE_BACKUP_VAULT_CA`; service/pass deben ser ficheros 0600 fuera del repo y la conexión se fuerza a
+`sslmode=verify-full`. El uploader vuelve a comprobar cabecera age, sidecar SHA, manifest, ausencia de clave
+privada y verifica SHA/tamaño en servidor tras un INSERT idempotente. No imprime DSN ni credenciales.
+El esquema reproducible está en `scripts/ops/backup_vault_schema.sql`.
