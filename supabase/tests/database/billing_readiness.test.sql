@@ -60,7 +60,7 @@ select is(
 );
 select is(
  (select revision from private.billing_seat_outbox where organization_id='82000000-0000-4000-8000-000000000001'),
- 2::bigint,'employee insert advances outbox revision after migration backfill'
+ 1::bigint,'first employee change creates the first outbox revision for a newly-created tenant'
 );
 update public.employees set active=false
 where id='84000000-0000-4000-8000-000000000001';
@@ -70,7 +70,7 @@ select is(
 );
 select is(
  (select revision from private.billing_seat_outbox where organization_id='82000000-0000-4000-8000-000000000001'),
- 3::bigint,'seat intent revisions are monotonic'
+ 2::bigint,'seat intent revisions are monotonic'
 );
 
 -- Fixed service RPCs own the external identifiers; clients never supply them to labour RPCs.
@@ -100,13 +100,15 @@ select is(
   '2026-11-02T00:00:00Z'
  )->>'duplicate','true','webhook event replay is idempotent'
 );
+reset role;
 select is(
  (select count(*)::int from private.billing_events where stripe_event_id='evt_Synthetic01'),
  1,'event ledger stores one row for a replay'
 );
+set local role service_role;
 select is(
  public.billing_ack_seat_sync(
-  '82000000-0000-4000-8000-000000000001',3,0
+  '82000000-0000-4000-8000-000000000001',2,0
  )->>'acked','true','seat sync ACK consumes only the matching revision'
 );
 select is(
