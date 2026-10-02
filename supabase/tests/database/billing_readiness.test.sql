@@ -29,6 +29,8 @@ select ok((has_function_privilege('service_role','public.billing_server_context(
  'service role may execute fixed server billing context');
 select ok((not has_function_privilege('authenticated','public.billing_attach_customer(uuid,text)','EXECUTE')),
  'client cannot attach Stripe customer mapping');
+select ok((not has_function_privilege('authenticated','public.billing_begin_checkout(uuid,uuid)','EXECUTE')),
+ 'client cannot manufacture a checkout claim');
 
 -- OWNER gets safe billing summary; ADMIN does not.
 select set_config('request.jwt.claims','{"sub":"81000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
@@ -73,12 +75,30 @@ select is(
  2::bigint,'seat intent revisions are monotonic'
 );
 
--- Fixed service RPCs own the external identifiers; clients never supply them to labour RPCs.
+-- Fixed service RPCs own checkout claims and external identifiers.
 set local role service_role;
+select is(
+ public.billing_begin_checkout(
+  '82000000-0000-4000-8000-000000000001','85000000-0000-4000-8000-000000000001'
+ )->>'generation','1','first checkout claim allocates generation 1'
+);
+select is(
+ public.billing_begin_checkout(
+  '82000000-0000-4000-8000-000000000001','85000000-0000-4000-8000-000000000002'
+ )->>'request_id','85000000-0000-4000-8000-000000000001',
+ 'concurrent checkout attempt resumes the existing claim instead of creating another'
+);
 select is(
  public.billing_attach_customer(
   '82000000-0000-4000-8000-000000000001','cus_Synthetic01'
  )->>'attached','true','service attaches Stripe customer id'
+);
+select is(
+ public.billing_finish_checkout(
+  '82000000-0000-4000-8000-000000000001',
+  '85000000-0000-4000-8000-000000000001',1,
+  'cs_test_Synthetic01','2099-01-01T00:00:00Z'
+ )->>'stored','true','checkout session is attached only to its exact claim'
 );
 select is(
  public.billing_server_context('82000000-0000-4000-8000-000000000001')->>'stripe_customer_id',
