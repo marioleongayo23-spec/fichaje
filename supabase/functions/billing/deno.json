@@ -1,0 +1,9 @@
+{
+  "nodeModulesDir": "auto",
+  "imports": {
+    "stripe": "npm:stripe@22.0.0"
+  },
+  "compilerOptions": {
+    "strict": true
+  }
+}
