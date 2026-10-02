@@ -65,7 +65,11 @@ printf 'SELECT 1;\\n'
 ''')
         self._stub('psql', '''
 args="$*"
-if [[ "$args" == *"-c"* ]]; then
+is_command=0
+for arg in "$@"; do
+  if [[ "$arg" == "-c" ]]; then is_command=1; break; fi
+done
+if [[ "$is_command" == 1 ]]; then
   if [[ "$args" == *"current_database()"* ]]; then printf 'postgres\\n'
   elif [[ "$args" == *"public.organizations"*"auth.users"* ]]; then printf '0\\n'
   elif [[ "$args" == *"schema_migrations"* ]]; then printf '%s\\n' "$H8_MIGRATION"
