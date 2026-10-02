@@ -38,6 +38,16 @@ sys.path.insert(0, str(ROOT / 'scripts' / 'ops'))
 from opslib import loopback  # noqa: E402
 
 RESULTS: dict[str, str] = {}
+BROWSER_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36'
+
+
+def request_headers(headers: dict | None = None) -> dict:
+    """External probes use a normal browser identity so CDN bot handling does
+    not replace the application response under test. Explicit security-test
+    headers always override these transport defaults."""
+    merged = {'User-Agent': BROWSER_USER_AGENT, 'Accept': '*/*'}
+    merged.update(headers or {})
+    return merged
 
 
 def record(name: str, ok: bool | None, reason: str = '') -> None:
@@ -51,7 +61,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def fetch(method: str, url: str, headers: dict | None = None, body: bytes | None = None, follow: bool = True, timeout: float = 20):
     opener = urllib.request.build_opener(*(() if follow else (NoRedirect(),)))
-    request = urllib.request.Request(url, data=body, method=method, headers=dict(headers or {}))
+    request = urllib.request.Request(url, data=body, method=method, headers=request_headers(headers))
     try:
         with opener.open(request, timeout=timeout) as response:
             return response.status, {k.lower(): v for k, v in response.headers.items()}, response.read()

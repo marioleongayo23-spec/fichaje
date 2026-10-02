@@ -45,6 +45,21 @@ doble barra en el meta-comando psql del restore, overrides de URLs directas del 
 override del host efectivo en DSN URI. Todos tienen regresión dedicada. Los checks válidos son
 siempre los del HEAD final visible en PR #17; no se reutilizan resultados de commits anteriores.
 
+### Evidencia productiva H8 — 2026-10-02
+- GO-01 llegó a 5/5 workflows PASS sobre `3919f7a55bb49ac3adde85d78d5eebc8144cd05d`.
+  El fix posterior del transporte del verificador mueve de nuevo el HEAD y obliga a repetir esos checks.
+- Supabase y Cloudflare sirven `h8-3919f7a55bb4`; readiness remoto: kiosk Auth/DB UP y
+  export-link Auth/REST/Storage/DB UP.
+- PostgreSQL del kiosk usa login dedicado que solo hereda `fichaje_gateway`, pooler de sesión y
+  `sslmode=verify-full` con CA oficial de Supabase; prueba real de TLS + SET ROLE PASS.
+- GO-05: canary sintético productivo WEB + KIOSK PASS, sin rotación, incluyendo RLS,
+  auditoría e idempotencia.
+- Primer `verify_production.py`: 17 PASS / 16 FAIL / 0 SKIPPED. Los 16 fallos comparten
+  transporte Cloudflare: el verificador usaba el User-Agent por defecto de urllib mientras las
+  mismas rutas estaban UP con transporte de navegador. Se corrige únicamente el cliente de
+  verificación/canary para modelar el tráfico same-origin real; GO-04 sigue pendiente hasta
+  repetir el verificador y obtener PASS sin SKIPPED.
+
 ### Pendiente antes de PASS
 - los cinco workflows obligatorios del HEAD final del PR deben terminar PASS;
 - desplegar el release aprobado en Cloudflare + Supabase productivos y verificarlo remotamente;

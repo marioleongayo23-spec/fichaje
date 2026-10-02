@@ -13,6 +13,11 @@ assert SPEC and SPEC.loader
 verify = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(verify)
 
+STAGING_SPEC = importlib.util.spec_from_file_location('verify_staging', ROOT / 'scripts' / 'staging' / 'verify_staging.py')
+assert STAGING_SPEC and STAGING_SPEC.loader
+staging_verify = importlib.util.module_from_spec(STAGING_SPEC)
+STAGING_SPEC.loader.exec_module(staging_verify)
+
 APP = 'fichaje.example.com'
 API = 'zyxwvutsrqponmlkjihg.supabase.co'
 
@@ -53,6 +58,11 @@ class ProductionVerifyGuardTest(unittest.TestCase):
         env['FICHAJE_ENV'] = 'staging'
         with mock.patch.dict(os.environ, env, clear=True):
             self.assertFalse(verify.allowed(f'https://{APP}', f'https://{API}'))
+
+    def test_external_verifier_uses_browser_transport_defaults(self):
+        headers = staging_verify.request_headers({'Sec-Fetch-Site': 'cross-site'})
+        self.assertIn('Mozilla/5.0', headers['User-Agent'])
+        self.assertEqual(headers['Sec-Fetch-Site'], 'cross-site', 'explicit attack probes must override defaults')
 
 
 if __name__ == '__main__':

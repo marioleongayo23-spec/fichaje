@@ -119,5 +119,22 @@ class H8ProvisioningGuard(unittest.TestCase):
             self.assertFalse(canary.Provisioner.allowed(f'https://{PRODUCTION_API}', PRODUCTION_DSN))
 
 
+    def test_gateway_models_same_origin_browser_transport(self):
+        captured = {}
+
+        def fake_http_json(method, url, headers, body, timeout):
+            captured.update(method=method, url=url, headers=dict(headers), body=body, timeout=timeout)
+            return 200, {'status': 'ok'}
+
+        gateway = canary.Gateway('https://fichaje.example.com/gateway/kiosk')
+        with mock.patch.object(canary, 'http_json', side_effect=fake_http_json):
+            result = gateway.post('authenticate', 'synthetic-token', {'x': 1}, 'kiosk.authenticate', None, False)
+        self.assertEqual(result, {'status': 'ok'})
+        self.assertEqual(captured['headers']['Origin'], 'https://fichaje.example.com')
+        self.assertEqual(captured['headers']['Sec-Fetch-Site'], 'same-origin')
+        self.assertEqual(captured['headers']['Sec-Fetch-Mode'], 'cors')
+        self.assertIn('Mozilla/5.0', captured['headers']['User-Agent'])
+
+
 if __name__ == '__main__':
     unittest.main()

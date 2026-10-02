@@ -23,6 +23,7 @@ import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from opslib import LOG, HttpError, OpsError, Timer, classify_exception, http_json, loopback, now_iso, release_info, write_private  # noqa: E402
@@ -66,17 +67,24 @@ class Api:
         return session['access_token']
 
 
+BROWSER_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36'
+
+
 class Gateway:
     """Kiosk gateway reached through the application origin (same-origin proxy)."""
 
     def __init__(self, base_url: str, timeout: float = 15.0):
         self.url = base_url.rstrip('/')
         self.timeout = timeout
+        parsed = urlsplit(self.url)
+        self.origin = f'{parsed.scheme}://{parsed.netloc}'
 
     def post(self, route: str, token: str, body: dict, operation: str, key: str | None, mutation: bool):
         data = json.dumps(body, sort_keys=True).encode()
         op = Operation('canary', operation, idempotent=mutation, mutation=mutation, payload=data, key=key)
-        return execute(op, lambda payload, _n: http_json('POST', f'{self.url}/{route}', {'Authorization': 'Bearer ' + token}, payload, self.timeout)[1],
+        headers = {'Authorization': 'Bearer ' + token, 'User-Agent': BROWSER_USER_AGENT,
+                   'Origin': self.origin, 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'cors'}
+        return execute(op, lambda payload, _n: http_json('POST', f'{self.url}/{route}', headers, payload, self.timeout)[1],
                        POLICY)
 
 
