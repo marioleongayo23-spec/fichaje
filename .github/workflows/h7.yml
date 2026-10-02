@@ -43,6 +43,7 @@ jobs:
         run: |
           python3 -m py_compile tests/integration/h7_support.py
           deno test supabase/functions/_shared/ingress_test.ts
+          deno test --config supabase/functions/kiosk/deno.json supabase/functions/kiosk/database_test.ts
           deno check --config supabase/functions/kiosk/deno.json supabase/functions/kiosk/index.ts
           deno check --config supabase/functions/export-link/deno.json supabase/functions/export-link/index.ts
       - name: Start isolated local Supabase

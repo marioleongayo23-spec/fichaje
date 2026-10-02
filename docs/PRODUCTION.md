@@ -46,6 +46,9 @@ El provisionador del canary exige además `FICHAJE_PRODUCTION_DB_HOST` y comprue
 destino efectivo de la DSN coincide exactamente, con `sslmode=verify-full`. Se rechazan
 `service=`, `hostaddr`, overrides de host/puerto/DB en la query URI, campos objetivo
 duplicados y puertos remotos distintos de 5432. La API/app remota solo acepta HTTPS estándar.
+El `kiosk` productivo usa además un login SQL dedicado que solo hereda `fichaje_gateway` y
+`KIOSK_DATABASE_CA` con la CA pública PEM de Supabase: `postgres.js` recibe esa CA de forma
+explícita para que `sslmode=verify-full` valide CA y hostname; no se rebaja a `require`.
 
 ## Recuperación
 Una base vacía también es un backup válido. Desde H8, `restore_database.sh` determina el

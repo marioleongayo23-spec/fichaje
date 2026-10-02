@@ -4,6 +4,7 @@ import { networkIdentifier } from './network.ts';
 import { argon2id, argon2Verify } from 'hash-wasm';
 import { classifySql, healthHandler, opsEvent, type ErrorClass, type Operation, type Outcome } from '../_shared/ops.ts';
 import { INGRESS_HEADER, ingressPolicy, routeOf, verifyIngress } from '../_shared/ingress.ts';
+import { databaseTls } from './database.ts';
 
 const env = (key: string) => { const value = Deno.env.get(key); if (!value) throw new Error('CONFIG_REQUIRED'); return value; };
 const authURL = Deno.env.get('KIOSK_AUTH_URL') ?? env('SUPABASE_URL');
@@ -21,7 +22,10 @@ for (const secret of ingress.secrets) {
   const value = btoa(String.fromCharCode(...secret));
   if (value === btoa(String.fromCharCode(...pepper)) || value === btoa(String.fromCharCode(...networkSecret))) throw new Error('CONFIG_REQUIRED');
 }
-const db = postgres(Deno.env.get('KIOSK_DATABASE_URL') ?? env('SUPABASE_DB_URL'), { max: 8, prepare: false, onnotice: () => {}, debug: false,
+const databaseURL = Deno.env.get('KIOSK_DATABASE_URL') ?? env('SUPABASE_DB_URL');
+const databaseSSL = databaseTls(databaseURL, Deno.env.get('KIOSK_DATABASE_CA'), Deno.env.get('FICHAJE_ENV'));
+const db = postgres(databaseURL, { max: 8, prepare: false, onnotice: () => {}, debug: false,
+  ...(databaseSSL ? { ssl: databaseSSL } : {}),
   connection: { application_name: 'kiosk-gateway', statement_timeout: 10000, lock_timeout: 5000, idle_in_transaction_session_timeout: 10000 } });
 const gatewayTx = <T>(work: (tx: Tx) => Promise<T>) => db.begin(async tx => {
   await tx.unsafe('set local role fichaje_gateway');
