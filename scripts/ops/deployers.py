@@ -122,7 +122,7 @@ class PlatformDeployer:
     """Cloudflare Pages (Direct Upload) + Supabase Edge Functions, operator-run."""
 
     CREDENTIALS = ('CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'SUPABASE_ACCESS_TOKEN')
-    FUNCTIONS = ('kiosk', 'export-link')
+    FUNCTIONS = ('kiosk', 'export-link', 'billing')
 
     def __init__(self, workdir: Path, environment: str, pages_project: str, supabase_ref: str, app_url: str, build_env: dict,
                  source: Path = ROOT, wrangler: str = 'wrangler', supabase: str = 'supabase', runner=subprocess.run):
