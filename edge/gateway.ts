@@ -1,5 +1,5 @@
 // H7 same-origin edge for the server-only functions (Cloudflare Pages Functions).
-// /gateway/kiosk/<route> and /gateway/export-link[/generate] are the only entrances the
+// /gateway/kiosk/<route>, /gateway/export-link[/generate] and /gateway/billing/<route> are the only entrances the
 // browser uses (no CORS). The edge: closed route/method table, fetch-metadata
 // and origin policy, bounded JSON bodies, only Authorization/Content-Type go
 // upstream (never client IP/forwarding headers, cookies or origin), a fresh
