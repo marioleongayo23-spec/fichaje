@@ -1,5 +1,39 @@
 # CURRENT_STATE — 2026-10-05
 
+## HITO 10 — fidelidad visual Bundy + entrada/login + despliegue final
+
+**ESTADO ACTUAL: IN PROGRESS.** Autorizado expresamente por el usuario el 2026-10-05.
+
+Rama: `astra/hito-10-fidelidad-visual-bundy`  
+Base: `main@a8bded0802cf5e495d859369593a93d5adcb99c5`.
+
+### Objetivo y fuente visual
+- Corregir la insuficiente fidelidad de HITO 9 sin tocar contratos funcionales ni backend.
+- Fuente visual autoritativa: `Bundy App.pdf` / `Bundy App(1).pdf`, `logos.zip` y la web comercial pública Bundy de Webflow.
+- Paleta medida en los activos oficiales: bosque `#1F4A33`, niebla `#EEF1EE`, aulaga `#F2C230`.
+- El PDF define el lenguaje de producto: marco/acentos bosque, superficies niebla/blanco, CTA aulaga, tarjetas suaves, navegación inferior y botón circular «Hacer bundy».
+- La web comercial define la entrada: «Hola de nuevo», acceso a equipo/horas y continuidad de marca Bundy.
+
+### Diagnóstico remoto previo
+- `https://fichaje-staging.pages.dev/` responde con un release antiguo: título «Iniciar sesión · Fichaje», copy «Fichaje APP», theme-color azul y release `98e814ffafc32b3fa8c892908fbcbff97e58fc42`.
+- `https://fichaje.pages.dev/` no sirve el SaaS validado: responde con una aplicación histórica distinta («Fichaje – Comparativa (Offline)»).
+- Por tanto HITO 10 incluye acreditar el despliegue correcto, no solo el código.
+
+### Límites
+- Solo presentación/composición/frontend y despliegue del mismo artefacto; sin SQL, migraciones, RLS/RPC, Edge Functions, motor horario, idempotencia, timestamps, auditoría, almacenamiento ni activación Stripe.
+- No implementar ni simular geolocalización, biometría, fotos, vacaciones, nóminas ni otras funciones fuera de V1 aunque aparezcan en referencias comerciales.
+- Mantener accesibilidad, nombres/contratos de acciones y todos los flujos existentes.
+
+### Puerta de salida
+1. Login/registro/onboarding y shell con identidad Bundy inequívoca y coherente con PDF/web.
+2. Fichar, horas y gestión visualmente alineados con el sistema Bundy sin inventar funcionalidades.
+3. Sesión limpia/incógnito muestra el login correcto.
+4. Diff sin backend/DB/security.
+5. CI + Database + E2E H6 + OPS-02 + H7 = 5/5 PASS sobre el mismo HEAD final.
+6. Staging/URL final verificadas contra ese release antes de declarar PASS.
+7. PR abierto; sin merge sin aprobación expresa posterior.
+
+
 ## HITO 9 — integración visual exacta del diseño del socio
 
 **ESTADO ACTUAL: PASS.**
@@ -7,7 +41,7 @@
 Repositorio: `marioleongayo23-spec/fichaje`  
 Rama: `astra/hito-9-integracion-visual-socio`  
 Base: `main@0c734cc61b5d60a20d2f0307042f94042fc70554`  
-PR: #25 — OPEN; no merge sin 5/5 PASS y aprobación expresa posterior.
+PR: #25 — MERGED; merge commit `a8bded0802cf5e495d859369593a93d5adcb99c5`.
 
 ### Fuente visual y alcance
 - Fuente visual autoritativa recibida: `Bundy App.pdf` + `logos.zip`.
@@ -48,7 +82,7 @@ El diff contra `main` se limita a documentación H9 y capa visual/frontend:
 - OPS-02 run `37291225971`: PASS.
 - H7 run `37291226032`: PASS.
 
-El siguiente commit es exclusivamente documental para registrar este cierre; debe volver a obtener 5/5 PASS antes de considerar el HEAD final cerrado. Tras ese 5/5, restaurar el repositorio a privado antes de cualquier merge. PR #25 permanece abierto y sin merge hasta aprobación expresa posterior.
+El HEAD documental final `fc37a9b1d4dac6e38158aa6055cc108705ec7562` obtuvo también 5/5 PASS (H7 load pasó en reintento sobre el mismo código). El repositorio volvió a privado y PR #25 fue aprobado y mergeado por orden expresa del usuario.
 
 
 ## HITO 8 — GO-LIVE / producción aprobado
