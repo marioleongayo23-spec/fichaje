@@ -24,14 +24,20 @@ test('Bundy visual contract is present on clean login and clock', { tag: '@deskt
 
   await login(page, s.employee);
   await expect(page.getByRole('heading', { name: 'Fichar' })).toBeVisible();
+  const welcome = page.locator('.bundy-welcome-screen');
+  await expect(welcome).toHaveCSS('border-color', 'rgb(31, 74, 51)');
+  await expect(page.getByText(/Yo\s+apunto tus horas/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Entrada', exact: true })).toHaveText('Hacer mi primer bundy');
+
+  await page.getByRole('button', { name: 'Entrada', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Entrada registrada' })).toBeVisible();
   const frame = page.locator('.clock-page');
   await expect(frame).toHaveCSS('border-color', 'rgb(31, 74, 51)');
-  const entry = page.getByRole('button', { name: 'Entrada', exact: true });
-  await expect(entry).toHaveCSS('background-color', 'rgb(242, 194, 48)');
-  const box = await entry.boundingBox();
+  const pause = page.getByRole('button', { name: 'Iniciar pausa', exact: true });
+  await expect(pause).toHaveCSS('background-color', 'rgb(242, 194, 48)');
+  const box = await pause.boundingBox();
   expect(box).not.toBeNull();
   expect(Math.abs((box?.width ?? 0) - (box?.height ?? 0))).toBeLessThanOrEqual(2);
-  await expect(page.getByText('Hacer bundy', { exact: true })).toBeVisible();
 });
 
 test('employee screens pass axe, structure and target-size checks', async ({ page }) => {
@@ -52,10 +58,13 @@ test('employee screens pass axe, structure and target-size checks', async ({ pag
   await expect(page.getByRole('heading', { name: 'Entrada registrada' })).toBeVisible();
   await audit(page, 'clock receipt');
   await go(page, 'Mi registro');
-  await expect(page.locator('article.session').first()).toBeVisible();
+  await expect(page.locator('.bundy-hours-list')).toBeVisible();
   await structure(page);
   await targets(page);
   await audit(page, 'evidence');
+  await page.getByText('Ver detalle legal del registro', { exact: true }).click();
+  await expect(page.locator('article.session').first()).toBeVisible();
+  await audit(page, 'evidence legal detail');
   await page.getByRole('button', { name: 'Solicitar corrección de esta jornada' }).first().click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await audit(page, 'correction dialog');
