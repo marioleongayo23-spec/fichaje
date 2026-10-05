@@ -7,7 +7,7 @@
 Repositorio: `marioleongayo23-spec/fichaje`  
 Rama: `astra/hito-9-integracion-visual-socio`  
 Base: `main@0c734cc61b5d60a20d2f0307042f94042fc70554`  
-PR: pendiente de abrir tras este commit de alcance.
+PR: #25 — OPEN.
 
 ### Alcance autorizado
 - Integrar **exactamente** el diseño entregado por el socio.
@@ -15,6 +15,7 @@ PR: pendiente de abrir tras este commit de alcance.
 - No modificar reglas de negocio, contratos RPC, RLS, migraciones, seguridad, idempotencia, máquina de estados, timestamps, auditoría, Stripe ni semántica PWA.
 - Mantener accesibilidad, responsive, offline seguro y ausencia de cache sensible.
 - Tras integrar el diseño: regresión completa de CI, Database, E2E H6, OPS-02 y H7 sobre el mismo HEAD.
+- Baseline previo a cualquier cambio visual: HEAD `686760122b60f1c43fd86061401fea6b251e01a0` con CI, Database, E2E H6, OPS-02 y H7 = 5/5 PASS.
 
 ### Fuente del diseño
 Búsqueda realizada antes de modificar UI:
