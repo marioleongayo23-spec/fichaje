@@ -1,13 +1,39 @@
 # CURRENT_STATE — 2026-10-05
 
+## HITO 9 — integración visual exacta del diseño del socio
+
+**ESTADO ACTUAL: BLOCKED por artefacto de diseño no localizado.**
+
+Repositorio: `marioleongayo23-spec/fichaje`  
+Rama: `astra/hito-9-integracion-visual-socio`  
+Base: `main@0c734cc61b5d60a20d2f0307042f94042fc70554`  
+PR: pendiente de abrir tras este commit de alcance.
+
+### Alcance autorizado
+- Integrar **exactamente** el diseño entregado por el socio.
+- Cambios exclusivamente de presentación/frontend visual.
+- No modificar reglas de negocio, contratos RPC, RLS, migraciones, seguridad, idempotencia, máquina de estados, timestamps, auditoría, Stripe ni semántica PWA.
+- Mantener accesibilidad, responsive, offline seguro y ausencia de cache sensible.
+- Tras integrar el diseño: regresión completa de CI, Database, E2E H6, OPS-02 y H7 sobre el mismo HEAD.
+
+### Fuente del diseño
+Búsqueda realizada antes de modificar UI:
+- repositorio, ramas, PRs, issues y referencias `figma.com`: sin artefacto del socio;
+- Project/Library de ChatGPT y carpeta `/Fichaje APP`: sin entrega visual reciente identificable;
+- Google Drive: sin archivo de diseño de Fichaje;
+- Gmail reciente: sin Fichaje/Figma/diseño;
+- Figma: no existe file URL/fileKey recuperable desde el contexto disponible.
+
+**Bloqueo:** no se puede cumplir “exactamente” sin el archivo/enlace/código/imágenes originales. No se hará una aproximación visual ni se tocará el frontend hasta disponer de esa fuente.
+
 ## HITO 8 — GO-LIVE / producción aprobado
 
 **ESTADO ACTUAL: PASS.** HITO 8 aprobado expresamente por el usuario el 2026-10-05.
 
 Repositorio: `marioleongayo23-spec/fichaje`  
-Rama: `astra/hito-8-go-live`  
-Base: `main@1b4d22488f028fb0d637cc74b15c230e8e920f6e`  
-PR: #17 — OPEN; no merge ni activación comercial sin aprobación expresa posterior.
+Rama histórica: `astra/hito-8-go-live`  
+PR: #17 — MERGED  
+Merge commit en `main`: `0c734cc61b5d60a20d2f0307042f94042fc70554`.
 
 ### Candidato productivo
 - Supabase `Fichaje APP`, ref `bypdviatamosygndeqhh`, región `eu-west-1` (Irlanda), ACTIVE_HEALTHY.
