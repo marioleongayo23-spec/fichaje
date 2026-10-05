@@ -27,6 +27,7 @@ export function EmployeesPage() {
   return (
     <>
       <PageHeader title="Empleados">
+        <p className="bundy-display-title" aria-hidden="true">Tu equipo hoy</p>
         <p>Fichas de empleado de la organización. Una persona sin correo ni cuenta puede tener ficha y fichar en el kiosco.</p>
       </PageHeader>
       <button type="button" className="btn btn-primary" onClick={() => { setStatus(null); setCreating(true); }}>Nuevo empleado</button>

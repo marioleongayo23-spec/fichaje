@@ -16,9 +16,11 @@ export function OrganizationPicker() {
   useEffect(() => { document.title = `${empty ? 'Configurar empresa' : 'Elegir organización'} · ${BRAND}`; }, [empty]);
   return (
     <main id="contenido" className="auth-page">
-      <div className="auth-card auth-card-wide">
-        <p className="brand-mark" aria-hidden="true">{BRAND}</p>
+      <div className="auth-card auth-card-wide bundy-onboarding-card">
+        <div className="bundy-wordmark-image" role="img" aria-label={BRAND} />
+        <p className="bundy-step-label">{empty ? 'PRIMER ACCESO' : 'TU ESPACIO'}</p>
         <h1>{empty ? 'Configura tu acceso' : 'Elige organización'}</h1>
+        <p className="bundy-onboarding-display">{empty ? 'Tu empresa, en orden desde hoy.' : '¿Dónde haces bundy hoy?'}</p>
         {tenant.notice && <Notice tone="warning" title={tenant.notice} />}
         {tenant.error && <Notice tone="error" title={tenant.error} />}
         {empty ? (
@@ -81,6 +83,7 @@ function CreateOrganization() {
 
   return (
     <section aria-labelledby="create-org-title" className="subsection">
+      <p className="bundy-step-label">01 · TU EMPRESA</p>
       <h2 id="create-org-title">Dar de alta mi empresa</h2>
       <form noValidate onSubmit={onSubmit}>
         <Field label="Nombre de la empresa" hint="Puedes cambiar la configuración operativa después del alta.">
@@ -128,6 +131,7 @@ function AcceptInvitation() {
 
   return (
     <section aria-labelledby="accept-title" className="subsection">
+      <p className="bundy-step-label">02 · INVITACIÓN</p>
       <h2 id="accept-title">Aceptar una invitación</h2>
       <form noValidate onSubmit={onSubmit}>
         <Field label="Código de invitación" hint="Te lo entrega tu empresa en persona o por un canal seguro. Caduca a las 24 horas.">

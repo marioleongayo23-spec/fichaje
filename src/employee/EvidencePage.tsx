@@ -38,6 +38,7 @@ export function EvidencePage() {
   return (
     <>
       <PageHeader title="Mi registro">
+        <p className="bundy-display-title" aria-hidden="true">Tus horas</p>
         <p>Tu registro de jornada tal como consta en el servidor: fichajes originales, correcciones aprobadas y jornadas incompletas.</p>
       </PageHeader>
       <form className="filters" onSubmit={(e) => e.preventDefault()}>

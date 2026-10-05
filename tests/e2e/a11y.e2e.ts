@@ -6,6 +6,34 @@ import { go, login } from './support/ui';
 
 test.use({ serviceWorkers: 'block' });
 
+test('Bundy visual contract is present on clean login and clock', { tag: '@desktop-only' }, async ({ page }) => {
+  const s = await scenario();
+  await page.goto('/');
+
+  await expect(page.getByRole('heading', { name: 'Iniciar sesión' })).toBeVisible();
+  await expect(page.getByText('Hola de nuevo', { exact: true })).toBeVisible();
+  await expect(page.getByText('Entra para ver tu equipo y tus horas.', { exact: true })).toBeVisible();
+  await expect(page.locator('.bundy-wordmark-image')).toBeVisible();
+  await expect(page.locator('.bundy-auth-shell')).toHaveCSS('border-color', 'rgb(31, 74, 51)');
+  await expect(page.getByRole('button', { name: 'Entrar' })).toHaveCSS('background-color', 'rgb(242, 194, 48)');
+
+  await page.getByRole('button', { name: 'Dar de alta una empresa' }).click();
+  await expect(page.getByRole('heading', { name: 'Crear cuenta' })).toBeVisible();
+  await expect(page.getByText('Crea tu cuenta', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Ya tengo una cuenta' }).click();
+
+  await login(page, s.employee);
+  await expect(page.getByRole('heading', { name: 'Fichar' })).toBeVisible();
+  const frame = page.locator('.clock-page');
+  await expect(frame).toHaveCSS('border-color', 'rgb(31, 74, 51)');
+  const entry = page.getByRole('button', { name: 'Entrada', exact: true });
+  await expect(entry).toHaveCSS('background-color', 'rgb(242, 194, 48)');
+  const box = await entry.boundingBox();
+  expect(box).not.toBeNull();
+  expect(Math.abs((box?.width ?? 0) - (box?.height ?? 0))).toBeLessThanOrEqual(2);
+  await expect(page.getByText('Hacer bundy', { exact: true })).toBeVisible();
+});
+
 test('employee screens pass axe, structure and target-size checks', async ({ page }) => {
   const s = await scenario();
   await clock(s.org, s.employee, s.employee.employee!, 'CLOCK_IN', 0);

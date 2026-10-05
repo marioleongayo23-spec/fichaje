@@ -137,15 +137,22 @@ export function ClockPage() {
   const busy = phase.kind === 'sending' || phase.kind === 'loading';
   const actions = state ? ACTIONS_BY_STATE[state.state] : [];
   const openSince = state?.state !== 'OUT' && state?.last_event_at && localDate(state.last_event_at, zone) !== localDate(now, zone);
+  const initials = employee.display_name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('');
 
   return (
     <div className="clock-page">
       <PageHeader title="Fichar">
-        <div className="bundy-greeting">
-          <span>Buenos días,</span>
-          <strong>{employee.display_name}</strong>
+        <div className="bundy-greeting-row">
+          <div className="bundy-greeting">
+            <span>Buenos días,</span>
+            <strong>{employee.display_name}</strong>
+          </div>
+          <span className="bundy-avatar" aria-hidden="true">{initials}</span>
         </div>
-        <div className="bundy-location-card">{tenant.current.organization.name}</div>
+        <div className="bundy-company-card">
+          <span aria-hidden="true" className="bundy-company-icon" />
+          <span>{tenant.current.organization.name}</span>
+        </div>
       </PageHeader>
 
       <p className="device-clock">
