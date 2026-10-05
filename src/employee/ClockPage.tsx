@@ -62,6 +62,9 @@ export function ClockPage() {
   useEffect(() => { void loadState(); }, [loadState]);
   // Keyboard/screen reader users land on the outcome instead of a removed button.
   useEffect(() => { if (confirmation) receiptHeading.current?.focus(); }, [confirmation]);
+  useEffect(() => {
+    if (phase.kind === 'ready' && !confirmation) document.getElementById('page-title')?.focus();
+  }, [phase.kind, confirmation]);
   useEffect(() => { if (phase.kind === 'unknown') retryButton.current?.focus(); }, [phase.kind]);
 
   // Back online: the server state is fetched before any action is offered.
@@ -163,10 +166,16 @@ export function ClockPage() {
           <LiveRegion tone="info" message={status} />
           <LiveRegion tone="error" message={error} />
           <div className="bundy-welcome-spacer" />
-          <button type="button" className="btn bundy-first-bundy" aria-label="Entrada" aria-disabled={busy}
-            onClick={() => send('CLOCK_IN')}>
-            {phase.kind === 'sending' ? 'Enviando…' : 'Hacer mi primer bundy'}
-          </button>
+          {!online ? (
+            <Notice tone="warning" title="Sin conexión: no se puede fichar.">
+              <p>No se guarda ningún fichaje para enviarlo más tarde. Sigue el procedimiento de contingencia de tu empresa y, cuando vuelva la conexión, solicita una corrección.</p>
+            </Notice>
+          ) : (
+            <button type="button" className="btn bundy-first-bundy" aria-label="Entrada" aria-disabled={busy}
+              onClick={() => send('CLOCK_IN')}>
+              {phase.kind === 'sending' ? 'Enviando…' : 'Hacer mi primer bundy'}
+            </button>
+          )}
         </div>
       </BundyPhoneScreen>
     );
