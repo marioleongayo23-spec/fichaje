@@ -43,7 +43,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <a className="skip-link" href="#contenido">Saltar al contenido principal</a>
       <header className="app-header">
         <div className="app-header-inner">
-          <p className="brand-mark">{BRAND}</p>
+          <p className="brand-mark bundy-header-wordmark" role="img" aria-label={BRAND} />
           <div className="org-info">
             <span className="org-name">{tenant.current.organization.name}</span>
             <span className="org-role">{ROLE_LABEL[tenant.role]}</span>
