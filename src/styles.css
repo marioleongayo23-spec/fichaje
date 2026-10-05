@@ -3285,3 +3285,28 @@ textarea:focus {
     min-height: var(--touch);
   }
 }
+
+
+/* HITO 12 regression fixes: override the legacy H9 mobile-nav !important and
+   keep secondary metadata above WCAG AA contrast. */
+.nav-footer {
+  color: #52685a;
+}
+
+.export-meta-grid span {
+  color: #52685a;
+}
+
+@media (max-width: 47.99rem) {
+  .nav-toggle {
+    display: inline-flex !important;
+  }
+
+  .nav-sections {
+    display: none !important;
+  }
+
+  .app-nav[data-open="true"] .nav-sections {
+    display: grid !important;
+  }
+}
