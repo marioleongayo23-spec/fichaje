@@ -7,7 +7,7 @@ import type { ClockReceipt, EmployeeState, TimeAction } from '../domain/types';
 import { newRequestId, rpc } from '../lib/api';
 import { asApiError, errorMessage } from '../lib/errors';
 import { useOnline } from '../lib/online';
-import { DEFAULT_ZONE, formatDate, formatDateTime, formatTime, localDate, zoneAbbreviation } from '../lib/time';
+import { DEFAULT_ZONE, formatDate, formatTime, localDate, zoneAbbreviation } from '../lib/time';
 import { LiveRegion, Loading, Notice, PageHeader } from '../ui/components';
 import { BundyEmployeeNav, BundyPhoneScreen, BundyStatusBar } from '../ui/BundyMobile';
 
