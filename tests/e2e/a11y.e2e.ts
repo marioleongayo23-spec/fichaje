@@ -26,7 +26,7 @@ test('Bundy visual contract is present on clean login and clock', { tag: '@deskt
   await expect(page.getByRole('heading', { name: 'Fichar' })).toBeVisible();
   const welcome = page.locator('.bundy-welcome-screen');
   await expect(welcome).toHaveCSS('border-color', 'rgb(31, 74, 51)');
-  await expect(page.getByText(/Yo\s+apunto tus horas/)).toBeVisible();
+  await expect(page.locator('.bundy-welcome-title')).toContainText('apunto tus horas');
   await expect(page.getByRole('button', { name: 'Entrada', exact: true })).toHaveText('Hacer mi primer bundy');
 
   await page.getByRole('button', { name: 'Entrada', exact: true }).click();
