@@ -2,7 +2,7 @@
 
 ## HITO 11 — réplica visual Bundy
 
-**ESTADO ACTUAL: IN PROGRESS.** Autorizado expresamente por el usuario el 2026-10-05.
+**ESTADO ACTUAL: PASS técnico.** Réplica visual implementada y validada 5/5; falta únicamente validar el commit documental final y devolver el repositorio a privado antes de cualquier merge.
 
 Rama: `astra/hito-11-replica-visual-bundy`  
 Base: `main@e1f249b398859a073fb95784b6659eca6be37f40`.
@@ -19,15 +19,20 @@ Base: `main@e1f249b398859a073fb95784b6659eca6be37f40`.
 - La ubicación del PDF NO se implementa ni se simula: V1 la prohíbe.
 - Sin cambios SQL, migraciones, RLS/RPC, Edge Functions, seguridad, motor horario, idempotencia, timestamps, auditoría, Stripe ni almacenamiento.
 
-### Puerta de salida
-1. Comparación visual directa con el PDF, no solo identidad de marca.
-2. Fichar: saludo/avatar, tarjeta de turno, tarjeta de empresa, CTA circular, contador/estado y barra inferior como en referencia.
-3. Mis horas: tabs Semana/Mes/Año, resumen compacto, lista de jornadas y CTA principal en composición Bundy, reutilizando datos reales disponibles.
-4. Gerente: resumen de equipo, banner de correcciones, lista visual y navegación inferior, sin inventar datos ni capacidades.
-5. Bienvenida/primer acceso: composición equivalente al mockup sin geolocalización.
-6. Diff frontend/documentación/tests visuales únicamente.
-7. CI + Database + E2E H6 + OPS-02 + H7 = 5/5 PASS sobre el HEAD final.
-8. PR abierto; sin merge ni despliegue productivo sin aprobación expresa posterior.
+### Evidencia de cierre
+- HEAD de código validado: `dd8581a0a5d5963af94120277ef4fc8f641ed000`.
+- Diff contra `main`: frontend, CSS, tests E2E visuales y documentación únicamente; sin SQL, migraciones, RLS/RPC, Edge Functions, seguridad, motor horario, idempotencia, auditoría, Stripe ni almacenamiento.
+- Pantallas replicadas desde el PDF: 05 Bienvenida, 01 Fichar, 03 Tus horas y 04 Tu equipo hoy.
+- Se conserva V1 real: sin geolocalización, fotos, biometría ni funciones ficticias; la evidencia legal sigue accesible tras «Ver detalle legal del registro».
+- Correcciones de regresión posteriores al primer corte: limpieza de import, foco/offline del fichaje, contraste y semántica de tabla, tolerancia del test al salto de línea y jerarquía de headings. Todas permanecen en capa frontend/tests.
+- Regresión sobre `dd8581a0a5d5963af94120277ef4fc8f641ed000`:
+  - CI run `37316156015`: PASS.
+  - Database run `37316156132`: PASS.
+  - E2E H6 run `37316156059`: PASS.
+  - OPS-02 run `37316155993`: PASS.
+  - H7 run `37316156040`: PASS.
+- El commit documental final debe volver a obtener 5/5 PASS por política del proyecto.
+- PR #27 permanece abierto; sin merge ni despliegue productivo sin aprobación expresa posterior.
 
 
 ## HITO 10 — fidelidad visual Bundy + entrada/login + despliegue final
