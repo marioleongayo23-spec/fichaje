@@ -1871,7 +1871,7 @@ body {
 .bundy-clock-state {
   margin: 0.35rem 0 0;
   font-size: 0.63rem;
-  color: #637469;
+  color: #485e50;
 }
 
 .bundy-clock-meta {
@@ -2200,7 +2200,16 @@ body {
 }
 
 .bundy-team-table thead {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .bundy-team-table tbody {
@@ -2294,7 +2303,7 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   font: 500 0.5rem/1.2 "DM Mono", Menlo, ui-monospace, monospace;
-  color: #697b70;
+  color: #4b6254;
 }
 
 .bundy-manager-export {
@@ -2391,7 +2400,7 @@ body {
   font: 500 0.56rem/1.2 "DM Mono", Menlo, ui-monospace, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #6a7b70;
+  color: #42584a;
 }
 
 .bundy-shift-icon {
