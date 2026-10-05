@@ -859,3 +859,594 @@ input:focus, select:focus, textarea:focus { border-color: var(--bundy-forest); }
 @media (prefers-reduced-motion: reduce) {
   .app-header { backdrop-filter: none; }
 }
+
+
+/* HITO 10 — Bundy fidelity pass.
+   Visual-only overrides. Official palette measured from supplied assets:
+   forest #1F4A33, mist #EEF1EE, aulaga #F2C230. */
+:root {
+  --bundy-forest: #1f4a33;
+  --bundy-forest-2: #285b3f;
+  --bundy-mist: #eef1ee;
+  --bundy-page: #e3e8e3;
+  --bundy-aulaga: #f2c230;
+  --bundy-aulaga-soft: #efe5be;
+  --bundy-ink-soft: #607267;
+  --bundy-line: #d7dfd8;
+}
+
+body {
+  background: var(--bundy-mist);
+  color: var(--bundy-forest);
+}
+
+.bundy-wordmark-image,
+.bundy-header-wordmark {
+  background-image: url("data:image/png;base64,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");
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: contain;
+}
+
+.bundy-wordmark-image {
+  display: block;
+  width: 8.8rem;
+  height: 2.7rem;
+  margin-bottom: 1.65rem;
+}
+
+.bundy-header-wordmark {
+  width: 6.9rem;
+  height: 2.1rem;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.bundy-header-wordmark::before { content: none !important; display: none !important; }
+
+/* Web entry: same product language as the public Bundy site, not a generic auth card. */
+.bundy-auth-page {
+  align-items: center;
+  padding: clamp(0.8rem, 3vw, 2.4rem);
+  background:
+    radial-gradient(circle at 10% 15%, rgb(242 194 48 / 0.13), transparent 22rem),
+    var(--bundy-page);
+}
+
+.bundy-auth-shell {
+  width: min(100%, 66rem);
+  min-height: min(46rem, calc(100dvh - 2rem));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.92fr);
+  overflow: hidden;
+  border: 0.45rem solid var(--bundy-forest);
+  border-radius: 2rem;
+  background: #fff;
+}
+
+.bundy-auth-card {
+  width: 100%;
+  max-width: none;
+  padding: clamp(1.5rem, 4vw, 3.7rem);
+  border-radius: 0;
+  box-shadow: none;
+  align-self: stretch;
+}
+
+.bundy-auth-heading h1 {
+  margin: 0 0 0.5rem;
+  font-family: "DM Mono", Menlo, ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #5a7061;
+}
+
+.bundy-auth-display,
+.bundy-onboarding-display,
+.bundy-display-title,
+.bundy-story-title {
+  font-family: "Arial Rounded MT Bold", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  color: var(--bundy-forest);
+}
+
+.bundy-auth-display {
+  margin: 0 0 0.55rem;
+  font-size: clamp(2.35rem, 5vw, 3.75rem);
+  line-height: 0.94;
+}
+
+.bundy-auth-lead {
+  max-width: 29rem;
+  margin-bottom: 1.75rem;
+  font-size: 1.02rem;
+  color: var(--bundy-ink-soft);
+}
+
+.bundy-auth-form .field { margin-bottom: 1rem; }
+.bundy-auth-form .field label {
+  margin-bottom: 0.4rem;
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+.bundy-auth-form input {
+  max-width: none;
+  min-height: 3.25rem;
+  border: 1px solid #bac6bd;
+  border-radius: 0.85rem;
+  padding: 0.78rem 0.9rem;
+  background: #fff;
+}
+
+.bundy-auth-submit {
+  min-height: 3.35rem;
+  margin-top: 0.2rem;
+  font-weight: 800;
+  box-shadow: none;
+}
+
+.bundy-auth-secondary {
+  margin-top: 1.55rem;
+  padding-top: 1.35rem;
+  border-top: 1px solid var(--bundy-line);
+}
+
+.bundy-auth-question {
+  margin-bottom: 0.65rem;
+  font-weight: 800;
+  color: var(--bundy-forest);
+}
+
+.bundy-auth-secondary .hint { margin-top: 1rem; }
+.bundy-auth-secondary .btn-link {
+  min-height: 2.75rem;
+  justify-content: flex-start;
+  padding-inline: 0;
+}
+
+.bundy-auth-note,
+.bundy-auth-footnote {
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.bundy-auth-footnote { margin-top: 1.15rem; margin-bottom: 0; }
+
+.bundy-auth-story {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(1.6rem, 4vw, 3.5rem);
+  background: var(--bundy-forest);
+  color: #fff;
+}
+
+.bundy-auth-story::before {
+  content: "";
+  position: absolute;
+  width: 22rem;
+  height: 22rem;
+  right: -11rem;
+  top: -9rem;
+  border-radius: 50%;
+  background: var(--bundy-aulaga);
+  opacity: 0.98;
+}
+
+.bundy-story-symbol {
+  position: relative;
+  z-index: 1;
+  width: 4.7rem;
+  height: 4.7rem;
+  display: grid;
+  place-items: center;
+  border-radius: 1.15rem;
+  background: #fff;
+}
+
+.bundy-story-symbol img { width: 3.2rem; height: 3.2rem; }
+
+.bundy-story-kicker {
+  position: relative;
+  z-index: 1;
+  margin: 3.1rem 0 0.65rem;
+  font-family: "DM Mono", Menlo, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: #e7eee8;
+}
+
+.bundy-story-title {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-size: clamp(2.4rem, 4.7vw, 4.2rem);
+  line-height: 0.91;
+  color: #fff;
+}
+
+.bundy-story-phone {
+  position: absolute;
+  left: clamp(1.6rem, 4vw, 3.5rem);
+  right: clamp(1.6rem, 4vw, 3.5rem);
+  bottom: -10rem;
+  min-height: 22rem;
+  padding: 1.2rem;
+  border: 0.35rem solid #153a28;
+  border-radius: 2rem;
+  background: var(--bundy-mist);
+  color: var(--bundy-forest);
+  transform: rotate(-2deg);
+}
+
+.bundy-story-status {
+  display: flex;
+  justify-content: space-between;
+  font: 600 0.68rem "DM Mono", Menlo, monospace;
+}
+
+.bundy-story-greeting {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+}
+
+.bundy-story-greeting strong {
+  display: block;
+  margin-top: 0.08rem;
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
+.bundy-story-card {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  border-radius: 0.8rem;
+  background: #fff;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.bundy-story-button {
+  width: 9.2rem;
+  height: 9.2rem;
+  margin: 1.8rem auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 0.55rem solid var(--bundy-aulaga-soft);
+  border-radius: 50%;
+  background: var(--bundy-aulaga);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.bundy-story-button img { width: 1.8rem; height: 1.8rem; margin-bottom: 0.25rem; }
+.bundy-story-button small { font-size: 0.6rem; }
+
+/* First organization / invitation flow. */
+.bundy-onboarding-card {
+  max-width: 43rem;
+  border: 0.42rem solid var(--bundy-forest);
+  border-radius: 2rem;
+  box-shadow: none;
+}
+
+.bundy-step-label {
+  margin: 0 0 0.55rem;
+  font-family: "DM Mono", Menlo, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: #58705f;
+}
+
+.bundy-onboarding-card > h1 {
+  margin-bottom: 0.3rem;
+  font-size: 1rem;
+  font-family: "DM Mono", Menlo, monospace;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bundy-onboarding-display {
+  max-width: 31rem;
+  margin: 0 0 1.35rem;
+  font-size: clamp(2rem, 6vw, 3.15rem);
+  line-height: 0.94;
+}
+
+.bundy-onboarding-card .subsection {
+  padding: 1.1rem;
+  border-radius: 1rem;
+  background: #f8faf8;
+}
+
+.bundy-onboarding-card .subsection + .subsection { margin-top: 0.8rem; }
+
+/* App chrome: official wordmark, mist canvas and white bottom navigation. */
+.app-header-inner {
+  max-width: 74rem;
+  min-height: 4rem;
+  padding-block: 0.65rem;
+}
+
+.app-header {
+  background: rgb(238 241 238 / 0.97);
+  border-bottom: 1px solid rgb(31 74 51 / 0.08);
+}
+
+.org-name { font-size: 0.78rem; }
+.org-role { font-size: 0.67rem; }
+
+.app-main {
+  max-width: 74rem;
+  padding-top: 1.15rem;
+}
+
+.app-nav {
+  min-height: 4.25rem;
+  border-top-color: #d3ddd5;
+}
+
+.nav-group a {
+  min-height: 3.65rem;
+  color: var(--bundy-forest);
+  font-weight: 600;
+}
+
+.nav-group a[aria-current="page"] {
+  font-weight: 800;
+}
+
+/* Employee clock: intentionally follows the supplied Fichar screen. */
+.clock-page {
+  width: min(100%, 23.5rem);
+  min-height: 39rem;
+  margin: 0 auto 1rem;
+  padding: 0.9rem 0.9rem 1.15rem;
+  border: 0.38rem solid var(--bundy-forest);
+  border-radius: 2.3rem;
+  background: var(--bundy-mist);
+  box-shadow: 0 1rem 3rem rgb(31 74 51 / 0.08);
+}
+
+.clock-page .page-header { margin-bottom: 0.65rem; }
+.clock-page .page-header h1 {
+  margin-bottom: 0.5rem;
+  font: 500 0.66rem "DM Mono", Menlo, monospace;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: #4c6b57;
+}
+
+.bundy-greeting-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.bundy-greeting { flex: 1; min-width: 0; }
+.bundy-greeting span { font-size: 0.78rem; }
+.bundy-greeting strong {
+  font-size: clamp(1.7rem, 8vw, 2.1rem);
+  line-height: 0.92;
+}
+
+.bundy-avatar {
+  width: 2.45rem;
+  height: 2.45rem;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  background: #e6d8b3;
+  color: var(--bundy-forest);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.bundy-company-card {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.8rem;
+  padding: 0.72rem 0.85rem;
+  border-radius: 0.78rem;
+  background: #fff;
+  color: var(--bundy-forest);
+  font-size: 0.75rem;
+}
+
+.bundy-company-icon {
+  width: 1rem;
+  height: 0.85rem;
+  position: relative;
+  flex: none;
+  border: 1.6px solid currentColor;
+  border-radius: 0.2rem;
+}
+
+.bundy-company-icon::before {
+  content: "";
+  position: absolute;
+  left: 0.18rem;
+  right: 0.18rem;
+  top: -0.38rem;
+  height: 0.3rem;
+  border: 1.6px solid currentColor;
+  border-bottom: 0;
+  border-radius: 0.2rem 0.2rem 0 0;
+}
+
+.clock-page .device-clock {
+  margin: 0 0 0.7rem;
+  justify-content: space-between;
+  font-size: 0.65rem;
+}
+
+.clock-page .device-clock-time {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+.clock-page .device-clock-date { font-size: 0.66rem; }
+.clock-page .device-clock .hint {
+  margin-top: 0.2rem;
+  font-size: 0.58rem;
+  line-height: 1.25;
+}
+
+.clock-panel { margin-top: 1.3rem; }
+.btn-clock-clock_in {
+  width: 10.7rem;
+  height: 10.7rem;
+  border-width: 0.6rem;
+  box-shadow: none;
+}
+
+.btn-clock img { width: 2.1rem; height: 2.1rem; }
+.clock-cta-title { font-size: 1.2rem; }
+.clock-cta-subtitle { font-size: 0.65rem; }
+
+.clock-page .state-card {
+  margin-top: 0.85rem;
+  padding: 0.55rem 0.8rem;
+  text-align: center;
+  background: transparent;
+}
+
+.clock-page .state-card h2 {
+  margin: 0;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.clock-page .state-value {
+  margin: 0.18rem 0 0;
+  justify-content: center;
+  font-family: "DM Mono", Menlo, monospace;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.clock-page .state-meta {
+  margin: 0.15rem auto 0;
+  max-width: 18rem;
+  font-size: 0.62rem;
+}
+
+/* Screen headings that keep the established accessible route title while
+   presenting the wording from the Bundy reference. */
+.bundy-display-title {
+  margin: 0.1rem 0 0.65rem;
+  font-size: clamp(2rem, 6vw, 2.8rem);
+  line-height: 0.93;
+}
+
+.page-header:has(.bundy-display-title) > h1 {
+  margin-bottom: 0.25rem;
+  font: 500 0.67rem "DM Mono", Menlo, monospace;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: #58705f;
+}
+
+.page-header:has(.bundy-display-title) .page-intro > p:not(.bundy-display-title) {
+  max-width: 48rem;
+  font-size: 0.84rem;
+  color: var(--bundy-ink-soft);
+}
+
+/* Hours and manager content use the compact white-card system in the PDF. */
+.filters {
+  border: 0;
+  border-radius: 1rem;
+  box-shadow: none;
+}
+
+.table-wrap {
+  border-radius: 1rem;
+  background: #fff;
+}
+
+.table th,
+.table td {
+  border-color: #e0e6e1;
+}
+
+.table thead th {
+  background: #f6f8f6;
+  color: #53695a;
+}
+
+.card,
+.session {
+  border: 0;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: none;
+}
+
+.app-main > .btn-primary,
+.page-header + .btn-primary {
+  font-weight: 800;
+}
+
+/* Keep forms and dialogs coherent with the same brand language. */
+.dialog {
+  border: 0.35rem solid var(--bundy-forest);
+  border-radius: 1.5rem;
+}
+
+.dialog::backdrop { background: rgb(19 49 33 / 0.62); }
+
+@media (max-width: 48rem) {
+  .bundy-auth-shell {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    border-width: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .bundy-auth-card {
+    min-height: calc(100dvh - 1.6rem);
+    border: 0.34rem solid var(--bundy-forest);
+    border-radius: 1.8rem;
+    padding: 1.35rem;
+  }
+
+  .bundy-auth-story { display: none; }
+  .bundy-auth-page { padding: 0.8rem; }
+
+  .bundy-onboarding-card {
+    border-width: 0.34rem;
+    border-radius: 1.8rem;
+    padding: 1.25rem;
+  }
+
+  .clock-page {
+    width: min(100%, 23rem);
+    min-height: calc(100dvh - 9.4rem);
+    border-width: 0.32rem;
+    border-radius: 2rem;
+    padding-inline: 0.75rem;
+  }
+}
+
+@media (max-width: 22rem) {
+  .bundy-auth-display { font-size: 2.1rem; }
+  .clock-page {
+    width: 100%;
+    border-left-width: 0;
+    border-right-width: 0;
+    border-radius: 0;
+  }
+}
