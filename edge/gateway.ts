@@ -31,7 +31,7 @@ const reply = (status: number, error: string, extra: Record<string, string> = {}
   new Response(JSON.stringify({ error }), { status, headers: { ...HEADERS, ...extra } });
 
 export function resolveRoute(pathname: string): Route | null {
-  const match = /^\/gateway\/(kiosk|export-link)(\/[a-z/]*)?$/.exec(pathname);
+  const match = /^\/gateway\/(kiosk|export-link|billing)(\/[a-z/]*)?$/.exec(pathname);
   if (!match) return null;
   const component = match[1] as IngressComponent;
   const rest = (match[2] ?? '').replace(/\/$/, '');
