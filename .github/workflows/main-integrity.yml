@@ -1,0 +1,82 @@
+name: Main integrity compensating guard
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+  issues: write
+
+jobs:
+  verify-main-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require merged PR and five successful gates
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sha = context.sha;
+            const required = [
+              'CI',
+              'Database H1 + H2 + H3 + H4 + KIO-H6-01 + H5',
+              'E2E H6 (browser, PWA, accessibility)',
+              'OPS-02 observability and resilience gate',
+              'H7 pilot readiness (edge, failure and incident drills, load, encrypted backup and restore)',
+            ];
+
+            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner,
+              repo,
+              commit_sha: sha,
+            });
+            const merged = prs.find((pr) => pr.base.ref === 'main' && pr.merged_at);
+            let reason = null;
+
+            if (!merged) {
+              reason = `main push ${sha} has no associated merged PR targeting main`;
+            } else {
+              const runs = await github.paginate(
+                github.rest.actions.listWorkflowRunsForRepo,
+                {
+                  owner,
+                  repo,
+                  head_sha: merged.head.sha,
+                  per_page: 100,
+                },
+              );
+              const missing = required.filter(
+                (name) => !runs.some((run) => run.name === name && run.conclusion === 'success'),
+              );
+              if (missing.length) {
+                reason = `PR #${merged.number} merged without required successful workflows: ${missing.join(', ')}`;
+              }
+            }
+
+            if (!reason) {
+              core.info(`main integrity PASS via PR #${merged.number}`);
+              return;
+            }
+
+            const title = 'CRITICAL: main integrity guard triggered';
+            const q = `repo:${owner}/${repo} is:issue is:open in:title "${title}"`;
+            const existing = await github.rest.search.issuesAndPullRequests({ q, per_page: 10 });
+            const body = [
+              reason,
+              '',
+              `Observed commit: ${sha}`,
+              `Actor: ${context.actor}`,
+              `Event: ${context.eventName}`,
+              '',
+              'GitHub Free cannot prevent the push on this private repository. This compensating guard detects the violation after the push. Do not deploy or merge further until reviewed.',
+            ].join('\n');
+
+            if (!existing.data.items.length) {
+              await github.rest.issues.create({ owner, repo, title, body });
+            }
+            core.setFailed(reason);

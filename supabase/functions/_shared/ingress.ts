@@ -14,7 +14,7 @@
 // live only in the platform secret stores (never Git, GitHub, VITE or logs).
 export const INGRESS_HEADER = 'x-fichaje-edge';
 export const INGRESS_WINDOW_S = 60;
-export type IngressComponent = 'kiosk' | 'export-link';
+export type IngressComponent = 'kiosk' | 'export-link' | 'billing';
 export interface IngressPolicy { secrets: Uint8Array<ArrayBuffer>[]; required: boolean }
 
 const enc = new TextEncoder();

@@ -1,22 +1,26 @@
-# Inventario de subencargados (art. 28.2 y 28.4 RGPD) — PLANTILLA REVISABLE
+# Inventario de subencargados (art. 28.2 y 28.4 RGPD) — PREPRODUCCIÓN H8
 
-> H7, 2026-09-28. Los proveedores listados son los que la **arquitectura técnica** usa o puede usar; su
-> condición contractual real (entidad firmante, DPA, región contratada, certificaciones y garantías de
-> transferencia) **no se ha verificado** desde el entorno de H7 y debe completarse con la documentación vigente
-> de cada proveedor antes del piloto. No se han rellenado datos ficticios.
+> Revisión 2026-10-02. Este inventario refleja la arquitectura realmente desplegada. La identidad legal del
+> proveedor de Fichaje y los datos de cada Empresa siguen siendo campos contractuales a completar antes de
+> tratar datos reales. No se confunde "proveedor publica DPA" con "contrato del primer cliente ya firmado".
 
-| Proveedor (entidad contratante) | Servicio | Datos personales tratados | Región / ubicación | Garantía de transferencia | DPA firmado | Estado |
-|---|---|---|---|---|---|---|
-| `[[ENTIDAD SUPABASE CONTRATANTE]]` | Base de datos PostgreSQL, Auth, Storage, Edge Functions | Todos los del registro (ver contrato de encargo) | `[[REGIÓN UE DEL PROYECTO]]` | `[[DPF / CCT / N.A.]]` | `[[SÍ/NO + FECHA]]` | Pendiente de verificación |
-| `[[SUBENCARGADO DE HOSTING DE SUPABASE, p. ej. proveedor cloud]]` | Infraestructura subyacente de Supabase | Los mismos, cifrados en reposo según el proveedor | `[[REGIÓN]]` | `[[…]]` | Vía Supabase | Pendiente de verificación |
-| `[[ENTIDAD CLOUDFLARE CONTRATANTE]]` | Cloudflare Pages (estáticos y función de borde `/gateway/*`), TLS, protección de red y WAF | Metadatos de conexión (IP, cabeceras) y cuerpos en tránsito hacia las funciones; no almacena registros laborales | Red global (procesamiento en el punto de presencia más cercano) | `[[DPF / CCT]]` | `[[…]]` | Pendiente de verificación |
-| `[[PROVEEDOR SMTP / EMAIL DE AUTH]]` | Emails de Auth (confirmación, recuperación) | Email de la persona usuaria | `[[…]]` | `[[…]]` | `[[…]]` | Pendiente de decisión |
-| `[[PROVEEDOR DE PAGER, p. ej. PagerDuty]]` | Alertas CRITICAL | Ninguno (alertas sin PII por contrato `fichaje.alert.v1`) | `[[…]]` | N.A. (sin datos personales) | `[[…]]` | Pendiente de decisión |
-| GitHub (`[[ENTIDAD]]`) | Código fuente, CI, tickets de alertas WARNING (repositorio privado) | Ninguno de empleados (código, datos sintéticos de prueba, alertas sin PII) | `[[…]]` | N.A. | `[[…]]` | Uso actual sin datos personales |
-| Google Drive (`[[ENTIDAD]]`) | Copia secundaria del repositorio (OPS-01) | Ninguno (código) | `[[…]]` | N.A. | `[[…]]` | Uso actual sin datos personales |
-| `[[DESTINO DEL BACKUP CIFRADO DE BASE DE DATOS]]` | Copias lógicas cifradas con age (35 días) | Todos, **cifrados** (la clave privada no está en el proveedor) | `[[REGIÓN UE]]` | `[[…]]` | `[[…]]` | Pendiente de decisión (H7 BLOCKED) |
-| `[[INSTANCIA DEL JOURNAL DE RECUPERACIÓN]]` | Registro independiente de bajas, retenciones y purgas | Identificadores técnicos y metadatos de recuperación (sin nombres, fichajes ni motivos) | `[[REGIÓN UE]]` | `[[…]]` | `[[…]]` | Pendiente de decisión (H7 BLOCKED) |
+| Proveedor / relación | Servicio | Datos tratados | Ubicación técnica | Marco contractual/transferencia verificado | Estado H8 |
+|---|---|---|---|---|---|
+| **Supabase Pte. Ltd** | PostgreSQL, Auth, Storage, Edge Functions | Datos de registro, identidades y evidencia descritos en el encargo | Proyecto productivo `eu-west-1` (Irlanda) | DPA v1 01/08/2026 integrado en Terms; subprocesadores y SCC módulos 2/3: https://supabase.com/legal/customer-resources/data-processing-addendum | Verificado como proveedor técnico; incorporar al anexo del cliente |
+| **Amazon Web Services, Inc. y demás subprocesadores de Supabase** | Infraestructura/subservicios de Supabase | Según servicio de Supabase | Primariamente región seleccionada cuando aplica; soporte/subprocesadores según lista vigente | Cubiertos por obligaciones de subprocesador de Supabase; lista y cambios bajo su DPA | Verificar lista vigente en cada firma/cambio |
+| **Cloudflare, Inc.** | Pages, TLS y borde `/gateway/*` | IP/cabeceras y cuerpos en tránsito; no se usa como archivo laboral | Red global | DPA v6.4 03/04/2026 para servicios self-service cuando actúa como processor/subprocessor; SCC: https://www.cloudflare.com/cloudflare-customer-dpa/ | Verificado como proveedor técnico; incorporar al anexo |
+| **Databricks, Inc. (Neon)** | (1) journal de recuperación; (2) vault offsite de backup cifrado en proyecto separado | Journal: UUID/metadatos mínimos. Vault: ciphertext age del backup; clave privada fuera de Neon | Dos proyectos independientes en `aws-eu-central-1` (Frankfurt): `fichaje-recovery` y `fichaje-backups` | Product Specific Schedule Neon 05/08/2026 + DPA/DTA Databricks y lista de subprocessors: https://neon.com/platform-terms / https://www.databricks.com/legal/dpa / https://www.databricks.com/legal/databricks-subprocessors | Verificado como proveedor técnico; incorporar al anexo |
+| **Google Drive personal (My Drive)** | Evidencia sintética histórica H8 y backup de repositorio | No es destino autorizado de futuros datos laborales | Cuenta de consumidor | No se usa como subencargado de datos laborales | Solo evidencia sintética/código; prohibido para backup laboral futuro |
+| **Google Drive personal (repo backup)** | Copia de bundles/snapshots de código | Sin datos de empleados por contrato de OPS-01 | Cuenta de consumidor | No se usa para datos personales laborales | Permitido mientras el artefacto siga sin datos personales |
+| **GitHub, Inc.** | Código, CI y tickets WARNING | Sin datos laborales; fixtures sintéticos y alertas sin PII | Servicio global | No se clasifica como subencargado de datos laborales mientras se mantenga este contrato de minimización | Uso actual |
+| **Email de Auth** | Confirmación/recuperación | Email de usuarios con cuenta | Según Supabase y sus subprocesadores mientras no exista SMTP propio | Cubierto dentro del servicio Supabase; cualquier SMTP propio futuro debe añadirse antes de uso | Sin proveedor SMTP adicional aprobado |
+| **Ruta CRITICAL / WARNING** | Guardia y tickets operativos | Contrato `fichaje.alert.v1` prohíbe PII/secrets | Según proveedor operativo | Fuera del inventario de datos laborales mientras siga sin datos personales | GO-06 PASS; revisar si cambia el payload |
 
-Procedimiento de cambios: aviso a cada Empresa con `[[PLAZO PREAVISO]]`; derecho de oposición; actualización
-de este inventario (versión y fecha) y del anexo del contrato. Evaluación anual de cada subencargado:
-`[[RESPONSABLE]]`.
+### Puerta previa a cada cliente
+El destino de backup laboral ya está acreditado técnicamente en Neon/Databricks. No se inicia tratamiento real
+hasta completar el encargo con identidad legal de Fichaje, identidad del responsable, canal de privacidad/DPD,
+plazo de aviso de cambios, garantías aplicables, información a plantilla, convenio/pausas y firmas.
+
+Procedimiento de cambios: mantener autorización general escrita cuando se use; avisar a cada Empresa con
+el plazo pactado, permitir oposición conforme al art. 28 RGPD y al DPA aplicable, actualizar este inventario
+y conservar evidencia de la versión aceptada.

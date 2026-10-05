@@ -1,4 +1,4 @@
-# Cumplimiento — base de diseño revisada 2026-09-21; revisión H7 2026-09-28 (ver al final)
+# Cumplimiento — base de diseño revisada 2026-09-21; revisión H7 2026-09-28; preproducción 2026-10-01; revisión H8 2026-10-02
 No es certificación de producto ni validación jurídica del piloto. H0 no procesa datos reales.
 
 ## Base normativa consultada
@@ -61,3 +61,60 @@ Fuentes primarias consultadas mediante lectura web el 2026-09-28:
 Decisiones técnicas propias: originales inmutables y correcciones append-only; borde con ingreso firmado; cifrado age, journal independiente y alertas minimizadas; cuatro años desde el cierre del periodo y extensión de la cadena tras correcciones. Estas decisiones sirven al diseño y a la auditabilidad; la ley no prescribe este stack ni estos mecanismos concretos.
 
 Las [plantillas legales](legal/README.md) siguen siendo revisables. Antes de usar datos reales hacen falta revisión jurídica del caso y convenio, encargo, subencargados/transferencias, información a la plantilla y valoración de riesgos/EIPD cuando corresponda. Esta revisión no certifica cumplimiento ni autoriza el piloto.
+
+
+## Revisión preproducción HITO 8 — 2026-10-01
+Se volvió a consultar la fuente consolidada del
+[Estatuto de los Trabajadores](https://www.boe.es/buscar/act.php?id=BOE-A-2015-11430).
+El art. 34.9 mantiene registro diario con hora concreta de inicio y fin, conservación durante
+cuatro años y disponibilidad para persona trabajadora, representantes e Inspección; la forma
+de organización/documentación sigue sometida al cauce de negociación/acuerdo o decisión
+empresarial previa consulta que establece el propio artículo. La ficha consolidada consultada
+indica última actualización general publicada el 04/12/2025.
+
+Se revisaron asimismo el
+[RGPD](https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=es), la
+[LOPDGDD](https://www.boe.es/buscar/act.php?id=BOE-A-2018-16673) y la
+[FAQ de la AEPD sobre control horario](https://www.aepd.es/preguntas-frecuentes/3-proteccion-de-datos-en-el-ambito-laboral/FAQ-0311-es-necesario-el-consentimiento-del-trabajador-para-implantar-un-sistema-de-control-horario).
+Para el registro ordinario la referencia sigue siendo obligación legal, no consentimiento,
+con deber de información; cuando Fichaje APP trate datos por cuenta de la empresa debe existir
+el correspondiente encargo del art. 28 RGPD.
+
+Esta comprobación no es certificación jurídica ni sustituye la revisión de cada cliente:
+antes del alta real hay que cerrar convenio/pausas, información a plantilla, representantes
+cuando corresponda, subencargados/transferencias, derechos y valoración de riesgos/EIPD según
+el caso. No se promete que cualquier configuración de cliente sea conforme por defecto.
+
+
+## Revisión HITO 8 — 2026-10-02
+Se volvió a contrastar el régimen vigente antes de autorizar datos reales. El art. 34.9 ET consolidado sigue
+exigiendo registro diario con hora concreta de inicio y fin, conservación durante cuatro años y disponibilidad
+para persona trabajadora, representación legal e Inspección; la organización/documentación se remite al cauce
+de negociación/acuerdo o decisión empresarial previa consulta previsto por el propio artículo. La AEPD mantiene
+para el control horario ordinario la base de obligación legal (art. 6.1.c RGPD), no consentimiento, con deber
+de información. No se encontró en las fuentes oficiales revisadas una norma general publicada que sustituya
+ese régimen; esta comprobación debe repetirse en cada alta.
+
+Fuentes de proveedor verificadas el 2026-10-02:
+- Supabase publica DPA v1 (01/08/2026), integrado en sus Terms, con Supabase Pte. Ltd como proveedor,
+  lista de subencargados, tratamiento regional cuando se selecciona región y CCT/SCC para transferencias:
+  https://supabase.com/legal/customer-resources/data-processing-addendum
+- Cloudflare publica DPA v6.4 (03/04/2026), aplicable a acuerdos self-service cuando actúa como
+  processor/subprocessor, y SCC: https://www.cloudflare.com/cloudflare-customer-dpa/
+- Neon se rige desde 05/08/2026 por el Product Specific Schedule de Databricks y su DPA/DTA; el journal
+  está en Frankfurt. Referencias: https://neon.com/platform-terms y https://www.databricks.com/legal/dpa
+- Google ofrece su Cloud Data Processing Addendum a clientes Google Workspace/Cloud Identity. My Drive
+  personal deja de ser destino autorizado de backups laborales; solo conserva evidencia sintética histórica
+  y backups del repositorio sin datos de empleados.
+- El destino laboral aprobado pasa a Neon/Databricks: segundo proyecto Free `fichaje-backups` en Frankfurt,
+  vault privado con ciphertext age, clave privada separada, verificación SHA y rotación de 35 días.
+
+**GO-09 queda PASS a nivel de readiness del producto**: la revisión normativa y las plantillas/controles de
+art. 28, subencargados/transferencias, información, RLT/Inspección y convenio/pausas están preparadas y el
+destino de backup tiene marco DPA aplicable. La firma y los datos de identidad de cada Empresa y del proveedor
+se completan obligatoriamente en el onboarding; no se inventan antes de existir el cliente. Ningún cliente real
+se activa sin completar `ENCARGO_TRATAMIENTO.md`, `SUBENCARGADOS.md`, `INFORMACION_EMPLEADOS.md`,
+`CHECKLIST_CONVENIO_PAUSAS.md` y `CHECKLIST_ONBOARDING_OFFBOARDING.md`.
+
+Esta revisión no certifica cumplimiento universal ni sustituye asesoría laboral/protección de datos del
+caso concreto.

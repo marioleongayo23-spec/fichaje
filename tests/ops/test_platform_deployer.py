@@ -74,16 +74,17 @@ class H7PlatformDeployer(unittest.TestCase):
         self.assertEqual(commands[2], ['supabase', 'functions', 'deploy', 'kiosk', '--project-ref', 'abcdefghijklmnopqrst', '--no-verify-jwt', '--use-api',
                                        '--workdir', str(target)])
         self.assertEqual(commands[3][3], 'export-link')
-        self.assertEqual(commands[4][:6], ['wrangler', 'pages', 'deploy', str(target / 'dist'), '--project-name', 'fichaje-staging'])
-        self.assertIn('--branch', commands[4])
-        self.assertEqual(commands[4][commands[4].index('--branch') + 1], 'staging')
-        self.assertEqual(runner.calls[4]['cwd'], str(target / 'pages'), 'wrangler compiles the release copy of functions/')
+        self.assertEqual(commands[4][3], 'billing')
+        self.assertEqual(commands[5][:6], ['wrangler', 'pages', 'deploy', str(target / 'dist'), '--project-name', 'fichaje-staging'])
+        self.assertIn('--branch', commands[5])
+        self.assertEqual(commands[5][commands[5].index('--branch') + 1], 'staging')
+        self.assertEqual(runner.calls[5]['cwd'], str(target / 'pages'), 'wrangler compiles the release copy of functions/')
         for call in runner.calls:
             flat = ' '.join(call['command'])
             for value in CREDS.values():
                 self.assertNotIn(value, flat, 'a credential never appears in argv')
         supabase_env = runner.calls[2]['env']
-        wrangler_env = runner.calls[4]['env']
+        wrangler_env = runner.calls[5]['env']
         self.assertIn('SUPABASE_ACCESS_TOKEN', supabase_env)
         self.assertNotIn('CLOUDFLARE_API_TOKEN', supabase_env)
         self.assertIn('CLOUDFLARE_API_TOKEN', wrangler_env)

@@ -132,3 +132,18 @@ Puerta de salida H7:
 No son bloqueadores para cerrar H7 sintético: contratar un tercer proyecto Supabase, ejecutar un restore en un segundo Supabase gestionado, configurar un proveedor real de guardia o hacer un piloto con una empresa real. Las suites locales/CI existentes de fallo, rollback, carga, incidente y REC se conservan y no se desactivan.
 
 Antes del **primer cliente real / producción**, habrá una puerta operativa separada: alertas reales, estrategia de backup/restore viable y probada en el entorno que se vaya a operar, respuesta a incidentes, revisión legal/seguridad necesaria y autorización expresa de producción. Esa puerta puede requerir gasto y se decidirá entonces.
+
+
+## H8 — GO-LIVE / producción
+| Criterio | Evidencia |
+|---|---|
+| GO-01 | HEAD de H8: CI, Database, E2E H6, OPS-02 y H7 en PASS; PR abierto contra `main`, sin merge automático |
+| GO-02 | `test_h7_guards.py`: staging y producción fijan API+DB por separado; host cruzado, TLS débil, pin ausente y DSN opaca → denegado |
+| GO-03 | Security Advisor + contrato `SECURITY.md`; sin hallazgos no explicados que amplíen acceso; secret scan PASS |
+| GO-04 | `verify_production.py`: host de app/API production-only, TLS/headers/CSP/borde/direct-bypass/Auth/Storage/API/canary; remoto 0 FAIL / 0 SKIPPED |
+| GO-05 | Canary sintético WEB+KIOSK en candidato productivo: OUT→…→OUT, RLS cross-tenant, audit e idempotencia |
+| GO-06 | Alertas reales: CRITICAL FIRING→RESOLVED en guardia y WARNING apertura→cierre de ticket; leak scan sin PII/secretos |
+| GO-07 | `test_restore_contract.py` + REC: base vacía restaurable; fallo pg_restore nunca PASS. En operación: backup cifrado real + restore aislado de la misma copia + journal |
+| GO-08 | Simulacro de incidente con tenant sintético: detección, revocación, evidencia, rotación, evaluación, canary/invariantes y reapertura |
+| GO-09 | `COMPLIANCE.md` revisado a fecha de salida; paquete contractual y parametrización convenio/pausas por cliente |
+| GO-10 | `main` protegido y release/rollback gobernados; aprobación expresa posterior para producción/primer cliente |

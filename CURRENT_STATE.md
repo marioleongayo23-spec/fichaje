@@ -1,106 +1,80 @@
-# CURRENT_STATE — 2026-10-01
+# CURRENT_STATE — 2026-10-05
 
-## HITO 7 — aprobado e integrado
+## HITO 8 — GO-LIVE / producción aprobado
 
-**ESTADO ACTUAL: PASS.** HITO 7 fue aprobado expresamente por el usuario el 2026-10-01 e integrado en `main` mediante PR #15.
+**ESTADO ACTUAL: PASS.** HITO 8 aprobado expresamente por el usuario el 2026-10-05.
 
 Repositorio: `marioleongayo23-spec/fichaje`  
-Rama histórica: `astra/hito-7-piloto-comercial`  
-PR: #15 — MERGED  
-HEAD final del PR validado: `137e4ab4d813585b3a4663e0dd9bac5bbc12be0c`  
-Merge commit en `main`: `01c80f3afc34bb602f28c90be1ae096fd073b81e`
+Rama: `astra/hito-8-go-live`  
+Base: `main@1b4d22488f028fb0d637cc74b15c230e8e920f6e`  
+PR: #17 — OPEN; no merge ni activación comercial sin aprobación expresa posterior.
 
-### Gates del HEAD validado
+### Candidato productivo
+- Supabase `Fichaje APP`, ref `bypdviatamosygndeqhh`, región `eu-west-1` (Irlanda), ACTIVE_HEALTHY.
+- Cloudflare Pages `fichaje`, release desplegado `h8-3919f7a55bb4`.
+- Solo datos sintéticos de canary/validación. Ningún cliente ni dato laboral real.
+- PostgreSQL de kiosk con login dedicado, rol mínimo y `sslmode=verify-full`.
 
-Los cinco workflows obligatorios terminaron `completed/success` sobre el mismo HEAD:
+### Puertas GO-01..GO-10
 
-- CI: run `36830693034`.
-- Database H1 + H2 + H3 + H4 + KIO-H6-01 + H5: run `36830692909`.
-- E2E H6: run `36830692919`.
-- OPS-02: run `36830692714`.
-- H7: run `36830692776`.
+| Gate | Estado | Evidencia / bloqueo |
+|---|---|---|
+| GO-01 Código | PASS | HEAD de código `b817d1a3bd7b824cbbe5b22f1521b4dd6ea2cc93`: CI, Database, E2E H6, OPS-02 y H7 = 5/5 PASS. Cualquier commit posterior de evidencia debe volver a obtener 5/5 PASS antes de merge. |
+| GO-02 Destinos/TLS | PASS | Canary fija API y PostgreSQL por entorno de forma independiente; cruces staging↔production, overrides DSN, `hostaddr`, `service`, puerto no estándar y TLS débil fallan cerrado. Producción exige `verify-full`. |
+| GO-03 Seguridad | PASS con riesgo residual documentado | Security Advisor sin ERROR; 20 SECURITY DEFINER revisadas: 0 ejecutables por anon, todas con search_path fijo; todas las tablas public con RLS + FORCE RLS; inmutabilidad presente; secret scan CI PASS. WARN de leaked-password protection solo disponible en Supabase Pro y no se contrata bajo política 0 €. |
+| GO-04 Release | PASS | Supabase + Cloudflare sirven el mismo release aprobado; `verify_production.py` remoto final: 33 PASS / 0 FAIL / 0 SKIPPED. |
+| GO-05 Canary | PASS | Tenant sintético productivo WEB + KIOSK, RLS, auditoría, idempotencia y replay. |
+| GO-06 Alertas | PASS | CRITICAL entregada/resuelta en ruta real; WARNING abrió/cerró issue #24; 0 pendientes y sin PII/secrets. |
+| GO-07 Recuperación | PASS | Backup productivo age `fichaje-db-20261002T100304Z-2af8ca8e`, restore aislado de esa misma copia PASS, negativos REC-03 PASS y journal independiente Neon Frankfurt con `verify-full`. El ciphertext se migró además a un segundo proyecto Neon Free (`fichaje-backups`, Frankfurt), con SHA/tamaño/cabecera/manifest verificados, clave age ausente, inmutabilidad y purga autorizada solo tras 35 días. |
+| GO-08 Incidente | PASS | Workflow H7 del mismo HEAD: `Incident response drill IR-01` SUCCESS; simulacro sintético cubre detección, contención, evidencia, revocación/rotación, evaluación RGPD, recuperación y reapertura autorizada. |
+| GO-09 Legal/comercial | PASS de readiness | Revisión normativa vigente; paquete Art. 28, subencargados/transferencias, información a plantilla, RLT/Inspección, convenio/pausas y onboarding preparados. Backup laboral futuro aprobado en Neon/Databricks bajo su marco DPA, no en Drive personal. Los campos de identidad/firma se completan obligatoriamente en el onboarding de cada cliente y no son inventables antes de existir ese cliente. |
+| GO-10 Gobierno | PASS por aceptación expresa de riesgo residual | Rollback implementado/documentado/probado. GitHub Free no ofrece protección preventiva de `main` en este repo privado; el usuario aprueba expresamente el 2026-10-05 cerrar HITO 8 manteniendo el repositorio privado y el plan gratuito. `.github/workflows/main-integrity.yml` queda como control compensatorio post-push y este riesgo residual permanece documentado. |
 
-El HEAD final del PR solo añadió la evidencia consolidada de `CURRENT_STATE.md` sobre el código desplegado y validado `98e814ffafc32b3fa8c892908fbcbff97e58fc42`; los cinco gates volvieron a terminar PASS. No se añadieron secretos ni datos reales.
+### GO-07 — evidencia productiva
+Backup:
+- nombre `fichaje-db-20261002T100304Z-2af8ca8e`;
+- cifrado age, ciphertext 30.980 bytes;
+- TLS `verify-full`, rol read-only, clave privada ausente del host/destino;
+- copia offsite privada verificada por descarga + SHA-256.
 
-### Staging desplegado
+Restore de la misma copia:
+- 17 migraciones, target vacío, migration match;
+- wrong key y ciphertext manipulado fallan cerrado;
+- datos/restauración/inmutabilidad PASS;
+- sin dump plano, clave privada eliminada y target aislado destruido.
 
-Cloudflare Pages: proyecto `fichaje-staging`.  
-Deployment final: `5afeab10`, marcado como Latest production deployment del proyecto de staging.  
-Alias estable: `https://fichaje-staging.pages.dev/`.  
-Release servido por el alias: `98e814ffafc32b3fa8c892908fbcbff97e58fc42`.
+Journal:
+- Neon Free, proyecto técnico `fichaje-recovery`, región `aws-eu-central-1` (Frankfurt);
+- roles `fichaje_archive_connection` y `fichaje_archive_writer` sin superuser/BYPASSRLS; writer NOLOGIN;
+- FORCE RLS + triggers append-only;
+- producción conecta por foreign server con `sslmode=verify-full` y CA del sistema;
+- prueba real: event `d94988fa-5111-47c5-8fa5-18cc30dccc17`, XID 1482 committed, finalización COMMITTED, `verify_journal_entry=true`, unresolved=0.
+No se almacena ninguna contraseña o user mapping en Git.
 
-La portada desplegada muestra la aplicación real: login, alta de empresa y alta para aceptar invitaciones. Ya no aparece el fallback de configuración pública ausente.
+### Condiciones operativas para el primer cliente
+1. **Onboarding contractual por cliente**: completar razón social/NIF/domicilio/contacto del proveedor y del cliente, firmar encargo Art. 28, inventario de subencargados, información a plantilla y checklist de convenio/pausas. Es una operación de alta, no trabajo técnico pendiente del producto.
+2. **Riesgo residual de gobierno**: `main` no puede protegerse preventivamente bajo GitHub Free + repo privado; el control compensatorio detecta después del push. Riesgo aceptado expresamente por el usuario para cerrar HITO 8.
 
-El término “Production” de Cloudflare se refiere únicamente al environment interno del proyecto **fichaje-staging**. No existe activación de Fichaje APP/producción ni cliente real.
+No se han creado clientes reales ni secretos en GitHub. Stripe continúa desactivado hasta su activación expresa.
 
-### Supabase staging
+### Stripe readiness — cierre de regresiones 2026-10-05
+- PR #17 mantiene billing **PREPARADO / DESACTIVADO**: no se han añadido secretos Stripe, clientes, cobros ni activación comercial.
+- Se corrigió el matcher cerrado del gateway para admitir únicamente las rutas billing ya contratadas: checkout, portal, sync y health.
+- `billing_begin_checkout` conserva privilegio mínimo: la lectura del estado de organización ya no solicita un lock que exigía UPDATE; la exclusión mutua del checkout permanece en `private.billing_accounts ... for update`.
+- El deployer incluye la función `billing` y su test operativo refleja el orden real sin ampliar credenciales.
+- Evidencia sobre `b817d1a3bd7b824cbbe5b22f1521b4dd6ea2cc93`: CI PASS, Database PASS, E2E H6 PASS, OPS-02 PASS, H7 PASS.
+- HITO 8 queda **aprobado** por orden expresa del usuario del 2026-10-05, aceptando el riesgo residual GO-10. Stripe permanece desactivado y este cierre no activa cobros.
 
-Proyecto existente: `fichaje-staging`, ref `pvfjffeszsedslmwdvgh`, región UE, ACTIVE_HEALTHY.
+## HITO 7 — cerrado
+HITO 7 y todos los hitos anteriores permanecen aprobados e integrados en `main`.
+La evidencia histórica sigue en Git.
 
-Migraciones aplicadas hasta `20260930000200_export_generation.sql`.  
-Edge Functions `kiosk` y `export-link` desplegadas y protegidas por el ingress firmado existente.  
-No se creó infraestructura adicional, plan de pago ni un proyecto por cliente.
 
-### Fichaje Demo
-
-Organización ficticia estable: **Fichaje Demo**.  
-Organization ID: `fb9c2b0e-f71d-4bb4-a6aa-44ea110e56eb`.
-
-La validación remota acumulada cubre:
-
-- identidades sintéticas OWNER, ADMIN y EMPLOYEE;
-- empleado sin email mediante kiosco;
-- horario Europe/Madrid;
-- CLOCK_IN → BREAK_START → BREAK_END → CLOCK_OUT por kiosco;
-- ciclo completo WEB;
-- consulta del registro;
-- solicitud de corrección y aprobación por un ADMIN independiente;
-- originales inmutables y ajuste append-only;
-- onboarding de empresa desde la app;
-- invitaciones y aceptación;
-- aislamiento multiempresa;
-- replay/idempotencia;
-- SEC-H4-01;
-- exportación final desde la UI.
-
-La evidencia remota previa de `verify_staging.py` se conserva: **33 PASS / 0 FAIL / 0 SKIPPED**. También se conserva la verificación remota de aislamiento y SEC-H4-01.
-
-### Exportación final — bloqueo resuelto
-
-El bloqueo anterior era un job histórico que quedó `PENDING` cuando staging no tenía generación server-side.
-
-Tras integrar la generación segura en `export-link` y desplegar el build final, se ejecutó un recorrido real desde la UI con una sesión ADMIN sintética de Fichaje Demo:
-
-- alcance: Toda la organización;
-- periodo: 2026-09-30 a 2026-09-30;
-- zona: Europe/Madrid;
-- la UI mostró `Paquete preparado`;
-- estado visible: `Lista para descargar`;
-- un único clic en `Descargar`;
-- la UI confirmó `Descarga iniciada. El enlace caduca en unos minutos y no se guarda.`;
-- PostgreSQL dejó el job nuevo `900f725d-3eca-4be1-8456-5592ed36cc5e` en `READY`, con checksum y ruta privada de objeto ZIP.
-
-El navegador de automatización no permite reabrir el historial de descargas ni desempaquetar el ZIP remoto en una sesión posterior. No se afirma una inspección byte a byte que no se pudo observar. La puerta H7 vigente exige exportación real desde la UI, que sí quedó verificada; la estructura CSV/JSON/PDF/manifest y el renderer permanecen cubiertos por las suites H5/H7 del mismo HEAD.
-
-### Seguridad y coste
-
-- Sin datos reales.
-- Sin clientes reales.
-- Sin secretos en GitHub.
-- Sin producción.
-- Sin Supabase Pro ni nueva infraestructura de pago.
-- Arquitectura multiempresa compartida: no se crea un Supabase de pago por cliente.
-- RLS + `organization_id` siguen siendo la frontera de aislamiento.
-- Los originales permanecen inmutables; las correcciones siguen siendo append-only.
-
-### Hitos anteriores
-
-HITO 0, OPS-01, HITO 1, HITO 2, HITO 3, HITO 4, HITO 5, HITO 6, OPS-02 y HITO 7 están aprobados e integrados en `main`.
-
-El detalle histórico completo permanece en el historial Git y en `docs/`; este archivo queda deliberadamente reducido al estado operativo actual.
-
-### HITO 7 cerrado
-
-No quedan tareas pendientes dentro de HITO 7.
-
-La siguiente fase es una puerta separada previa al primer cliente real / producción: alertas reales, estrategia de backup/restore definitiva, respuesta a incidentes, revisión legal/seguridad y autorización expresa de producción. No se inicia por este merge y cualquier gasto futuro requiere autorización expresa.
+### Backup vault gratuito — 2026-10-02
+- proyecto Neon Free `fichaje-backups`, id `orange-heart-83052077`, `aws-eu-central-1` (Frankfurt);
+- vault privado PostgreSQL `backup_vault.objects`; no usa Drive personal para futuros backups laborales;
+- copia `fichaje-db-20261002T100304Z-2af8ca8e`: ciphertext 30.980 bytes + checksum + manifest;
+- 3/3 SHA-256 recalculados dentro de Neon = MATCH, tamaños = MATCH, cabecera age = PASS, migration `20260930000200` = MATCH;
+- búsqueda de `AGE-SECRET-KEY-1` en 3/3 payloads = ausente; la identidad privada sigue en custodia separada;
+- UPDATE/TRUNCATE y DELETE anticipado bloqueados; `purge_expired()` solo permite purga tras 35 días y deja `purge_log`;
+- el bucket Object Storage privado creado durante la exploración queda sin uso; el vault PostgreSQL es el destino acreditado porque la red del entorno de operación no resolvió el endpoint Storage. No afecta a la verificación del ciphertext.

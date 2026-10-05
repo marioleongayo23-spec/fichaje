@@ -179,12 +179,13 @@ El último comando ejecuta también H1/H2/H3. Requiere Deno y cryptography (solo
 
 Variables exclusivamente servidor: `KIOSK_AUTH_URL`, `KIOSK_ANON_KEY`,
 `KIOSK_AUTH_PROVISION_KEY` (Auth admin exclusivamente alta/compensación de identidades),
-`KIOSK_DATABASE_URL` (login dedicado que solo hereda `fichaje_gateway`), `KIOSK_PEPPER`
+`KIOSK_DATABASE_URL` (login dedicado que solo hereda `fichaje_gateway`), `KIOSK_DATABASE_CA`
+(CA pública PEM que `postgres.js` recibe explícitamente para validar `verify-full`), `KIOSK_PEPPER`
 (base64 aleatorio >=32 bytes, secret store externo a PostgreSQL/GitHub), `KIOSK_PORT`,
 `KIOSK_LISTEN_HOST`. No VITE, service_role para consultas/RPC ni credenciales SQL de postgres.
 Los roles de migración son NOLOGIN; CI crea un login efímero con contraseña aleatoria,
-sin BYPASSRLS ni roles humanos. Producción exige TLS, secret store y configuración explícita
-posterior en H7; no se crea aquí. El entorno Edge recibe también estas variables de servidor.
+sin BYPASSRLS ni roles humanos. Staging/producción exigen `sslmode=verify-full`, CA explícita,
+secret store y configuración por entorno; la CA no es secreta pero permanece server-side. El entorno Edge recibe también estas variables de servidor.
 No llamar al endpoint desde Internet sin TLS y política de origen en el despliegue futuro.
 
 POST JSON con Authorization Bearer validado por `/auth/v1/user` (no decode sin verificar).

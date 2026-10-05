@@ -85,14 +85,21 @@ set +e
       | pg_restore --data-only --no-owner --no-acl --file=- 2>/dev/null; then
     printf '%s\n' 'SET LOCAL session_replication_role = origin;' "$fk_check" 'COMMIT;'
   else
+    # This group is the left side of a pipeline and therefore runs in a
+    # subshell. Send ROLLBACK and exit non-zero so PIPESTATUS proves that
+    # decryption + pg_restore really completed.
     printf '%s\n' 'ROLLBACK;'
+    exit 23
   fi
 } | psql "$conninfo" -Xq -v ON_ERROR_STOP=1 >/dev/null 2>&1
 statuses=("${PIPESTATUS[@]}")
 set -e
-[[ ${statuses[1]} -eq 0 ]] || failed 'RESTORE_FAILED (transaction rolled back)'
-# The load really committed only if the tenant data is visible now.
-[[ $(psql_q 'select count(*) > 0 from public.organizations') == t ]] || failed 'RESTORE_FAILED (decryption or dump error; transaction rolled back)'
+[[ ${#statuses[@]} -eq 2 && ${statuses[0]} -eq 0 && ${statuses[1]} -eq 0 ]] \
+  || failed 'RESTORE_FAILED (transaction rolled back)'
+# A backup taken before the first tenant is valid. The successful streaming
+# pipeline, single transaction and FK check prove completion without requiring
+# public.organizations to contain a row.
+[[ $(psql_q 'select 1') == 1 ]] || failed 'RESTORE_FAILED (post-commit verification failed)'
 completed=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 if [[ -n ${FICHAJE_RESTORE_RESULT:-} ]]; then
   printf '{"schema":"fichaje.db-restore.v1","backup":"%s","result":"success","started_at":"%s","completed_at":"%s","migration_version":"%s","checks":["checksum","key","empty_target","schema_version","single_transaction","foreign_keys"]}\n' \

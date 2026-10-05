@@ -143,3 +143,83 @@ sigue bloqueado; este ensayo no habilita backup ni restore de producción.
 - **BLOCKED para activar**: destino privado definitivo, custodia offline de la identidad age separada del
   destino, host de operación con conexión verify-full a staging, instancia independiente del journal con CA
   utilizable desde la base gestionada (`STAGING.md` §3.4) y ensayo en staging con un segundo proyecto vacío.
+
+
+## H8 — corrección de restore vacío y activación productiva
+`restore_database.sh` ya no usa `count(*) > 0 from public.organizations` como prueba de
+éxito: una copia anterior al primer tenant es válida. El lado de descifrado + `pg_restore`
+sale explícitamente no-cero si falla, `PIPESTATUS` exige éxito tanto del productor como de
+`psql`, y la validación de FK permanece dentro de la misma transacción. Después del commit
+se comprueba conectividad, no existencia artificial de datos. `test_restore_contract.py`
+cubre tanto el restore con cero organizaciones como un `pg_restore` fallido que debe acabar
+en ROLLBACK y FAIL.
+
+Para GO-07 sigue siendo obligatorio restaurar **la misma copia cifrada real** en un objetivo
+aislado antes de afirmar que el backup operativo es recuperable. El arreglo anterior no
+convierte por sí solo el backup de producción en PASS.
+
+
+## H8 — GO-07 productivo PASS (2026-10-02)
+La evidencia H7 anterior es histórica. En H8 se activó y verificó la recuperación del candidato productivo
+solo con datos sintéticos:
+
+- backup age real `fichaje-db-20261002T100304Z-2af8ca8e`, conexión PostgreSQL `verify-full`, rol de solo
+  lectura, sin dump plano y sin clave privada en el host ni en el destino;
+- copia offsite privada descargada de nuevo y validada por SHA-256;
+- restore **de esa misma copia** en PostgreSQL aislado: 17 migraciones, target vacío, migration match,
+  wrong-key/tamper negativos, restore/data/inmutabilidad PASS; clave eliminada y target destruido;
+- journal independiente en Neon Free, `aws-eu-central-1` (Frankfurt), base `fichaje_recovery`.
+  Los roles del archive se crearon por SQL para evitar la membresía `neon_superuser` que Neon concede a
+  roles creados por Console/API: connection LOGIN mínimo, writer NOLOGIN, ambos sin BYPASSRLS, FORCE RLS,
+  ejecución limitada a `journal.prepare`/`journal.verify` y triggers de inmutabilidad;
+- producción usa un foreign server sin credencial en Git, con host Neon directo, `sslmode=verify-full` y
+  `sslrootcert=system`. Prueba real: PREPARED `d94988fa-5111-47c5-8fa5-18cc30dccc17`, XID 1482 confirmado
+  `committed` en el outbox fuente, finalización COMMITTED en el archive y
+  `private.verify_journal_entry(...)=true`; 0 PREPARED sin resolver.
+
+**Separación técnica vs. puerta comercial:** GO-07 técnico es PASS. El destino offsite actual del backup DB
+es un My Drive personal y contiene solo el backup cifrado del candidato sintético. No se autoriza almacenar
+datos reales allí hasta que GO-09 acredite un contrato/DPA aplicable o se migre a un destino aprobado.
+La identidad age privada permanece separada del destino.
+
+
+## H8 — vault offsite definitivo sin coste (2026-10-02)
+El backup de base de datos para datos laborales **no depende de Google Drive personal**. La copia H8 verificada
+se migró a un segundo proyecto Neon Free distinto del journal:
+
+- proyecto `fichaje-backups` (`orange-heart-83052077`), `aws-eu-central-1` Frankfurt;
+- almacenamiento acreditado: PostgreSQL privado, schema `backup_vault`, separado de Supabase productivo y
+  del proyecto Neon `fichaje-recovery`; no comparte credenciales de aplicación;
+- `fichaje-db-20261002T100304Z-2af8ca8e.dump.age` (30.980 bytes), checksum y manifest se transfirieron byte
+  a byte desde la copia ya ensayada; Neon recalculó SHA-256 y tamaño para los tres objetos, todos MATCH;
+- la cabecera `age-encryption.org/v1`, el SHA/tamaño del manifest, la migración
+  `20260930000200` y el TLS de origen `verify-full` se verificaron dentro del vault;
+- no aparece `AGE-SECRET-KEY-1` en ningún payload; la identidad age privada permanece fuera del proveedor;
+- UPDATE y TRUNCATE están bloqueados; DELETE ordinario y borrado antes de 35 días fallan cerrado.
+  `backup_vault.purge_expired()` es la única ruta de rotación, solo para filas ≥35 días y con
+  `backup_vault.purge_log`.
+
+La copia histórica en My Drive contiene únicamente evidencia sintética H8 y no es destino autorizado de futuros
+backups laborales. El repositorio puede seguir respaldándose allí porque su contrato operativo prohíbe datos
+de empleados.
+
+Riesgo residual aceptado para V1 sin coste: backup y journal están en **proyectos Neon distintos** bajo la misma
+familia de proveedor. Son recursos/bases separados y el backup continúa cifrado con clave fuera de Neon, pero
+existe riesgo correlacionado de indisponibilidad del proveedor. Antes de prometer RTO/RPO comercial o aumentar
+criticidad se reevaluará un segundo proveedor offsite.
+
+
+### Operación reproducible del vault
+El uploader versionado es `scripts/ops/backup_vault.py`. En un host de operador ya autorizado, después de
+`backup_database.sh`:
+
+```
+python scripts/ops/backup_vault.py upload <backup_dir> <backup_name>
+python scripts/ops/backup_vault.py purge
+```
+
+Requiere `FICHAJE_BACKUP_VAULT_PGSERVICE`, `PGSERVICEFILE`, `PGPASSFILE` y
+`FICHAJE_BACKUP_VAULT_CA`; service/pass deben ser ficheros 0600 fuera del repo y la conexión se fuerza a
+`sslmode=verify-full`. El uploader vuelve a comprobar cabecera age, sidecar SHA, manifest, ausencia de clave
+privada y verifica SHA/tamaño en servidor tras un INSERT idempotente. No imprime DSN ni credenciales.
+El esquema reproducible está en `scripts/ops/backup_vault_schema.sql`.

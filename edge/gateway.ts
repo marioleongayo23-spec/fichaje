@@ -1,5 +1,5 @@
 // H7 same-origin edge for the server-only functions (Cloudflare Pages Functions).
-// /gateway/kiosk/<route> and /gateway/export-link[/generate] are the only entrances the
+// /gateway/kiosk/<route>, /gateway/export-link[/generate] and /gateway/billing/<route> are the only entrances the
 // browser uses (no CORS). The edge: closed route/method table, fetch-metadata
 // and origin policy, bounded JSON bodies, only Authorization/Content-Type go
 // upstream (never client IP/forwarding headers, cookies or origin), a fresh
@@ -13,13 +13,14 @@ import { decodeSecret, INGRESS_HEADER, signIngress, type IngressComponent } from
 export interface EdgeEnv {
   FICHAJE_KIOSK_UPSTREAM?: string;
   FICHAJE_EXPORT_LINK_UPSTREAM?: string;
+  FICHAJE_BILLING_UPSTREAM?: string;
   FICHAJE_INGRESS_SECRET?: string;
 }
 
 interface Route { component: IngressComponent; route: string; method: 'GET' | 'POST'; limit: number; suffix: string }
 
 export const KIOSK_ROUTES = ['provision', 'revoke', 'reset', 'authenticate', 'record'];
-export const LIMITS = { kiosk: 8192, 'export-link': 1024, response: 65536 } as const;
+export const LIMITS = { kiosk: 8192, 'export-link': 1024, billing: 1024, response: 65536 } as const;
 export const UPSTREAM_TIMEOUT_MS = 15000;
 
 const HEADERS = {
@@ -30,7 +31,7 @@ const reply = (status: number, error: string, extra: Record<string, string> = {}
   new Response(JSON.stringify({ error }), { status, headers: { ...HEADERS, ...extra } });
 
 export function resolveRoute(pathname: string): Route | null {
-  const match = /^\/gateway\/(kiosk|export-link)(\/[a-z/]*)?$/.exec(pathname);
+  const match = /^\/gateway\/(kiosk|export-link|billing)(\/[a-z/]*)?$/.exec(pathname);
   if (!match) return null;
   const component = match[1] as IngressComponent;
   const rest = (match[2] ?? '').replace(/\/$/, '');
@@ -38,6 +39,9 @@ export function resolveRoute(pathname: string): Route | null {
   if (component === 'kiosk' && KIOSK_ROUTES.includes(rest.slice(1))) return { component, route: rest.slice(1), method: 'POST', limit: LIMITS.kiosk, suffix: rest };
   if (component === 'export-link' && rest === '') return { component, route: 'sign', method: 'POST', limit: LIMITS['export-link'], suffix: '' };
   if (component === 'export-link' && rest === '/generate') return { component, route: 'generate', method: 'POST', limit: LIMITS['export-link'], suffix: rest };
+  if (component === 'billing' && ['checkout', 'portal', 'sync'].includes(rest.slice(1))) {
+    return { component, route: rest.slice(1), method: 'POST', limit: LIMITS.billing, suffix: rest };
+  }
   return null;
 }
 
@@ -82,7 +86,8 @@ export async function handleGateway(request: Request, env: EdgeEnv, options: Edg
   const site = request.headers.get('sec-fetch-site');
   const origin = request.headers.get('origin');
   if ((site !== null && site !== 'same-origin') || (origin !== null && origin !== 'null' && origin !== url.origin)) return reply(403, 'FORBIDDEN');
-  const base = upstreamBase(route.component === 'kiosk' ? env.FICHAJE_KIOSK_UPSTREAM : env.FICHAJE_EXPORT_LINK_UPSTREAM);
+  const base = upstreamBase(route.component === 'kiosk' ? env.FICHAJE_KIOSK_UPSTREAM
+    : route.component === 'export-link' ? env.FICHAJE_EXPORT_LINK_UPSTREAM : env.FICHAJE_BILLING_UPSTREAM);
   let secret: Uint8Array<ArrayBuffer>;
   try { secret = decodeSecret(env.FICHAJE_INGRESS_SECRET ?? ''); } catch { return reply(503, 'EDGE_NOT_CONFIGURED'); }
   if (!base) return reply(503, 'EDGE_NOT_CONFIGURED');
