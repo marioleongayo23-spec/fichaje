@@ -2,7 +2,7 @@
 
 ## HITO 9 — integración visual exacta del diseño del socio
 
-**ESTADO ACTUAL: EN VALIDACIÓN FINAL.**
+**ESTADO ACTUAL: PASS.**
 
 Repositorio: `marioleongayo23-spec/fichaje`  
 Rama: `astra/hito-9-integracion-visual-socio`  
@@ -41,7 +41,14 @@ El diff contra `main` se limita a documentación H9 y capa visual/frontend:
 - dos expectativas E2E de marca/título;
 - `CURRENT_STATE.md` y `docs/ROADMAP.md`.
 
-**Validación final:** el repositorio se hizo público temporalmente el 2026-10-05 para recuperar runners GitHub-hosted sin coste tras agotar la cuota mensual privada. Ejecutar CI + Database + E2E H6 + OPS-02 + H7 sobre el mismo HEAD final. Tras 5/5 PASS, volver a privado antes de cualquier merge; PR #25 permanece abierto y sin merge hasta aprobación expresa posterior.
+**Validación final:** el repositorio se hizo público temporalmente el 2026-10-05 para recuperar runners GitHub-hosted sin coste tras agotar la cuota mensual privada. Sobre `cc27163f6318562cf10f8fc9947c37f10ef9de68` se obtuvo 5/5 PASS:
+- CI run `37291226017`: PASS.
+- Database run `37291225997`: PASS.
+- E2E H6 run `37291226090`: PASS.
+- OPS-02 run `37291225971`: PASS.
+- H7 run `37291226032`: PASS.
+
+El siguiente commit es exclusivamente documental para registrar este cierre; debe volver a obtener 5/5 PASS antes de considerar el HEAD final cerrado. Tras ese 5/5, restaurar el repositorio a privado antes de cualquier merge. PR #25 permanece abierto y sin merge hasta aprobación expresa posterior.
 
 
 ## HITO 8 — GO-LIVE / producción aprobado
