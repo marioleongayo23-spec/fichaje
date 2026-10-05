@@ -2,7 +2,7 @@
 
 ## HITO 12 — premium UI system Bundy
 
-**ESTADO ACTUAL: IN PROGRESS.** Autorizado expresamente por el usuario el 2026-10-05 a partir de revisión visual real de la app.
+**ESTADO ACTUAL: PASS técnico.** Sistema visual premium implementado y validado 5/5; falta únicamente validar el commit documental final y devolver el repositorio a privado antes de cualquier merge.
 
 Rama: `astra/hito-12-premium-ui-system`  
 Base: `main@ebca6a939041bed578485b944e9e5200209297b0`.
@@ -20,15 +20,24 @@ Base: `main@ebca6a939041bed578485b944e9e5200209297b0`.
 - Sin inventar funcionalidades ni datos. La mejora de “información” se limita a jerarquía, contexto y presentación de datos/acciones ya existentes.
 - Sin cambios SQL, migraciones, RLS/RPC, Edge Functions, seguridad, motor horario, idempotencia, timestamps, auditoría, Stripe ni almacenamiento.
 
-### Puerta de salida
-1. Desktop ya no presenta navegación inferior tipo móvil ni controles desproporcionados.
-2. Header/nav/formularios/tablas/cards coherentes en toda la app.
-3. Márgenes y max-width consistentes; mejor uso del espacio sin llenar con datos ficticios.
-4. Mobile Bundy H11 permanece visual y funcionalmente estable.
-5. WCAG/foco/targets preservados.
-6. Diff frontend/documentación/tests visuales únicamente.
-7. CI + Database + E2E H6 + OPS-02 + H7 = 5/5 PASS mismo HEAD.
-8. PR abierto; sin merge ni despliegue productivo sin aprobación expresa posterior.
+### Evidencia de cierre
+- HEAD de código validado: `742c0ed2197ead991a99f8debdb65e0c8d9d2652`.
+- Diff contra `main`: frontend/CSS/tests visuales/documentación únicamente; sin SQL, migraciones, RLS/RPC, Edge Functions, seguridad, motor horario, idempotencia, auditoría, Stripe ni almacenamiento.
+- Shell desktop sustituido por navegación lateral real con iconografía SVG, header compacto, márgenes útiles y jerarquía coherente.
+- Design system global aplicado a botones, inputs, selects, tablas, cards, badges, avisos, dialogs y responsive manteniendo la identidad Bundy.
+- Exportaciones convertida en un control center con alcance, periodo, zona horaria y metadatos de formatos/disponibilidad; sin inventar datos ni funciones.
+- La réplica móvil H11 permanece aislada del sistema desktop.
+- Incidencias reales encontradas y corregidas en E2E:
+  - contraste insuficiente en cabeceras de tabla de «Personas y roles»;
+  - botón «Menú» móvil ligeramente inferior a 44 px.
+- Regresión sobre `742c0ed2197ead991a99f8debdb65e0c8d9d2652`:
+  - CI run `37331154210`: PASS.
+  - Database run `37331154155`: PASS.
+  - E2E H6 run `37331154438`: PASS.
+  - OPS-02 run `37331154464`: PASS.
+  - H7 run `37331154254`: PASS.
+- El commit documental final debe volver a obtener 5/5 PASS por política del proyecto.
+- PR #28 permanece abierto; sin merge ni despliegue productivo sin aprobación expresa posterior.
 
 
 ## HITO 11 — réplica visual Bundy
