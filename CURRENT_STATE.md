@@ -1,8 +1,38 @@
 # CURRENT_STATE — 2026-10-05
 
+## HITO 11 — réplica visual Bundy
+
+**ESTADO ACTUAL: IN PROGRESS.** Autorizado expresamente por el usuario el 2026-10-05.
+
+Rama: `astra/hito-11-replica-visual-bundy`  
+Base: `main@e1f249b398859a073fb95784b6659eca6be37f40`.
+
+### Fuente visual autoritativa
+- `Bundy App(1).pdf` / `Bundy App.pdf` renderizados a imagen para comparación visual.
+- `logos.zip` para identidad oficial.
+- HITO 11 usa el PDF como referencia estricta de composición, proporciones, jerarquía, navegación inferior, espaciado, radios, densidad y CTA.
+
+### Alcance
+- Reproducir con mucha mayor fidelidad las pantallas 01 Fichar, 03 Mis horas, 04 Gerente y 05 Bienvenida.
+- Login/onboarding solo se ajustan si hace falta mantener coherencia de sistema; no se reabre lógica de autenticación.
+- Mantener únicamente funciones V1 reales. Si el mockup muestra una función fuera de V1, se conserva el espacio/estética sin inventar comportamiento.
+- La ubicación del PDF NO se implementa ni se simula: V1 la prohíbe.
+- Sin cambios SQL, migraciones, RLS/RPC, Edge Functions, seguridad, motor horario, idempotencia, timestamps, auditoría, Stripe ni almacenamiento.
+
+### Puerta de salida
+1. Comparación visual directa con el PDF, no solo identidad de marca.
+2. Fichar: saludo/avatar, tarjeta de turno, tarjeta de empresa, CTA circular, contador/estado y barra inferior como en referencia.
+3. Mis horas: tabs Semana/Mes/Año, resumen compacto, lista de jornadas y CTA principal en composición Bundy, reutilizando datos reales disponibles.
+4. Gerente: resumen de equipo, banner de correcciones, lista visual y navegación inferior, sin inventar datos ni capacidades.
+5. Bienvenida/primer acceso: composición equivalente al mockup sin geolocalización.
+6. Diff frontend/documentación/tests visuales únicamente.
+7. CI + Database + E2E H6 + OPS-02 + H7 = 5/5 PASS sobre el HEAD final.
+8. PR abierto; sin merge ni despliegue productivo sin aprobación expresa posterior.
+
+
 ## HITO 10 — fidelidad visual Bundy + entrada/login + despliegue final
 
-**ESTADO ACTUAL: PASS.** HITO 10 validado técnica y remotamente; PR #26 permanece abierto y sin merge hasta aprobación expresa posterior.
+**ESTADO ACTUAL: PASS / MERGED.** HITO 10 aprobado y mergeado por orden expresa del usuario. PR #26 cerrado; merge commit `e1f249b398859a073fb95784b6659eca6be37f40`.
 
 Rama: `astra/hito-10-fidelidad-visual-bundy`  
 Base: `main@a8bded0802cf5e495d859369593a93d5adcb99c5`.
@@ -39,7 +69,7 @@ Base: `main@a8bded0802cf5e495d859369593a93d5adcb99c5`.
 - La verificación previa había demostrado que `fichaje-staging.pages.dev` servía un release antiguo y `fichaje.pages.dev` una app histórica distinta. HITO 10 corrige staging; producción `fichaje.pages.dev` no se ha tocado.
 - Commit documental `e12b4538b39a51265532fb35ffdf72ed12b14b65`: CI `37299737788`, Database `37299737812`, E2E H6 `37299737797`, OPS-02 `37299737807`, H7 `37299737789` = 5/5 PASS.
 - Este commit deja el estado documentado como PASS; el HEAD resultante debe recibir una última regresión 5/5 por política del proyecto.
-- PR #26 permanece abierto; sin merge sin aprobación expresa posterior.
+- PR #26 fue aprobado y mergeado por orden expresa del usuario. `main` quedó en `e1f249b398859a073fb95784b6659eca6be37f40`.
 
 
 ## HITO 9 — integración visual exacta del diseño del socio
