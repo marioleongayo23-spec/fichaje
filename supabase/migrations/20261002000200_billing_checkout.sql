@@ -27,7 +27,7 @@ begin
   if p_organization_id is null or p_request_id is null then
     raise exception using errcode='22023',message='INVALID_INPUT';
   end if;
-  select status into v_org_status from public.organizations where id=p_organization_id for update;
+  select status into v_org_status from public.organizations where id=p_organization_id;
   if not found or v_org_status<>'ACTIVE' then
     raise exception using errcode='42501',message='ORGANIZATION_INACTIVE';
   end if;
