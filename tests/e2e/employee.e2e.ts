@@ -61,6 +61,7 @@ test('full cycle with confirmation only after the server ACK', async ({ page }) 
 
   // Own evidence: originals, sources and informative totals.
   await go(page, 'Mi registro');
+  await page.getByText('Ver detalle legal del registro', { exact: true }).click();
   const session = page.locator('article.session');
   await expect(session).toHaveCount(1);
   await expect(session.getByRole('row')).toHaveCount(5);
@@ -195,6 +196,7 @@ test('correction request with review, independent approval and own export', asyn
   await page.reload();
   await expect(page.locator('.card')).toContainText('Aprobada');
   await go(page, 'Mi registro');
+  await page.getByText('Ver detalle legal del registro', { exact: true }).click();
   await expect(page.locator('article.session')).toContainText('Corrección aprobada (original:');
   await page.getByText('Registros originales y correcciones').click();
   await expect(page.locator('article.session')).toContainText('Sustituido por una corrección');
