@@ -11,6 +11,7 @@
 | OPS-02 Observabilidad y resiliencia | Telemetría, health checks, canaries sintéticos, invariantes, alertas, rollback y self-healing seguro | Fallos inducidos detectados; rollback/retry seguro probado; backups vigilados; ningún mecanismo automático reescribe datos laborales originales |
 | 7 Cierre del producto y validación sintética final | App final desplegada, empresa ficticia completa, seguridad, recuperación y documentación legal | OPS-02 PASS obligatorio; CI integral; verificación remota; flujo E2E completo con empresa ficticia; aprobación del usuario. Sin empresa real ni producción |
 | 8 GO-LIVE / producción | Candidato productivo, release gate, alertas, recuperación operativa, incidente, legal y gobierno | GO-01..10 PASS, 0 datos reales durante la validación y autorización expresa posterior antes del primer cliente |
+| 9 Integración visual del socio | Sustituir únicamente la presentación por el diseño exacto entregado por el socio, preservando contratos y lógica H1-H8 | Fuente visual exacta trazable; diff sin cambios backend/DB/security; responsive y accesibilidad; CI + Database + E2E H6 + OPS-02 + H7 5/5 PASS; aprobación del usuario |
 
 No crear infraestructura remota ni datos reales antes del hito autorizado. Backup DB solo se habilita
 en cambio separado después de disponer de conexión segura, cifrado, custodia de claves y restore validado.
@@ -33,3 +34,7 @@ La puerta completa está en `docs/PRODUCTION.md`. H8 no puede rebajar controles 
 coste 0: si una alerta de guardia, backup/restore aislado, requisito contractual o control de
 plataforma no puede acreditarse sin coste, se declara BLOCKED y se solicita autorización antes
 de contratar. El merge del PR y la activación para clientes requieren aprobación expresa posterior.
+
+
+## HITO 9 — integración visual del socio
+H9 comienza tras H8 aprobado e integrado. Su alcance es exclusivamente visual: la fuente entregada por el socio es autoritativa y no se reinterpretará. No se permiten cambios en backend, SQL/RLS/RPC, seguridad, lógica horaria, idempotencia, auditoría, Stripe ni semántica PWA. La salida exige demostrar por diff y regresión completa que la lógica validada permanece intacta.
