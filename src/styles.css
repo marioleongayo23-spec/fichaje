@@ -2344,3 +2344,32 @@ body {
     justify-self: start;
   }
 }
+
+
+/* HITO 11 accessibility sizing: keep visual proportions without shrinking hit targets. */
+.bundy-period-tabs button,
+.bundy-secondary-actions .btn,
+.bundy-hours-controls .btn-link,
+.bundy-hours-correct,
+.bundy-hours-primary,
+.bundy-team-toolbar .btn,
+.bundy-team-table .btn-small,
+.bundy-first-bundy {
+  min-height: var(--touch);
+}
+
+.bundy-hours-correct {
+  min-width: var(--touch);
+}
+
+.bundy-period-tabs button {
+  padding-block: 0.45rem;
+}
+
+.bundy-team-table .btn-small {
+  min-width: var(--touch);
+}
+
+.bundy-main-clock-action {
+  background: var(--bundy-aulaga);
+}
