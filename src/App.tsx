@@ -13,7 +13,7 @@ import { OrganizationPicker } from './app/OrganizationPicker';
 import { RouterProvider, useRouter } from './app/router';
 import { ServicesContext } from './app/services';
 import { TenantProvider, useCurrentTenant, useTenant } from './app/tenant';
-import { readAppConfig, type AppConfig, type AppEnvironment } from './config';
+import { BRAND, readAppConfig, type AppConfig, type AppEnvironment } from './config';
 import { isManager } from './domain/labels';
 import { ClockPage } from './employee/ClockPage';
 import { CorrectionsPage } from './employee/CorrectionsPage';
@@ -30,7 +30,7 @@ function Unconfigured({ invalid }: { invalid?: boolean }) {
   return (
     <main id="contenido" className="auth-page">
       <div className="auth-card">
-        <h1>Fichaje APP</h1>
+        <h1>{BRAND}</h1>
         <p>{invalid ? 'La configuración pública del servicio no es válida.' : 'Sin servicio de fichaje activo: falta la configuración pública del servicio.'}</p>
       </div>
     </main>

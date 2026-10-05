@@ -1,13 +1,64 @@
 # CURRENT_STATE — 2026-10-05
 
+## HITO 9 — integración visual exacta del diseño del socio
+
+**ESTADO ACTUAL: PASS.**
+
+Repositorio: `marioleongayo23-spec/fichaje`  
+Rama: `astra/hito-9-integracion-visual-socio`  
+Base: `main@0c734cc61b5d60a20d2f0307042f94042fc70554`  
+PR: #25 — OPEN; no merge sin 5/5 PASS y aprobación expresa posterior.
+
+### Fuente visual y alcance
+- Fuente visual autoritativa recibida: `Bundy App.pdf` + `logos.zip`.
+- Integración limitada a presentación/frontend: identidad Bundy, paleta bosque/niebla/amarillo, tarjetas blancas, navegación inferior, CTA circular «Hacer bundy», formularios, diálogo, PWA branding y kiosco visual.
+- No se implementó ni simuló geolocalización del material de referencia porque V1 la prohíbe.
+- No se modificaron SQL, migraciones, RLS/RPC, Edge Functions, seguridad, motor horario, idempotencia, timestamps, auditoría, Stripe, almacenamiento ni semántica offline/PWA.
+- Los únicos tests editados ajustan expectativas de marca/título; no se relajó ninguna aserción funcional ni de accesibilidad.
+
+### Evidencia
+- Commit visual: `c680b9ec2f6ca94f8707bc5ca4f9fbc2d2be39dd`.
+- Regresión real sobre ese HEAD:
+  - CI: PASS.
+  - Database: PASS.
+  - OPS-02: PASS.
+  - H7: PASS.
+  - E2E H6: FAIL con 48/52; las 4 únicas fallas fueron el mismo control de accesibilidad WCAG 2.5.8: «Cerrar sesión» quedó por debajo de 44 px tras compactar el header.
+  - Flujos funcionales employee/manager/kiosk/PWA, aislamiento, fichajes, correcciones, exportaciones, offline y seguridad pasaron dentro de esa ejecución.
+- Corrección mínima: `b232a3db3bb5cf3660f324e71fe7693efd157102`, únicamente 4 líneas CSS para restaurar `min-height: var(--touch)` en «Cerrar sesión».
+- Desde `b232a3db...`, GitHub no asigna runner a ningún workflow: CI, Database, E2E H6, OPS-02 y H7 terminan antes del primer step. Evidencia API repetida: `runner_id=0`, `runner_name=""`, `steps=[]/null`, `logs_url=null`; CI se reintentó hasta attempt 3 con el mismo resultado.
+- Por tanto el código no puede recibir aún el 5/5 obligatorio del HEAD corregido. No se declara PASS.
+
+### Diff de seguridad del alcance
+El diff contra `main` se limita a documentación H9 y capa visual/frontend:
+- `index.html`;
+- assets SVG Bundy;
+- `public/manifest.webmanifest`;
+- `src/App.tsx` (marca);
+- `src/config.ts` (constante de marca);
+- `src/employee/ClockPage.tsx` (composición/semántica visual, manteniendo nombres accesibles de acciones);
+- `src/styles.css`;
+- dos expectativas E2E de marca/título;
+- `CURRENT_STATE.md` y `docs/ROADMAP.md`.
+
+**Validación final:** el repositorio se hizo público temporalmente el 2026-10-05 para recuperar runners GitHub-hosted sin coste tras agotar la cuota mensual privada. Sobre `cc27163f6318562cf10f8fc9947c37f10ef9de68` se obtuvo 5/5 PASS:
+- CI run `37291226017`: PASS.
+- Database run `37291225997`: PASS.
+- E2E H6 run `37291226090`: PASS.
+- OPS-02 run `37291225971`: PASS.
+- H7 run `37291226032`: PASS.
+
+El siguiente commit es exclusivamente documental para registrar este cierre; debe volver a obtener 5/5 PASS antes de considerar el HEAD final cerrado. Tras ese 5/5, restaurar el repositorio a privado antes de cualquier merge. PR #25 permanece abierto y sin merge hasta aprobación expresa posterior.
+
+
 ## HITO 8 — GO-LIVE / producción aprobado
 
 **ESTADO ACTUAL: PASS.** HITO 8 aprobado expresamente por el usuario el 2026-10-05.
 
 Repositorio: `marioleongayo23-spec/fichaje`  
-Rama: `astra/hito-8-go-live`  
-Base: `main@1b4d22488f028fb0d637cc74b15c230e8e920f6e`  
-PR: #17 — OPEN; no merge ni activación comercial sin aprobación expresa posterior.
+Rama histórica: `astra/hito-8-go-live`  
+PR: #17 — MERGED  
+Merge commit en `main`: `0c734cc61b5d60a20d2f0307042f94042fc70554`.
 
 ### Candidato productivo
 - Supabase `Fichaje APP`, ref `bypdviatamosygndeqhh`, región `eu-west-1` (Irlanda), ACTIVE_HEALTHY.
