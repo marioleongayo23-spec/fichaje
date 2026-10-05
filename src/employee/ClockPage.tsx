@@ -159,6 +159,7 @@ export function ClockPage() {
               <span>Tu fichaje usa la hora segura del servidor. No usamos ubicación, fotos ni biometría.</span>
             </div>
           </PageHeader>
+          <p className="state-value visually-hidden">{STATE_LABEL[state.state]}</p>
           <LiveRegion tone="info" message={status} />
           <LiveRegion tone="error" message={error} />
           <div className="bundy-welcome-spacer" />
@@ -172,7 +173,7 @@ export function ClockPage() {
   }
 
   return (
-    <BundyPhoneScreen className="bundy-clock-screen">
+    <BundyPhoneScreen className="bundy-clock-screen clock-page">
       <div className="bundy-screen-content">
         <BundyStatusBar time={formatTime(now, zone)} />
 
@@ -242,7 +243,7 @@ export function ClockPage() {
                 </Notice>
               ) : primaryAction ? (
                 <>
-                  <button type="button" className={`bundy-main-clock-action bundy-action-${primaryAction.toLowerCase()}`}
+                  <button type="button" className={`btn btn-clock btn-clock-${primaryAction.toLowerCase()} bundy-main-clock-action bundy-action-${primaryAction.toLowerCase()}`}
                     aria-label={ACTION_LABEL[primaryAction]} aria-disabled={busy} onClick={() => send(primaryAction)}>
                     {phase.kind === 'sending' && phase.action === primaryAction ? <span className="clock-cta-title">Enviando…</span> : (
                       <>
@@ -268,6 +269,7 @@ export function ClockPage() {
 
             <section className="bundy-clock-readout" aria-labelledby="state-title">
               <h2 id="state-title" className="visually-hidden">Estado actual</h2>
+              <p className="state-value visually-hidden">{STATE_LABEL[state.state]}</p>
               <p className="bundy-clock-digits">
                 {state.state === 'OUT' ? '00:00:00' : state.last_event_at ? formatTime(state.last_event_at, zone, true) : '—'}
               </p>
