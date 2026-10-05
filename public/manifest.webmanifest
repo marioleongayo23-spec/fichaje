@@ -1,7 +1,7 @@
 {
-  "name": "Fichaje",
-  "short_name": "Fichaje",
-  "description": "Registro de jornada: fichaje, consulta de registro y correcciones.",
+  "name": "bundy",
+  "short_name": "bundy",
+  "description": "bundy · registro de jornada, horas y correcciones.",
   "lang": "es",
   "dir": "ltr",
   "id": "/",
@@ -9,8 +9,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f6f7f9",
-  "theme_color": "#1f4fbf",
+  "background_color": "#eef1ee",
+  "theme_color": "#1f4a33",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

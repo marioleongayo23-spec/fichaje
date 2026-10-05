@@ -20,7 +20,7 @@ test('manifest is valid and Chrome reports the app as installable', async ({ pag
   await page.goto('/');
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest');
   const manifest = await (await page.request.get('/manifest.webmanifest')).json();
-  expect(manifest).toMatchObject({ name: 'Fichaje', short_name: 'Fichaje', lang: 'es', start_url: '/', scope: '/', display: 'standalone' });
+  expect(manifest).toMatchObject({ name: 'bundy', short_name: 'bundy', lang: 'es', start_url: '/', scope: '/', display: 'standalone' });
   for (const icon of manifest.icons) {
     const size = png(await (await page.request.get(icon.src)).body());
     expect(size && `${size.width}x${size.height}`).toBe(icon.sizes);

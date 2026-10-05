@@ -1,7 +1,7 @@
 import { readSupabaseConfig, type PublicEnvironment, type SupabaseConfig } from './lib/supabase';
 
-// Placeholder identity: sober and replaceable, no definitive brand.
-export const BRAND = 'Fichaje';
+// Visual identity approved in HITO 9; business/security contracts remain unchanged.
+export const BRAND = 'bundy';
 
 export interface AppEnvironment extends PublicEnvironment {
   VITE_KIOSK_GATEWAY_URL?: string;

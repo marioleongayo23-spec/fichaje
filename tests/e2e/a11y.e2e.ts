@@ -126,7 +126,7 @@ test('keyboard only: skip link, login, clock, focus order and visible focus', { 
   await page.getByRole('link', { name: 'Mi registro', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Mi registro' })).toBeFocused();
-  await expect(page).toHaveTitle('Mi registro · Fichaje');
+  await expect(page).toHaveTitle('Mi registro · bundy');
 });
 
 test('dialogs trap focus, close with Escape and return focus to the opener', { tag: '@desktop-only' }, async ({ page }) => {

@@ -139,9 +139,13 @@ export function ClockPage() {
   const openSince = state?.state !== 'OUT' && state?.last_event_at && localDate(state.last_event_at, zone) !== localDate(now, zone);
 
   return (
-    <>
+    <div className="clock-page">
       <PageHeader title="Fichar">
-        <p>{tenant.current.organization.name} · {employee.display_name}</p>
+        <div className="bundy-greeting">
+          <span>Buenos días,</span>
+          <strong>{employee.display_name}</strong>
+        </div>
+        <div className="bundy-location-card">{tenant.current.organization.name}</div>
       </PageHeader>
 
       <p className="device-clock">
@@ -210,8 +214,14 @@ export function ClockPage() {
             <div className="clock-actions">
               {actions.map((action) => (
                 <button key={action} type="button" className={`btn btn-clock btn-clock-${action.toLowerCase()}`}
-                  aria-disabled={busy} onClick={() => send(action)}>
-                  {phase.kind === 'sending' && phase.action === action ? 'Enviando…' : ACTION_LABEL[action]}
+                  aria-label={ACTION_LABEL[action]} aria-disabled={busy} onClick={() => send(action)}>
+                  {phase.kind === 'sending' && phase.action === action ? 'Enviando…' : action === 'CLOCK_IN' ? (
+                    <>
+                      <img src="/bundy-symbol.svg" alt="" aria-hidden="true" />
+                      <span className="clock-cta-title">Hacer bundy</span>
+                      <span className="clock-cta-subtitle">Entrada</span>
+                    </>
+                  ) : ACTION_LABEL[action]}
                 </button>
               ))}
             </div>
@@ -222,6 +232,6 @@ export function ClockPage() {
         </section>
       )}
 
-    </>
+    </div>
   );
 }
