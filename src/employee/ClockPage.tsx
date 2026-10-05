@@ -233,6 +233,17 @@ export function ClockPage() {
           </div>
         )}
 
+        {confirmation && (
+          <section className="receipt bundy-receipt" aria-labelledby="receipt-title">
+            <h2 id="receipt-title" ref={receiptHeading} tabIndex={-1}>{ACTION_DONE[confirmation.action]}</h2>
+            <dl>
+              <div><dt>Hora registrada por el servidor</dt>
+                <dd>{formatTime(confirmation.receipt.server_at, zone, true)} ({zoneAbbreviation(confirmation.receipt.server_at, zone)}), {formatDate(confirmation.receipt.server_at, zone)}</dd></div>
+              <div><dt>Estado resultante</dt><dd>{STATE_LABEL[confirmation.receipt.state]}</dd></div>
+            </dl>
+          </section>
+        )}
+
         {state && (phase.kind === 'ready' || phase.kind === 'sending') && (
           <>
             <section aria-labelledby="actions-title" className="bundy-clock-action-zone">
@@ -281,17 +292,6 @@ export function ClockPage() {
               )}
             </section>
           </>
-        )}
-
-        {confirmation && (
-          <section className="receipt bundy-receipt" aria-labelledby="receipt-title">
-            <h2 id="receipt-title" ref={receiptHeading} tabIndex={-1}>{ACTION_DONE[confirmation.action]}</h2>
-            <dl>
-              <div><dt>Hora registrada por el servidor</dt>
-                <dd>{formatTime(confirmation.receipt.server_at, zone, true)} ({zoneAbbreviation(confirmation.receipt.server_at, zone)}), {formatDate(confirmation.receipt.server_at, zone)}</dd></div>
-              <div><dt>Estado resultante</dt><dd>{STATE_LABEL[confirmation.receipt.state]}</dd></div>
-            </dl>
-          </section>
         )}
 
         {state?.state === 'OUT' && policy.data && !policy.data.current && (
