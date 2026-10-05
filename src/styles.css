@@ -3267,3 +3267,21 @@ textarea:focus {
     transform: none !important;
   }
 }
+
+
+/* HITO 12 accessibility safeguards. */
+.org-kicker,
+.nav-group-title,
+.surface-kicker {
+  color: #596d60;
+}
+
+.header-actions .btn-link {
+  min-height: var(--touch);
+}
+
+@media (max-width: 47.99rem) {
+  .header-actions .btn-link {
+    min-height: var(--touch);
+  }
+}
