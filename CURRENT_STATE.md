@@ -2,7 +2,7 @@
 
 ## HITO 10 — fidelidad visual Bundy + entrada/login + despliegue final
 
-**ESTADO ACTUAL: IN PROGRESS.** Autorizado expresamente por el usuario el 2026-10-05.
+**ESTADO ACTUAL: PASS técnico y remoto.** Pendiente únicamente de la regresión 5/5 del commit documental final y aprobación expresa posterior para merge.
 
 Rama: `astra/hito-10-fidelidad-visual-bundy`  
 Base: `main@a8bded0802cf5e495d859369593a93d5adcb99c5`.
@@ -24,14 +24,21 @@ Base: `main@a8bded0802cf5e495d859369593a93d5adcb99c5`.
 - No implementar ni simular geolocalización, biometría, fotos, vacaciones, nóminas ni otras funciones fuera de V1 aunque aparezcan en referencias comerciales.
 - Mantener accesibilidad, nombres/contratos de acciones y todos los flujos existentes.
 
-### Puerta de salida
-1. Login/registro/onboarding y shell con identidad Bundy inequívoca y coherente con PDF/web.
-2. Fichar, horas y gestión visualmente alineados con el sistema Bundy sin inventar funcionalidades.
-3. Sesión limpia/incógnito muestra el login correcto.
-4. Diff sin backend/DB/security.
-5. CI + Database + E2E H6 + OPS-02 + H7 = 5/5 PASS sobre el mismo HEAD final.
-6. Staging/URL final verificadas contra ese release antes de declarar PASS.
-7. PR abierto; sin merge sin aprobación expresa posterior.
+### Evidencia de cierre
+- HEAD de código validado: `c6b87752949766164b9e055dd2b8fac3b03ceafe`.
+- Diff contra main: frontend/documentación/tests visuales únicamente; 0 cambios SQL, migraciones, RLS/RPC, Edge, seguridad, motor horario, idempotencia, auditoría o Stripe.
+- Regresión sobre ese HEAD:
+  - CI run `37297152164`: PASS.
+  - Database run `37297152230`: PASS.
+  - E2E H6 run `37297152093`: PASS.
+  - OPS-02 run `37297152084`: PASS.
+  - H7 run `37297152104`: PASS.
+- E2E H6 incorpora contrato visual Bundy: sesión limpia muestra login, «Hola de nuevo», paleta oficial y CTA circular «Hacer bundy».
+- Despliegue manual Direct Upload en `https://fichaje-staging.pages.dev/` realizado con el artefacto exacto de CI `pages-dist-c6b877...`.
+- Verificación remota posterior: título `Iniciar sesión · bundy`; copy «Hola de nuevo» / «Entra para ver tu equipo y tus horas.»; assets `bundy-app-icon.svg` y `bundy-symbol.svg`; `theme-color #1f4a33`; metadato `fichaje-release=c6b87752949766164b9e055dd2b8fac3b03ceafe`.
+- La verificación previa había demostrado que `fichaje-staging.pages.dev` servía un release antiguo y `fichaje.pages.dev` una app histórica distinta. HITO 10 corrige staging; producción `fichaje.pages.dev` no se ha tocado.
+- Este commit documental final debe volver a obtener 5/5 PASS para que el HEAD del PR quede cerrado.
+- PR #26 permanece abierto; sin merge sin aprobación expresa posterior.
 
 
 ## HITO 9 — integración visual exacta del diseño del socio
