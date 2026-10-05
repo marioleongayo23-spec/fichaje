@@ -2,30 +2,47 @@
 
 ## HITO 9 — integración visual exacta del diseño del socio
 
-**ESTADO ACTUAL: BLOCKED por artefacto de diseño no localizado.**
+**ESTADO ACTUAL: BLOCKED por GitHub Actions / asignación de runner.**
 
 Repositorio: `marioleongayo23-spec/fichaje`  
 Rama: `astra/hito-9-integracion-visual-socio`  
 Base: `main@0c734cc61b5d60a20d2f0307042f94042fc70554`  
-PR: #25 — OPEN.
+PR: #25 — OPEN; no merge sin 5/5 PASS y aprobación expresa posterior.
 
-### Alcance autorizado
-- Integrar **exactamente** el diseño entregado por el socio.
-- Cambios exclusivamente de presentación/frontend visual.
-- No modificar reglas de negocio, contratos RPC, RLS, migraciones, seguridad, idempotencia, máquina de estados, timestamps, auditoría, Stripe ni semántica PWA.
-- Mantener accesibilidad, responsive, offline seguro y ausencia de cache sensible.
-- Tras integrar el diseño: regresión completa de CI, Database, E2E H6, OPS-02 y H7 sobre el mismo HEAD.
-- Baseline previo a cualquier cambio visual: HEAD `686760122b60f1c43fd86061401fea6b251e01a0` con CI, Database, E2E H6, OPS-02 y H7 = 5/5 PASS.
+### Fuente visual y alcance
+- Fuente visual autoritativa recibida: `Bundy App.pdf` + `logos.zip`.
+- Integración limitada a presentación/frontend: identidad Bundy, paleta bosque/niebla/amarillo, tarjetas blancas, navegación inferior, CTA circular «Hacer bundy», formularios, diálogo, PWA branding y kiosco visual.
+- No se implementó ni simuló geolocalización del material de referencia porque V1 la prohíbe.
+- No se modificaron SQL, migraciones, RLS/RPC, Edge Functions, seguridad, motor horario, idempotencia, timestamps, auditoría, Stripe, almacenamiento ni semántica offline/PWA.
+- Los únicos tests editados ajustan expectativas de marca/título; no se relajó ninguna aserción funcional ni de accesibilidad.
 
-### Fuente del diseño
-Búsqueda realizada antes de modificar UI:
-- repositorio, ramas, PRs, issues y referencias `figma.com`: sin artefacto del socio;
-- Project/Library de ChatGPT y carpeta `/Fichaje APP`: sin entrega visual reciente identificable;
-- Google Drive: sin archivo de diseño de Fichaje;
-- Gmail reciente: sin Fichaje/Figma/diseño;
-- Figma: no existe file URL/fileKey recuperable desde el contexto disponible.
+### Evidencia
+- Commit visual: `c680b9ec2f6ca94f8707bc5ca4f9fbc2d2be39dd`.
+- Regresión real sobre ese HEAD:
+  - CI: PASS.
+  - Database: PASS.
+  - OPS-02: PASS.
+  - H7: PASS.
+  - E2E H6: FAIL con 48/52; las 4 únicas fallas fueron el mismo control de accesibilidad WCAG 2.5.8: «Cerrar sesión» quedó por debajo de 44 px tras compactar el header.
+  - Flujos funcionales employee/manager/kiosk/PWA, aislamiento, fichajes, correcciones, exportaciones, offline y seguridad pasaron dentro de esa ejecución.
+- Corrección mínima: `b232a3db3bb5cf3660f324e71fe7693efd157102`, únicamente 4 líneas CSS para restaurar `min-height: var(--touch)` en «Cerrar sesión».
+- Desde `b232a3db...`, GitHub no asigna runner a ningún workflow: CI, Database, E2E H6, OPS-02 y H7 terminan antes del primer step. Evidencia API repetida: `runner_id=0`, `runner_name=""`, `steps=[]/null`, `logs_url=null`; CI se reintentó hasta attempt 3 con el mismo resultado.
+- Por tanto el código no puede recibir aún el 5/5 obligatorio del HEAD corregido. No se declara PASS.
 
-**Bloqueo:** no se puede cumplir “exactamente” sin el archivo/enlace/código/imágenes originales. No se hará una aproximación visual ni se tocará el frontend hasta disponer de esa fuente.
+### Diff de seguridad del alcance
+El diff contra `main` se limita a documentación H9 y capa visual/frontend:
+- `index.html`;
+- assets SVG Bundy;
+- `public/manifest.webmanifest`;
+- `src/App.tsx` (marca);
+- `src/config.ts` (constante de marca);
+- `src/employee/ClockPage.tsx` (composición/semántica visual, manteniendo nombres accesibles de acciones);
+- `src/styles.css`;
+- dos expectativas E2E de marca/título;
+- `CURRENT_STATE.md` y `docs/ROADMAP.md`.
+
+**Bloqueo de salida:** obtener CI + Database + E2E H6 + OPS-02 + H7 = 5/5 PASS sobre un mismo HEAD cuando GitHub vuelva a asignar runners. Hasta entonces PR #25 permanece abierto y sin merge.
+
 
 ## HITO 8 — GO-LIVE / producción aprobado
 
