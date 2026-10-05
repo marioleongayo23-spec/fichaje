@@ -9,6 +9,7 @@ import { asApiError, errorMessage } from '../lib/errors';
 import { useOnline } from '../lib/online';
 import { DEFAULT_ZONE, formatDate, formatDateTime, formatTime, localDate, zoneAbbreviation } from '../lib/time';
 import { LiveRegion, Loading, Notice, PageHeader } from '../ui/components';
+import { BundyEmployeeNav, BundyPhoneScreen, BundyStatusBar } from '../ui/BundyMobile';
 
 type Phase =
   | { kind: 'loading' }
@@ -138,107 +139,164 @@ export function ClockPage() {
   const actions = state ? ACTIONS_BY_STATE[state.state] : [];
   const openSince = state?.state !== 'OUT' && state?.last_event_at && localDate(state.last_event_at, zone) !== localDate(now, zone);
   const initials = employee.display_name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('');
+  const firstUse = state?.state === 'OUT' && state.version === 0 && !state.last_event_at;
+  const primaryAction = actions[0] ?? null;
+  const secondaryActions = actions.slice(1);
+  const currentPolicy = policy.data?.current;
+
+  if (firstUse && state && (phase.kind === 'ready' || phase.kind === 'sending')) {
+    return (
+      <BundyPhoneScreen className="bundy-welcome-screen">
+        <div className="bundy-screen-content">
+          <BundyStatusBar time={formatTime(now, zone)} />
+          <div className="bundy-progress-dots" aria-hidden="true"><span className="active" /><span /><span /></div>
+          <PageHeader title="Fichar">
+            <div className="bundy-welcome-icon"><img src="/bundy-app-icon.svg" alt="" aria-hidden="true" /></div>
+            <p className="bundy-welcome-title">Hola, {employee.display_name.split(/\s+/)[0]}. Yo<br />apunto tus horas.</p>
+            <p className="bundy-welcome-copy">Tú las ves siempre que quieras. Si algo no cuadra, lo corriges y tu responsable lo valida.</p>
+            <div className="bundy-welcome-note">
+              <span className="bundy-note-icon" aria-hidden="true">✓</span>
+              <span>Tu fichaje usa la hora segura del servidor. No usamos ubicación, fotos ni biometría.</span>
+            </div>
+          </PageHeader>
+          <LiveRegion tone="info" message={status} />
+          <LiveRegion tone="error" message={error} />
+          <div className="bundy-welcome-spacer" />
+          <button type="button" className="btn bundy-first-bundy" aria-label="Entrada" aria-disabled={busy}
+            onClick={() => send('CLOCK_IN')}>
+            {phase.kind === 'sending' ? 'Enviando…' : 'Hacer mi primer bundy'}
+          </button>
+        </div>
+      </BundyPhoneScreen>
+    );
+  }
 
   return (
-    <div className="clock-page">
-      <PageHeader title="Fichar">
-        <div className="bundy-greeting-row">
-          <div className="bundy-greeting">
-            <span>Buenos días,</span>
-            <strong>{employee.display_name}</strong>
+    <BundyPhoneScreen className="bundy-clock-screen">
+      <div className="bundy-screen-content">
+        <BundyStatusBar time={formatTime(now, zone)} />
+
+        <PageHeader title="Fichar">
+          <div className="bundy-greeting-row">
+            <div className="bundy-greeting">
+              <span>Buenos días,</span>
+              <strong>{employee.display_name}</strong>
+            </div>
+            <span className="bundy-avatar" aria-hidden="true">{initials}</span>
           </div>
-          <span className="bundy-avatar" aria-hidden="true">{initials}</span>
-        </div>
-        <div className="bundy-company-card">
-          <span aria-hidden="true" className="bundy-company-icon" />
-          <span>{tenant.current.organization.name}</span>
-        </div>
-      </PageHeader>
 
-      <p className="device-clock">
-        <span className="device-clock-time">{formatTime(now, zone)}</span>{' '}
-        <span className="device-clock-date">{formatDate(now, zone)}</span>
-        <span className="hint"> Hora de este dispositivo, solo informativa. La hora del fichaje la fija el servidor.</span>
-      </p>
+          <div className="bundy-shift-card">
+            <span className="bundy-shift-icon" aria-hidden="true">□</span>
+            <span>
+              <strong>Tu horario hoy</strong>
+              <small>{currentPolicy
+                ? `Horario v${currentPolicy.version} · ${zoneAbbreviation(now, zone)} · pausas ${currentPolicy.break_counts_as_work ? 'computables' : 'no computables'}`
+                : 'Sin horario asignado'}</small>
+            </span>
+          </div>
 
-      <LiveRegion tone="info" message={status} />
-      <LiveRegion tone="error" message={error} />
+          <div className="bundy-company-card">
+            <span aria-hidden="true" className="bundy-company-pin">⌾</span>
+            <span>{tenant.current.organization.name}</span>
+          </div>
+        </PageHeader>
 
-      {phase.kind === 'loading' && <Loading label="Consultando tu estado en el servidor…" />}
-      {phase.kind === 'load-error' && (
-        <Notice tone="error" title="No se ha podido consultar tu estado actual.">
-          <p>{phase.message} Sin conocer tu estado no se puede fichar.</p>
-          <button type="button" className="btn btn-secondary" onClick={() => void loadState()} disabled={!online}>Reintentar</button>
-        </Notice>
-      )}
+        <p className="visually-hidden">La hora mostrada es informativa. La hora del fichaje la fija el servidor.</p>
+        <LiveRegion tone="info" message={status} />
+        <LiveRegion tone="error" message={error} />
 
-      {state && phase.kind !== 'loading' && phase.kind !== 'load-error' && (
-        <section className={`state-card state-${state.state.toLowerCase()}`} aria-labelledby="state-title">
-          <h2 id="state-title">Estado actual</h2>
-          <p className="state-value"><span className="state-icon" aria-hidden="true" />{STATE_LABEL[state.state]}</p>
-          {state.last_event_at && (
-            <p className="state-meta">Último fichaje confirmado: {formatDateTime(state.last_event_at, zone)} ({zoneAbbreviation(state.last_event_at, zone)}), hora del servidor.</p>
-          )}
-          {openSince && (
-            <Notice tone="warning" title="Tu jornada sigue abierta desde otro día.">
-              <p>Si olvidaste fichar la salida, fíchala ahora y solicita una corrección de la hora en «Mis correcciones».</p>
-            </Notice>
-          )}
-        </section>
-      )}
-
-      {confirmation && (
-        <section className="receipt" aria-labelledby="receipt-title">
-          <h2 id="receipt-title" ref={receiptHeading} tabIndex={-1}>{ACTION_DONE[confirmation.action]}</h2>
-          <dl>
-            <div><dt>Hora registrada por el servidor</dt>
-              <dd>{formatTime(confirmation.receipt.server_at, zone, true)} ({zoneAbbreviation(confirmation.receipt.server_at, zone)}), {formatDate(confirmation.receipt.server_at, zone)}</dd></div>
-            <div><dt>Estado resultante</dt><dd>{STATE_LABEL[confirmation.receipt.state]}</dd></div>
-          </dl>
-        </section>
-      )}
-      {phase.kind === 'unknown' && (
-        <div role="alert" className="unknown-outcome">
-          <Notice tone="warning" title={`Resultado desconocido: no sabemos si se ha registrado la ${ACTION_LABEL[phase.action].toLowerCase()}.`}>
-            <p>La conexión se interrumpió después de enviar. No des el fichaje por hecho.</p>
-            <p>«Comprobar resultado» reenvía exactamente la misma solicitud: si ya se registró verás ese mismo fichaje; si no, se registrará una sola vez con la hora del servidor.</p>
-            <div className="button-row">
-              <button ref={retryButton} type="button" className="btn btn-primary" onClick={retry}>Comprobar resultado</button>
-              <button type="button" className="btn btn-secondary" onClick={() => void loadState()}>Consultar solo mi estado</button>
-            </div>
+        {phase.kind === 'loading' && <Loading label="Consultando tu estado en el servidor…" />}
+        {phase.kind === 'load-error' && (
+          <Notice tone="error" title="No se ha podido consultar tu estado actual.">
+            <p>{phase.message} Sin conocer tu estado no se puede fichar.</p>
+            <button type="button" className="btn btn-secondary" onClick={() => void loadState()} disabled={!online}>Reintentar</button>
           </Notice>
-        </div>
-      )}
+        )}
 
-      {state && (phase.kind === 'ready' || phase.kind === 'sending') && (
-        <section aria-labelledby="actions-title" className="clock-panel">
-          <h2 id="actions-title" className="visually-hidden">Acciones disponibles</h2>
-          {!online ? (
-            <Notice tone="warning" title="Sin conexión: no se puede fichar.">
-              <p>No se guarda ningún fichaje para enviarlo más tarde. Sigue el procedimiento de contingencia de tu empresa y, cuando vuelva la conexión, solicita una corrección.</p>
+        {openSince && (
+          <Notice tone="warning" title="Tu jornada sigue abierta desde otro día.">
+            <p>Si olvidaste fichar la salida, fíchala ahora y solicita una corrección de la hora en «Mis correcciones».</p>
+          </Notice>
+        )}
+
+        {phase.kind === 'unknown' && (
+          <div role="alert" className="unknown-outcome">
+            <Notice tone="warning" title={`Resultado desconocido: no sabemos si se ha registrado la ${ACTION_LABEL[phase.action].toLowerCase()}.`}>
+              <p>La conexión se interrumpió después de enviar. No des el fichaje por hecho.</p>
+              <p>«Comprobar resultado» reenvía exactamente la misma solicitud: si ya se registró verás ese mismo fichaje; si no, se registrará una sola vez con la hora del servidor.</p>
+              <div className="button-row">
+                <button ref={retryButton} type="button" className="btn btn-primary" onClick={retry}>Comprobar resultado</button>
+                <button type="button" className="btn btn-secondary" onClick={() => void loadState()}>Consultar solo mi estado</button>
+              </div>
             </Notice>
-          ) : (
-            <div className="clock-actions">
-              {actions.map((action) => (
-                <button key={action} type="button" className={`btn btn-clock btn-clock-${action.toLowerCase()}`}
-                  aria-label={ACTION_LABEL[action]} aria-disabled={busy} onClick={() => send(action)}>
-                  {phase.kind === 'sending' && phase.action === action ? 'Enviando…' : action === 'CLOCK_IN' ? (
-                    <>
-                      <img src="/bundy-symbol.svg" alt="" aria-hidden="true" />
-                      <span className="clock-cta-title">Hacer bundy</span>
-                      <span className="clock-cta-subtitle">Entrada</span>
-                    </>
-                  ) : ACTION_LABEL[action]}
-                </button>
-              ))}
-            </div>
-          )}
-          {state.state === 'OUT' && policy.data && !policy.data.current && (
-            <p className="hint">No tienes un horario asignado ahora mismo; el servidor rechazará la entrada hasta que tu empresa lo asigne.</p>
-          )}
-        </section>
-      )}
+          </div>
+        )}
 
-    </div>
+        {state && (phase.kind === 'ready' || phase.kind === 'sending') && (
+          <>
+            <section aria-labelledby="actions-title" className="bundy-clock-action-zone">
+              <h2 id="actions-title" className="visually-hidden">Acciones disponibles</h2>
+              {!online ? (
+                <Notice tone="warning" title="Sin conexión: no se puede fichar.">
+                  <p>No se guarda ningún fichaje para enviarlo más tarde. Sigue el procedimiento de contingencia de tu empresa y, cuando vuelva la conexión, solicita una corrección.</p>
+                </Notice>
+              ) : primaryAction ? (
+                <>
+                  <button type="button" className={`bundy-main-clock-action bundy-action-${primaryAction.toLowerCase()}`}
+                    aria-label={ACTION_LABEL[primaryAction]} aria-disabled={busy} onClick={() => send(primaryAction)}>
+                    {phase.kind === 'sending' && phase.action === primaryAction ? <span className="clock-cta-title">Enviando…</span> : (
+                      <>
+                        <img src="/bundy-symbol.svg" alt="" aria-hidden="true" />
+                        <span className="clock-cta-title">{primaryAction === 'CLOCK_IN' ? 'Hacer bundy' : ACTION_LABEL[primaryAction]}</span>
+                        <span className="clock-cta-subtitle">{primaryAction === 'CLOCK_IN' ? 'Entrada' : STATE_LABEL[state.state]}</span>
+                      </>
+                    )}
+                  </button>
+                  {secondaryActions.length > 0 && (
+                    <div className="bundy-secondary-actions">
+                      {secondaryActions.map((action) => (
+                        <button key={action} type="button" className="btn btn-secondary"
+                          aria-label={ACTION_LABEL[action]} aria-disabled={busy} onClick={() => send(action)}>
+                          {phase.kind === 'sending' && phase.action === action ? 'Enviando…' : ACTION_LABEL[action]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </section>
+
+            <section className="bundy-clock-readout" aria-labelledby="state-title">
+              <h2 id="state-title" className="visually-hidden">Estado actual</h2>
+              <p className="bundy-clock-digits">
+                {state.state === 'OUT' ? '00:00:00' : state.last_event_at ? formatTime(state.last_event_at, zone, true) : '—'}
+              </p>
+              <p className="bundy-clock-state">
+                {state.state === 'OUT' ? 'Aún no has fichado hoy' : STATE_LABEL[state.state]}
+              </p>
+              {state.last_event_at && state.state !== 'OUT' && (
+                <p className="bundy-clock-meta">Última acción confirmada a las {formatTime(state.last_event_at, zone, true)} · hora del servidor</p>
+              )}
+            </section>
+          </>
+        )}
+
+        {confirmation && (
+          <section className="receipt bundy-receipt" aria-labelledby="receipt-title">
+            <h2 id="receipt-title" ref={receiptHeading} tabIndex={-1}>{ACTION_DONE[confirmation.action]}</h2>
+            <dl>
+              <div><dt>Hora registrada por el servidor</dt>
+                <dd>{formatTime(confirmation.receipt.server_at, zone, true)} ({zoneAbbreviation(confirmation.receipt.server_at, zone)}), {formatDate(confirmation.receipt.server_at, zone)}</dd></div>
+              <div><dt>Estado resultante</dt><dd>{STATE_LABEL[confirmation.receipt.state]}</dd></div>
+            </dl>
+          </section>
+        )}
+
+        {state?.state === 'OUT' && policy.data && !policy.data.current && (
+          <p className="hint">No tienes un horario asignado ahora mismo; el servidor rechazará la entrada hasta que tu empresa lo asigne.</p>
+        )}
+      </div>
+      <BundyEmployeeNav />
+    </BundyPhoneScreen>
   );
 }
