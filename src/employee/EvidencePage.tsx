@@ -157,7 +157,7 @@ export function EvidencePage() {
             <details className="bundy-record-details">
               <summary>Ver detalle legal del registro</summary>
               <p className="hint">Consulta realizada el {formatDateTime(evidence.data.cutoff_at, zone)} (corte del servidor).</p>
-              {shown.map((session) => <SessionView key={session.id} session={session} />)}
+              {shown.map((session) => <SessionView key={session.id} session={session} headingLevel={2} />)}
             </details>
           </>
         )}
