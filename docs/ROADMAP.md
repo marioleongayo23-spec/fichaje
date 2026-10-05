@@ -46,3 +46,7 @@ H10 corrige exclusivamente la presentación y la acreditación del despliegue tr
 
 ## HITO 11 — réplica visual Bundy
 H11 parte de H10 ya integrado y usa el PDF entregado como referencia visual estricta, no como mera inspiración. La composición móvil, proporciones, navegación, CTA, tarjetas y jerarquía deben aproximarse directamente a las pantallas 01, 03, 04 y 05. Las funciones no presentes en V1 no se implementan ni simulan; en particular, no se añade geolocalización. No hay cambios backend/DB/security.
+
+
+## HITO 12 — premium UI system Bundy
+H12 parte de H11 integrado y aplica un sistema visual global de mayor calidad al shell y a las pantallas administrativas/desktop. Mantiene la identidad Bundy, las funciones V1 y la réplica móvil ya validada. El objetivo es coherencia de márgenes, densidad, jerarquía, navegación, botones, formularios, tablas, cards y responsive; no añade funcionalidades ni datos ficticios y no toca backend/DB/security.
