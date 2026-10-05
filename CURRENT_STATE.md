@@ -2,7 +2,7 @@
 
 ## HITO 9 — integración visual exacta del diseño del socio
 
-**ESTADO ACTUAL: BLOCKED por GitHub Actions / asignación de runner.**
+**ESTADO ACTUAL: EN VALIDACIÓN FINAL.**
 
 Repositorio: `marioleongayo23-spec/fichaje`  
 Rama: `astra/hito-9-integracion-visual-socio`  
@@ -41,7 +41,7 @@ El diff contra `main` se limita a documentación H9 y capa visual/frontend:
 - dos expectativas E2E de marca/título;
 - `CURRENT_STATE.md` y `docs/ROADMAP.md`.
 
-**Bloqueo de salida:** obtener CI + Database + E2E H6 + OPS-02 + H7 = 5/5 PASS sobre un mismo HEAD cuando GitHub vuelva a asignar runners. Hasta entonces PR #25 permanece abierto y sin merge.
+**Validación final:** el repositorio se hizo público temporalmente el 2026-10-05 para recuperar runners GitHub-hosted sin coste tras agotar la cuota mensual privada. Ejecutar CI + Database + E2E H6 + OPS-02 + H7 sobre el mismo HEAD final. Tras 5/5 PASS, volver a privado antes de cualquier merge; PR #25 permanece abierto y sin merge hasta aprobación expresa posterior.
 
 
 ## HITO 8 — GO-LIVE / producción aprobado
