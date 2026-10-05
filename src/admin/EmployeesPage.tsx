@@ -7,62 +7,126 @@ import { ROLE_LABEL, STATE_LABEL } from '../domain/labels';
 import type { Employee, EmployeeState } from '../domain/types';
 import { newRequestId, rpc } from '../lib/api';
 import { errorMessage } from '../lib/errors';
-import { currentMonth, DEFAULT_ZONE, formatDateTime, localDate, zoneLabel, zonedCandidates } from '../lib/time';
+import { currentMonth, DEFAULT_ZONE, formatDateTime, formatTime, localDate, zoneLabel, zonedCandidates } from '../lib/time';
+import { loadRequests } from '../employee/CorrectionsPage';
 import { SessionView } from '../employee/SessionView';
+import { Link } from '../app/router';
+import { BundyManagerNav, BundyPhoneScreen, BundyStatusBar } from '../ui/BundyMobile';
 import { Badge, Dialog, EmptyState, Field, LiveRegion, Loading, Notice, PageHeader, TableWrap } from '../ui/components';
 import { loadEmployeeSessions, useDirectory, type Directory } from './data';
 import { PinReset } from './PinReset';
 
 export function EmployeesPage() {
+  const { client } = useServices();
+  const tenant = useCurrentTenant();
+  const org = tenant.current.organization.id;
   const directory = useDirectory();
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const data = directory.data;
   const employee = data?.employees.find((e) => e.id === selected) ?? null;
+  const employeeKey = data?.employees.filter((e) => e.active).map((e) => e.id).join(',') ?? '';
+
+  const states = useLoader(async () => {
+    const active = directory.data?.employees.filter((e) => e.active) ?? [];
+    const pairs = await Promise.all(active.map(async (item) => [
+      item.id,
+      await rpc<EmployeeState>(client, 'get_employee_state', { p_organization_id: org, p_employee_id: item.id }),
+    ] as const));
+    return new Map<string, EmployeeState>(pairs);
+  }, [client, org, employeeKey]);
+
+  const pendingCorrections = useLoader(async () => {
+    const requests = await loadRequests(client, org);
+    return requests.filter((item) => !item.decision).length;
+  }, [client, org]);
 
   if (employee && data) {
     return <EmployeeDetail employee={employee} directory={data} onBack={() => setSelected(null)} onChanged={() => void directory.reload()} />;
   }
+
+  const working = [...(states.data?.values() ?? [])].filter((state) => state.state === 'WORKING').length;
+  const paused = [...(states.data?.values() ?? [])].filter((state) => state.state === 'PAUSED').length;
+  const out = [...(states.data?.values() ?? [])].filter((state) => state.state === 'OUT').length;
+
   return (
-    <>
-      <PageHeader title="Empleados">
-        <p className="bundy-display-title" aria-hidden="true">Tu equipo hoy</p>
-        <p>Fichas de empleado de la organización. Una persona sin correo ni cuenta puede tener ficha y fichar en el kiosco.</p>
-      </PageHeader>
-      <button type="button" className="btn btn-primary" onClick={() => { setStatus(null); setCreating(true); }}>Nuevo empleado</button>
-      <LiveRegion tone="success" message={status} />
-      {directory.loading && <Loading />}
-      {directory.error && <Notice tone="error" title={directory.error} />}
-      {data && (data.employees.length === 0 ? <EmptyState>Todavía no hay empleados.</EmptyState> : (
-        <TableWrap label="Empleados de la organización">
-          <table className="table">
-            <caption className="visually-hidden">Empleados de la organización</caption>
-            <thead><tr><th scope="col">Nombre</th><th scope="col">Código</th><th scope="col">Acceso</th><th scope="col">Horario vigente</th><th scope="col">Situación</th><th scope="col"><span className="visually-hidden">Acciones</span></th></tr></thead>
-            <tbody>
-              {data.employees.map((e) => {
-                const membership = data.memberships.find((m) => m.id === e.membership_id);
-                const policy = currentPolicy(data.policies, data.assignments.filter((a) => a.employee_id === e.id));
-                return (
-                  <tr key={e.id}>
-                    <th scope="row">{e.display_name}</th>
-                    <td>{e.code}</td>
-                    <td>{membership ? `Cuenta (${ROLE_LABEL[membership.role]}${membership.active ? '' : ', retirada'})` : 'Sin cuenta: kiosco'}</td>
-                    <td>{policy ? `v${policy.version} · ${zoneLabel(policy.timezone)}` : <Badge tone="warning">Sin horario</Badge>}</td>
-                    <td>{e.active ? <Badge tone="success">Activo</Badge> : <Badge>Inactivo</Badge>}</td>
-                    <td><button type="button" className="btn btn-secondary btn-small" onClick={() => setSelected(e.id)}>Ver ficha<span className="visually-hidden"> de {e.display_name}</span></button></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </TableWrap>
-      ))}
-      {creating && data && (
-        <EmployeeForm directory={data} employee={null} onClose={() => setCreating(false)}
-          onSaved={(name) => { setCreating(false); setStatus(`Empleado «${name}» creado.`); void directory.reload(); }} />
-      )}
-    </>
+    <BundyPhoneScreen className="bundy-team-screen">
+      <div className="bundy-screen-content">
+        <BundyStatusBar time={formatTime(new Date(), DEFAULT_ZONE)} />
+        <PageHeader title="Empleados">
+          <p className="bundy-team-org">{tenant.current.organization.name}</p>
+          <p className="bundy-screen-title">Tu equipo hoy</p>
+        </PageHeader>
+
+        <section className="bundy-team-stats" aria-label="Resumen del equipo">
+          <div><strong>{working}</strong><span>trabajando</span></div>
+          <div><strong>{paused}</strong><span>en pausa</span></div>
+          <div><strong>{out}</strong><span>fuera</span></div>
+        </section>
+
+        {(pendingCorrections.loading || states.loading) && <p className="bundy-soft-loading">Actualizando estado del equipo…</p>}
+        {pendingCorrections.data !== undefined && (
+          <div className="bundy-correction-banner">
+            <span aria-hidden="true">♧</span>
+            <span><strong>{pendingCorrections.data} corrección{pendingCorrections.data === 1 ? '' : 'es'}</strong> pendiente{pendingCorrections.data === 1 ? '' : 's'} de validación</span>
+            <Link to="/gestion/correcciones">Ver</Link>
+          </div>
+        )}
+
+        <div className="bundy-team-toolbar">
+          <button type="button" className="btn btn-primary" onClick={() => { setStatus(null); setCreating(true); }}>Nuevo empleado</button>
+        </div>
+        <LiveRegion tone="success" message={status} />
+        {directory.loading && <Loading />}
+        {directory.error && <Notice tone="error" title={directory.error} />}
+        {states.error && <Notice tone="error" title={states.error} />}
+
+        {data && (data.employees.length === 0 ? <EmptyState>Todavía no hay empleados.</EmptyState> : (
+          <TableWrap label="Empleados de la organización">
+            <table className="table bundy-team-table">
+              <caption className="visually-hidden">Empleados de la organización</caption>
+              <thead><tr><th scope="col">Nombre</th><th scope="col">Código</th><th scope="col">Acceso</th><th scope="col">Horario vigente</th><th scope="col">Situación</th><th scope="col"><span className="visually-hidden">Acciones</span></th></tr></thead>
+              <tbody>
+                {data.employees.map((e) => {
+                  const membership = data.memberships.find((m) => m.id === e.membership_id);
+                  const policy = currentPolicy(data.policies, data.assignments.filter((a) => a.employee_id === e.id));
+                  const current = states.data?.get(e.id);
+                  const initials = e.display_name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('');
+                  return (
+                    <tr key={e.id}>
+                      <th scope="row">
+                        <span className="bundy-team-person">
+                          <span className="bundy-team-avatar" aria-hidden="true">{initials}</span>
+                          <span><strong>{e.display_name}</strong><small>{current?.last_event_at
+                            ? `Último fichaje ${formatTime(current.last_event_at, policy?.timezone ?? DEFAULT_ZONE)}`
+                            : e.code}</small></span>
+                        </span>
+                      </th>
+                      <td>{e.code}</td>
+                      <td>{membership ? `Cuenta (${ROLE_LABEL[membership.role]}${membership.active ? '' : ', retirada'})` : 'Sin cuenta: kiosco'}</td>
+                      <td>{policy ? `v${policy.version} · ${zoneLabel(policy.timezone)}` : <Badge tone="warning">Sin horario</Badge>}</td>
+                      <td>{!e.active ? <Badge>Inactivo</Badge> : current
+                        ? <Badge tone={current.state === 'WORKING' ? 'success' : current.state === 'PAUSED' ? 'warning' : 'neutral'}>{STATE_LABEL[current.state]}</Badge>
+                        : <Badge>Consultando</Badge>}</td>
+                      <td><button type="button" className="btn btn-secondary btn-small" onClick={() => setSelected(e.id)}>Ver ficha<span className="visually-hidden"> de {e.display_name}</span></button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableWrap>
+        ))}
+
+        <Link to="/gestion/exportaciones" className="bundy-manager-export">Preparar informe para gestoría</Link>
+
+        {creating && data && (
+          <EmployeeForm directory={data} employee={null} onClose={() => setCreating(false)}
+            onSaved={(name) => { setCreating(false); setStatus(`Empleado «${name}» creado.`); void directory.reload(); }} />
+        )}
+      </div>
+      <BundyManagerNav />
+    </BundyPhoneScreen>
   );
 }
 
