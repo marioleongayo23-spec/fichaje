@@ -432,7 +432,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--bundy-forest); }
 .org-role { font-size: 0.7rem; color: var(--muted); }
 .header-actions { margin-left: auto; gap: 0; }
 .header-actions .btn-link {
-  min-height: 2.5rem;
+  min-height: var(--touch);
   font-size: 0.75rem;
   padding-inline: 0.6rem;
   text-decoration: none;
@@ -844,7 +844,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--bundy-forest); }
   .app-header .brand-mark { flex: 0 0 100%; }
   .org-info { flex: 1 1 8rem; }
   .header-actions { flex: 0 1 auto; }
-  .header-actions .btn-link { min-height: 2.25rem; padding: 0.35rem; }
+  .header-actions .btn-link { min-height: var(--touch); padding: 0.35rem; }
   .app-main { padding-inline: 0.85rem; }
   .filters { display: grid; grid-template-columns: 1fr; }
   .filters .field { width: 100%; }
