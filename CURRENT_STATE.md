@@ -1,4 +1,4 @@
-# CURRENT_STATE — 2026-10-02
+# CURRENT_STATE — 2026-10-05
 
 ## HITO 8 — GO-LIVE / producción en curso
 
@@ -19,7 +19,7 @@ PR: #17 — OPEN; no merge ni activación comercial sin aprobación expresa post
 
 | Gate | Estado | Evidencia / bloqueo |
 |---|---|---|
-| GO-01 Código | PASS previo; repetir en HEAD final | HEAD `9e3aef29246308cac9c363f708656f2745c5e235`: CI, Database, E2E H6, OPS-02 y H7 = 5/5 PASS. Este commit H8 final obliga a repetir los cinco workflows antes de cierre. |
+| GO-01 Código | PASS | HEAD de código `b817d1a3bd7b824cbbe5b22f1521b4dd6ea2cc93`: CI, Database, E2E H6, OPS-02 y H7 = 5/5 PASS. Cualquier commit posterior de evidencia debe volver a obtener 5/5 PASS antes de merge. |
 | GO-02 Destinos/TLS | PASS | Canary fija API y PostgreSQL por entorno de forma independiente; cruces staging↔production, overrides DSN, `hostaddr`, `service`, puerto no estándar y TLS débil fallan cerrado. Producción exige `verify-full`. |
 | GO-03 Seguridad | PASS con riesgo residual documentado | Security Advisor sin ERROR; 20 SECURITY DEFINER revisadas: 0 ejecutables por anon, todas con search_path fijo; todas las tablas public con RLS + FORCE RLS; inmutabilidad presente; secret scan CI PASS. WARN de leaked-password protection solo disponible en Supabase Pro y no se contrata bajo política 0 €. |
 | GO-04 Release | PASS | Supabase + Cloudflare sirven el mismo release aprobado; `verify_production.py` remoto final: 33 PASS / 0 FAIL / 0 SKIPPED. |
@@ -56,6 +56,14 @@ No se almacena ninguna contraseña o user mapping en Git.
 2. **Protección preventiva de main**: GitHub Free + repo privado no permite la protección requerida. El guard compensatorio detecta y alerta, pero no puede impedir el push. Mantener GitHub Free y repo privado deja GO-10 formalmente BLOCKED.
 
 No se han creado clientes reales ni secretos en GitHub. Cualquier gasto, publicación del repositorio, merge o activación comercial requiere autorización expresa.
+
+### Stripe readiness — cierre de regresiones 2026-10-05
+- PR #17 mantiene billing **PREPARADO / DESACTIVADO**: no se han añadido secretos Stripe, clientes, cobros ni activación comercial.
+- Se corrigió el matcher cerrado del gateway para admitir únicamente las rutas billing ya contratadas: checkout, portal, sync y health.
+- `billing_begin_checkout` conserva privilegio mínimo: la lectura del estado de organización ya no solicita un lock que exigía UPDATE; la exclusión mutua del checkout permanece en `private.billing_accounts ... for update`.
+- El deployer incluye la función `billing` y su test operativo refleja el orden real sin ampliar credenciales.
+- Evidencia sobre `b817d1a3bd7b824cbbe5b22f1521b4dd6ea2cc93`: CI PASS, Database PASS, E2E H6 PASS, OPS-02 PASS, H7 PASS.
+- HITO 8 continúa **BLOCKED exclusivamente por GO-10**; este cierre no autoriza merge, clientes reales ni cobros.
 
 ## HITO 7 — cerrado
 HITO 7 y todos los hitos anteriores permanecen aprobados e integrados en `main`.
