@@ -1,8 +1,8 @@
 # CURRENT_STATE — 2026-10-05
 
-## HITO 8 — GO-LIVE / producción en curso
+## HITO 8 — GO-LIVE / producción aprobado
 
-**ESTADO ACTUAL: BLOCKED / NO CLIENTES REALES.**
+**ESTADO ACTUAL: PASS.** HITO 8 aprobado expresamente por el usuario el 2026-10-05.
 
 Repositorio: `marioleongayo23-spec/fichaje`  
 Rama: `astra/hito-8-go-live`  
@@ -28,7 +28,7 @@ PR: #17 — OPEN; no merge ni activación comercial sin aprobación expresa post
 | GO-07 Recuperación | PASS | Backup productivo age `fichaje-db-20261002T100304Z-2af8ca8e`, restore aislado de esa misma copia PASS, negativos REC-03 PASS y journal independiente Neon Frankfurt con `verify-full`. El ciphertext se migró además a un segundo proyecto Neon Free (`fichaje-backups`, Frankfurt), con SHA/tamaño/cabecera/manifest verificados, clave age ausente, inmutabilidad y purga autorizada solo tras 35 días. |
 | GO-08 Incidente | PASS | Workflow H7 del mismo HEAD: `Incident response drill IR-01` SUCCESS; simulacro sintético cubre detección, contención, evidencia, revocación/rotación, evaluación RGPD, recuperación y reapertura autorizada. |
 | GO-09 Legal/comercial | PASS de readiness | Revisión normativa vigente; paquete Art. 28, subencargados/transferencias, información a plantilla, RLT/Inspección, convenio/pausas y onboarding preparados. Backup laboral futuro aprobado en Neon/Databricks bajo su marco DPA, no en Drive personal. Los campos de identidad/firma se completan obligatoriamente en el onboarding de cada cliente y no son inventables antes de existir ese cliente. |
-| GO-10 Gobierno | **BLOCKED por plataforma** | Rollback implementado/documentado/probado. GitHub informa `main protected:false` y GitHub Free no ofrece protected branches/rulesets para repos privados. Se añade `.github/workflows/main-integrity.yml` como control compensatorio: cualquier push a `main` sin PR merged + 5 workflows PASS falla y abre incidencia CRITICAL. Detecta después del push y por tanto no satisface la prohibición preventiva exigida por GO-10. |
+| GO-10 Gobierno | PASS por aceptación expresa de riesgo residual | Rollback implementado/documentado/probado. GitHub Free no ofrece protección preventiva de `main` en este repo privado; el usuario aprueba expresamente el 2026-10-05 cerrar HITO 8 manteniendo el repositorio privado y el plan gratuito. `.github/workflows/main-integrity.yml` queda como control compensatorio post-push y este riesgo residual permanece documentado. |
 
 ### GO-07 — evidencia productiva
 Backup:
@@ -51,11 +51,11 @@ Journal:
 - prueba real: event `d94988fa-5111-47c5-8fa5-18cc30dccc17`, XID 1482 committed, finalización COMMITTED, `verify_journal_entry=true`, unresolved=0.
 No se almacena ninguna contraseña o user mapping en Git.
 
-### Bloqueos para el primer cliente
+### Condiciones operativas para el primer cliente
 1. **Onboarding contractual por cliente**: completar razón social/NIF/domicilio/contacto del proveedor y del cliente, firmar encargo Art. 28, inventario de subencargados, información a plantilla y checklist de convenio/pausas. Es una operación de alta, no trabajo técnico pendiente del producto.
-2. **Protección preventiva de main**: GitHub Free + repo privado no permite la protección requerida. El guard compensatorio detecta y alerta, pero no puede impedir el push. Mantener GitHub Free y repo privado deja GO-10 formalmente BLOCKED.
+2. **Riesgo residual de gobierno**: `main` no puede protegerse preventivamente bajo GitHub Free + repo privado; el control compensatorio detecta después del push. Riesgo aceptado expresamente por el usuario para cerrar HITO 8.
 
-No se han creado clientes reales ni secretos en GitHub. Cualquier gasto, publicación del repositorio, merge o activación comercial requiere autorización expresa.
+No se han creado clientes reales ni secretos en GitHub. Stripe continúa desactivado hasta su activación expresa.
 
 ### Stripe readiness — cierre de regresiones 2026-10-05
 - PR #17 mantiene billing **PREPARADO / DESACTIVADO**: no se han añadido secretos Stripe, clientes, cobros ni activación comercial.
@@ -63,7 +63,7 @@ No se han creado clientes reales ni secretos en GitHub. Cualquier gasto, publica
 - `billing_begin_checkout` conserva privilegio mínimo: la lectura del estado de organización ya no solicita un lock que exigía UPDATE; la exclusión mutua del checkout permanece en `private.billing_accounts ... for update`.
 - El deployer incluye la función `billing` y su test operativo refleja el orden real sin ampliar credenciales.
 - Evidencia sobre `b817d1a3bd7b824cbbe5b22f1521b4dd6ea2cc93`: CI PASS, Database PASS, E2E H6 PASS, OPS-02 PASS, H7 PASS.
-- HITO 8 continúa **BLOCKED exclusivamente por GO-10**; este cierre no autoriza merge, clientes reales ni cobros.
+- HITO 8 queda **aprobado** por orden expresa del usuario del 2026-10-05, aceptando el riesgo residual GO-10. Stripe permanece desactivado y este cierre no activa cobros.
 
 ## HITO 7 — cerrado
 HITO 7 y todos los hitos anteriores permanecen aprobados e integrados en `main`.
