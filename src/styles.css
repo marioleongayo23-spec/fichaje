@@ -2373,3 +2373,35 @@ body {
 .bundy-main-clock-action {
   background: var(--bundy-aulaga);
 }
+
+
+/* HITO 11 final static safeguards before browser regression. */
+.bundy-welcome-screen .page-header > h1,
+.bundy-clock-screen .page-header > h1,
+.bundy-hours-screen .page-header > h1,
+.bundy-team-screen .page-header > h1 {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  white-space: normal;
+  margin: 0 0 0.35rem;
+  font: 500 0.56rem/1.2 "DM Mono", Menlo, ui-monospace, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6a7b70;
+}
+
+.bundy-shift-icon {
+  position: relative;
+}
+
+.bundy-correction-banner a {
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
