@@ -1,8 +1,39 @@
 # CURRENT_STATE — 2026-10-05
 
+## HITO 12 — premium UI system Bundy
+
+**ESTADO ACTUAL: IN PROGRESS.** Autorizado expresamente por el usuario el 2026-10-05 a partir de revisión visual real de la app.
+
+Rama: `astra/hito-12-premium-ui-system`  
+Base: `main@ebca6a939041bed578485b944e9e5200209297b0`.
+
+### Objetivo visual
+- Mantener identidad Bundy y paleta bosque/niebla/aulaga.
+- Elevar toda la interfaz a un lenguaje SaaS premium, limpio y contemporáneo, con inspiración Apple/Silicon Valley sin copiar otra marca.
+- Corregir especialmente los problemas observados en desktop: márgenes incoherentes, exceso de vacío, navegación inferior extraña, botones sin jerarquía, formularios planos y poca densidad informativa.
+- Conservar la réplica móvil Bundy de HITO 11 y mejorar el shell global alrededor de ella.
+
+### Alcance
+- Shell de aplicación: header, navegación, anchura útil, ritmo vertical, responsive.
+- Sistema visual global: spacing, radios, sombras, superficies, foco, botones, inputs, selects, tablas, cards, badges, avisos y dialogs.
+- Pantallas administrativas y de exportación como caso prioritario de desktop.
+- Sin inventar funcionalidades ni datos. La mejora de “información” se limita a jerarquía, contexto y presentación de datos/acciones ya existentes.
+- Sin cambios SQL, migraciones, RLS/RPC, Edge Functions, seguridad, motor horario, idempotencia, timestamps, auditoría, Stripe ni almacenamiento.
+
+### Puerta de salida
+1. Desktop ya no presenta navegación inferior tipo móvil ni controles desproporcionados.
+2. Header/nav/formularios/tablas/cards coherentes en toda la app.
+3. Márgenes y max-width consistentes; mejor uso del espacio sin llenar con datos ficticios.
+4. Mobile Bundy H11 permanece visual y funcionalmente estable.
+5. WCAG/foco/targets preservados.
+6. Diff frontend/documentación/tests visuales únicamente.
+7. CI + Database + E2E H6 + OPS-02 + H7 = 5/5 PASS mismo HEAD.
+8. PR abierto; sin merge ni despliegue productivo sin aprobación expresa posterior.
+
+
 ## HITO 11 — réplica visual Bundy
 
-**ESTADO ACTUAL: PASS técnico.** Réplica visual implementada y validada 5/5; falta únicamente validar el commit documental final y devolver el repositorio a privado antes de cualquier merge.
+**ESTADO ACTUAL: PASS / MERGED.** HITO 11 aprobado y mergeado por orden expresa del usuario. PR #27 cerrado; merge commit `ebca6a939041bed578485b944e9e5200209297b0`.
 
 Rama: `astra/hito-11-replica-visual-bundy`  
 Base: `main@e1f249b398859a073fb95784b6659eca6be37f40`.
@@ -31,8 +62,8 @@ Base: `main@e1f249b398859a073fb95784b6659eca6be37f40`.
   - E2E H6 run `37316156059`: PASS.
   - OPS-02 run `37316155993`: PASS.
   - H7 run `37316156040`: PASS.
-- El commit documental final debe volver a obtener 5/5 PASS por política del proyecto.
-- PR #27 permanece abierto; sin merge ni despliegue productivo sin aprobación expresa posterior.
+- Commit documental final `14b6c5cac4c1e83e65e8683b7ca55c662b02837d`: 5/5 PASS.
+- PR #27 fue aprobado y mergeado por orden expresa del usuario; `main` quedó en `ebca6a939041bed578485b944e9e5200209297b0`.
 
 
 ## HITO 10 — fidelidad visual Bundy + entrada/login + despliegue final
