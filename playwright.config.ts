@@ -37,7 +37,7 @@ export default defineConfig({
     timeout: 180_000,
     reuseExistingServer: false,
     env: {
-      VITE_SUPABASE_URL: url, VITE_SUPABASE_PUBLISHABLE_KEY: publishable,
+      VITE_SUPABASE_URL: url, VITE_SUPABASE_PUBLISHABLE_KEY: publishable, VITE_BILLING_ENABLED: '1',
       FICHAJE_KIOSK_GATEWAY_TARGET: 'http://127.0.0.1:8765', FICHAJE_EXPORT_LINK_TARGET: 'http://127.0.0.1:8000',
     },
   },
