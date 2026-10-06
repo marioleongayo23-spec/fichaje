@@ -6,8 +6,16 @@ export const BRAND = 'bundy';
 export interface AppEnvironment extends PublicEnvironment {
   VITE_KIOSK_GATEWAY_URL?: string;
   VITE_EXPORT_LINK_URL?: string;
+  VITE_BILLING_GATEWAY_URL?: string;
+  VITE_BILLING_ENABLED?: string;
 }
-export interface AppConfig { supabase: SupabaseConfig; kioskGatewayUrl: string; exportLinkUrl: string }
+export interface AppConfig {
+  supabase: SupabaseConfig;
+  kioskGatewayUrl: string;
+  exportLinkUrl: string;
+  billingGatewayUrl: string;
+  billingEnabled: boolean;
+}
 
 // Server-only functions are reached through public URLs; never keys or secrets.
 // A relative path keeps them same-origin (reverse proxy), avoiding open CORS.
@@ -33,5 +41,7 @@ export function readAppConfig(env: AppEnvironment): AppConfig | null {
     supabase,
     kioskGatewayUrl: readEndpoint(env.VITE_KIOSK_GATEWAY_URL, '/gateway/kiosk'),
     exportLinkUrl: readEndpoint(env.VITE_EXPORT_LINK_URL, '/gateway/export-link'),
+    billingGatewayUrl: readEndpoint(env.VITE_BILLING_GATEWAY_URL, '/gateway/billing'),
+    billingEnabled: env.VITE_BILLING_ENABLED?.trim() === '1',
   };
 }
