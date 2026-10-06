@@ -12,11 +12,11 @@
 - Billing cerrado por defecto y **solo test mode** en H13. El runtime rechaza `sk_live_*`.
 - Sin secretos en GitHub y sin cobros reales. El E2E real de Stripe test mode es puerta obligatoria antes de PASS.
 
-### Evidencia pendiente
-- Regresión 5/5 del HEAD de H13.
-- E2E real Stripe test mode: catálogo, Checkout, webhook firmado/replay/out-of-order, portal y seat sync.
-- Validación del enlace Webflow → `/contratar` una vez desplegado el candidato.
-- **Dependencia externa conocida:** la cuenta Stripe está gestionada desde la empresa y no se conectará desde esta sesión. H13 no puede declararse PASS ni mergearse hasta ejecutar allí STRIPE-09 con credenciales test, sin compartir secretos en chat ni GitHub.
+### Evidencia
+- HEAD interno validado `7612086a935fac948b5abe282bc789cf8364c8a7`: CI `37426538932`, Database `37426538957`, E2E H6 `37426538843`, OPS-02 `37426538930`, H7 `37426538881` = **5/5 PASS**.
+- Pendiente exclusivamente STRIPE-09: E2E real Stripe test mode (catálogo, Checkout, webhook firmado/replay/out-of-order, portal y seat sync) y validación Webflow → `/contratar` sobre candidato desplegado.
+- **Dependencia externa conocida:** la cuenta Stripe está gestionada desde la empresa y no se conectará desde esta sesión. H13 queda BLOCKED para PASS/merge hasta ejecutar allí STRIPE-09 con credenciales test, sin compartir secretos en chat ni GitHub.
+- Este commit documental final debe volver a obtener 5/5 PASS por política del proyecto.
 
 ## HITO 12 — premium UI system Bundy
 
