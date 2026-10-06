@@ -6,6 +6,7 @@ import { EmployeesPage } from './admin/EmployeesPage';
 import { ExportsPage, OwnExportPage } from './admin/ExportsPage';
 import { MembersPage } from './admin/MembersPage';
 import { PoliciesPage } from './admin/PoliciesPage';
+import { BillingPage } from './billing/BillingPage';
 import { AuthProvider, useAuth } from './app/auth';
 import { Layout } from './app/Layout';
 import { LoginPage } from './app/LoginPage';
@@ -62,11 +63,11 @@ function HumanApp({ config }: { config: AppConfig }) {
 
 function Session() {
   const auth = useAuth();
-  const { navigate } = useRouter();
-  // A new sign-in always starts at the home route, never at the previous user's page.
-  useEffect(() => { if (!auth.loading && !auth.session) navigate('/'); }, [auth.loading, auth.session, navigate]);
+  const { path, navigate } = useRouter();
+  // /contratar is the only public deep-link. Other stale paths are discarded on sign-out.
+  useEffect(() => { if (!auth.loading && !auth.session && path !== '/contratar') navigate('/'); }, [auth.loading, auth.session, navigate, path]);
   if (auth.loading) return <main id="contenido" className="auth-page"><Loading label="Comprobando la sesión…" /></main>;
-  if (!auth.session) return <LoginPage />;
+  if (!auth.session) return <LoginPage initialMode={path === '/contratar' ? 'register' : 'login'} />;
   return <TenantProvider key={auth.session.user.id}><TenantGate /></TenantProvider>;
 }
 
@@ -108,6 +109,7 @@ function Routes() {
   const { path } = useRouter();
   const tenant = useCurrentTenant();
   const manager = isManager(tenant.role);
+  const owner = tenant.role === 'OWNER';
   const own = tenant.current.employee !== null;
   switch (path) {
     case '/': return own || !manager ? <ClockPage /> : <EmployeesPage />;
@@ -121,6 +123,8 @@ function Routes() {
     case '/gestion/horas': return <Guard allowed={manager}><ClassificationsPage /></Guard>;
     case '/gestion/exportaciones': return <Guard allowed={manager}><ExportsPage /></Guard>;
     case '/gestion/kioscos': return <Guard allowed={manager}><DevicesPage /></Guard>;
+    case '/contratar':
+    case '/gestion/facturacion': return <Guard allowed={owner}><BillingPage /></Guard>;
     default: return (<><PageHeader title="Página no encontrada" /><Notice tone="info" title="La dirección no existe. Usa el menú para continuar." /></>);
   }
 }
