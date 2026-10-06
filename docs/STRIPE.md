@@ -1,6 +1,6 @@
 # Stripe — preparación de facturación
 
-Estado: **PREPARADO / DESACTIVADO**. Este documento define el contrato para conectar la cuenta Stripe de Fichaje APP sin almacenar secretos en GitHub ni cobrar a clientes durante HITO 8.
+Estado HITO 13: **IMPLEMENTACIÓN TEST MODE**. Checkout, webhook, portal, UI OWNER y sincronización de empleados quedan integrados con fail-closed. El runtime rechaza claves live; no se cobra a clientes reales y ningún secreto se almacena en GitHub.
 
 ## Objetivo
 
@@ -64,7 +64,7 @@ Servidor, nunca frontend:
 
 Ninguna variable Stripe se incluirá como `VITE_*`.
 
-## Contrato de runtime pendiente de la siguiente entrega
+## Contrato de runtime HITO 13
 
 ### Checkout
 
@@ -152,9 +152,9 @@ No guardar facturas completas ni datos de pago salvo que exista una necesidad co
 
 ## Activación y control de acceso
 
-**No se implementa en este cambio.**
+HITO 13 añade la entrada pública `/contratar`, la pantalla OWNER `/gestion/facturacion` y el despacho de seat-sync tras cambios de empleados. La mutación laboral confirma primero en PostgreSQL; la llamada a Stripe es best-effort y el outbox privado conserva la revisión si falla.
 
-La facturación se activa únicamente cuando Checkout + webhook + portal + seat sync tengan tests completos en Stripe test mode.
+La facturación real sigue desactivada. El runtime H13 acepta exclusivamente `sk_test_*`; una clave live hace que billing quede DOWN. Checkout + webhook + portal + seat sync deben superar además la prueba real en Stripe test mode antes de cerrar el hito.
 
 No se debe reutilizar `organizations.status='SUSPENDED'` de forma automática ante un único fallo de pago: ese estado hoy bloquea las RPC laborales. La política de grace period, dunning y acceso a evidencias debe definirse expresamente para no impedir el acceso legal a registros históricos por un incidente de cobro.
 
