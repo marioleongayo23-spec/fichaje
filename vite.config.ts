@@ -34,7 +34,7 @@ function serviceWorker(): Plugin {
 // network only to the configured Supabase origin (and gateways if absolute).
 export function contentSecurityPolicy(env: Record<string, string>): string {
   const origins = new Set<string>();
-  for (const key of ['VITE_SUPABASE_URL', 'VITE_KIOSK_GATEWAY_URL', 'VITE_EXPORT_LINK_URL']) {
+  for (const key of ['VITE_SUPABASE_URL', 'VITE_KIOSK_GATEWAY_URL', 'VITE_EXPORT_LINK_URL', 'VITE_BILLING_GATEWAY_URL']) {
     const value = env[key]?.trim();
     if (value && /^https?:\/\//.test(value)) origins.add(new URL(value).origin);
   }
@@ -97,9 +97,11 @@ function gatewayProxy(): Record<string, ProxyOptions> {
   const proxy: Record<string, ProxyOptions> = {};
   const kiosk = process.env.FICHAJE_KIOSK_GATEWAY_TARGET;
   const exportLink = process.env.FICHAJE_EXPORT_LINK_TARGET;
+  const billing = process.env.FICHAJE_BILLING_GATEWAY_TARGET;
   if (kiosk) proxy['/gateway/kiosk'] = { target: kiosk, rewrite: (path) => path.replace(/^\/gateway\/kiosk/, '') };
   // The signer answers at its root; OPS-02 health paths stay reachable same-origin.
   if (exportLink) proxy['/gateway/export-link'] = { target: exportLink, rewrite: (path) => path.replace(/^\/gateway\/export-link/, '') || '/' };
+  if (billing) proxy['/gateway/billing'] = { target: billing, rewrite: (path) => path.replace(/^\/gateway\/billing/, '') || '/' };
   return proxy;
 }
 

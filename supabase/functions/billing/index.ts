@@ -49,6 +49,9 @@ function config(): BillingConfig | null {
   try {
     const secret = required('STRIPE_SECRET_KEY');
     const webhookSecret = required('STRIPE_WEBHOOK_SECRET');
+    // HITO 13 is deliberately test-mode only. A live key fails closed even if
+    // billing was enabled; live charging needs a later explicit approval.
+    if (!secret.startsWith('sk_test_') || !webhookSecret.startsWith('whsec_')) throw new Error('CONFIG_REQUIRED');
     const basePrice = required('STRIPE_PRICE_BASE_MONTHLY');
     const employeePrice = required('STRIPE_PRICE_EMPLOYEES_MONTHLY');
     if (!stripeId('price_', basePrice) || !stripeId('price_', employeePrice)) throw new Error('CONFIG_REQUIRED');

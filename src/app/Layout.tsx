@@ -6,7 +6,7 @@ import { useAuth } from './auth';
 import { Link, useRouter } from './router';
 import { useCurrentTenant } from './tenant';
 
-type NavIconName = 'clock' | 'hours' | 'edit' | 'download' | 'team' | 'people' | 'calendar' | 'approve' | 'chart' | 'reports' | 'kiosk';
+type NavIconName = 'clock' | 'hours' | 'edit' | 'download' | 'team' | 'people' | 'calendar' | 'approve' | 'chart' | 'reports' | 'kiosk' | 'billing';
 
 export const PERSONAL_NAV = [
   { to: '/', label: 'Fichar', icon: 'clock' },
@@ -25,6 +25,10 @@ export const MANAGEMENT_NAV = [
   { to: '/gestion/kioscos', label: 'Kioscos', icon: 'kiosk' },
 ] satisfies { to: string; label: string; icon: NavIconName }[];
 
+export const OWNER_NAV = [
+  { to: '/gestion/facturacion', label: 'Facturación', icon: 'billing' },
+] satisfies { to: string; label: string; icon: NavIconName }[];
+
 function NavIcon({ name }: { name: NavIconName }) {
   const p = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
   switch (name) {
@@ -39,6 +43,7 @@ function NavIcon({ name }: { name: NavIconName }) {
     case 'chart': return <svg {...p}><path d="M5 20V10M12 20V4M19 20v-7" /></svg>;
     case 'reports': return <svg {...p}><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
     case 'kiosk': return <svg {...p}><rect x="5" y="3" width="14" height="16" rx="2" /><path d="M9 22h6M12 19v3M9 7h6" /></svg>;
+    case 'billing': return <svg {...p}><rect x="4" y="6" width="16" height="13" rx="2" /><path d="M4 10h16M8 15h3" /></svg>;
   }
 }
 
@@ -65,6 +70,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const personal = tenant.current.employee !== null;
   const manager = isManager(tenant.role);
+  const owner = tenant.role === 'OWNER';
 
   useEffect(() => {
     setMenuOpen(false);
@@ -110,7 +116,7 @@ export function Layout({ children }: { children: ReactNode }) {
           {manager && (
             <div className="nav-group">
               <p className="nav-group-title" id="nav-management">Gestión</p>
-              <ul aria-labelledby="nav-management"><NavItems items={MANAGEMENT_NAV} /></ul>
+              <ul aria-labelledby="nav-management"><NavItems items={[...MANAGEMENT_NAV, ...(owner ? OWNER_NAV : [])]} /></ul>
             </div>
           )}
           <div className="nav-footer" aria-hidden="true">

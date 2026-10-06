@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { currentPolicy, useLoader } from '../app/hooks';
+import { useAuth } from '../app/auth';
 import { useServices } from '../app/services';
 import { useCurrentTenant } from '../app/tenant';
 import { sortSessions } from '../domain/evidence';
@@ -8,6 +9,7 @@ import type { Employee, EmployeeState } from '../domain/types';
 import { newRequestId, rpc } from '../lib/api';
 import { errorMessage } from '../lib/errors';
 import { currentMonth, DEFAULT_ZONE, formatDateTime, formatTime, localDate, zoneLabel, zonedCandidates } from '../lib/time';
+import { syncSeats } from '../billing/client';
 import { loadRequests } from '../employee/CorrectionsPage';
 import { SessionView } from '../employee/SessionView';
 import { Link } from '../app/router';
@@ -133,7 +135,8 @@ export function EmployeesPage() {
 function EmployeeForm({ directory, employee, onClose, onSaved }: {
   directory: Directory; employee: Employee | null; onClose: () => void; onSaved: (name: string) => void;
 }) {
-  const { client } = useServices();
+  const { client, config } = useServices();
+  const { session } = useAuth();
   const tenant = useCurrentTenant();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ code?: string; name?: string }>({});
@@ -166,6 +169,9 @@ function EmployeeForm({ directory, employee, onClose, onSaved }: {
     try {
       await rpc(client, 'manage_employee', { ...args, p_request_id: requestId });
       attempt.current = null;
+      // Stripe is never part of the labour transaction. If this best-effort
+      // dispatch fails, the database outbox keeps the seat revision pending.
+      if (config.billingEnabled && session) void syncSeats(config, session.access_token, tenant.current.organization.id).catch(() => undefined);
       onSaved(name);
     } catch (failure) {
       tenant.handleError(failure);

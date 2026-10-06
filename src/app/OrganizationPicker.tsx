@@ -6,13 +6,16 @@ import { parseInvitation } from '../lib/codes';
 import { asApiError, errorMessage } from '../lib/errors';
 import { Field, LiveRegion, Notice } from '../ui/components';
 import { useAuth } from './auth';
+import { useRouter } from './router';
 import { useServices } from './services';
 import { useTenant } from './tenant';
 
 export function OrganizationPicker() {
   const tenant = useTenant();
   const { signOut } = useAuth();
+  const { path } = useRouter();
   const empty = tenant.entries.length === 0;
+  const contracting = path === '/contratar';
   useEffect(() => { document.title = `${empty ? 'Configurar empresa' : 'Elegir organización'} · ${BRAND}`; }, [empty]);
   return (
     <main id="contenido" className="auth-page">
@@ -25,8 +28,10 @@ export function OrganizationPicker() {
         {tenant.error && <Notice tone="error" title={tenant.error} />}
         {empty ? (
           <>
-            <p>Tu cuenta todavía no pertenece a ninguna empresa. Puedes crear tu primera empresa o aceptar una invitación existente.</p>
-            <CreateOrganization />
+            <p>{contracting
+              ? 'Crea la empresa que quedará vinculada a tu suscripción. Después continuarás al pago seguro en Stripe.'
+              : 'Tu cuenta todavía no pertenece a ninguna empresa. Puedes crear tu primera empresa o aceptar una invitación existente.'}</p>
+            <CreateOrganization contracting={contracting} />
           </>
         ) : (
           <>
@@ -50,7 +55,7 @@ export function OrganizationPicker() {
   );
 }
 
-function CreateOrganization() {
+function CreateOrganization({ contracting = false }: { contracting?: boolean }) {
   const { client } = useServices();
   const tenant = useTenant();
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +95,7 @@ function CreateOrganization() {
           {(p) => <input {...p} name="organization" type="text" autoComplete="organization" maxLength={200} required />}
         </Field>
         <LiveRegion tone="error" message={error} />
-        <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? 'Creando empresa…' : 'Crear empresa'}</button>
+        <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? 'Creando empresa…' : contracting ? 'Crear empresa y continuar' : 'Crear empresa'}</button>
       </form>
     </section>
   );

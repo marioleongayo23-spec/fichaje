@@ -1,8 +1,26 @@
-# CURRENT_STATE — 2026-10-05
+# CURRENT_STATE — 2026-10-06
+
+## HITO 13 — contratación + Stripe E2E
+
+**ESTADO ACTUAL: EN IMPLEMENTACIÓN.** Rama `astra/hito-13-stripe-e2e`, base `main@36341b7064edad3bc1aacc58b671bc0583d557d2`.
+
+### Alcance autorizado
+- Webflow Bundy permanece como web comercial; su CTA debe apuntar a la entrada pública de la app `/contratar`.
+- Flujo seguro: cuenta verificada → alta de primera empresa OWNER → Stripe-hosted Checkout → webhook firmado → suscripción → acceso y Customer Portal.
+- UI OWNER de facturación, callback informativo no autoritativo y URLs Stripe validadas antes de redirigir.
+- Seat sync desacoplado del alta/baja de empleados: PostgreSQL confirma primero, outbox durable y reconciliación posterior.
+- Billing cerrado por defecto y **solo test mode** en H13. El runtime rechaza `sk_live_*`.
+- Sin secretos en GitHub y sin cobros reales. El E2E real de Stripe test mode es puerta obligatoria antes de PASS.
+
+### Evidencia
+- HEAD interno validado `7612086a935fac948b5abe282bc789cf8364c8a7`: CI `37426538932`, Database `37426538957`, E2E H6 `37426538843`, OPS-02 `37426538930`, H7 `37426538881` = **5/5 PASS**.
+- Pendiente exclusivamente STRIPE-09: E2E real Stripe test mode (catálogo, Checkout, webhook firmado/replay/out-of-order, portal y seat sync) y validación Webflow → `/contratar` sobre candidato desplegado.
+- **Dependencia externa conocida:** la cuenta Stripe está gestionada desde la empresa y no se conectará desde esta sesión. H13 queda BLOCKED para PASS/merge hasta ejecutar allí STRIPE-09 con credenciales test, sin compartir secretos en chat ni GitHub.
+- Este commit documental final debe volver a obtener 5/5 PASS por política del proyecto.
 
 ## HITO 12 — premium UI system Bundy
 
-**ESTADO ACTUAL: PASS técnico.** Sistema visual premium implementado y validado 5/5; falta únicamente validar el commit documental final y devolver el repositorio a privado antes de cualquier merge.
+**ESTADO ACTUAL: PASS / MERGED.** PR #28 aprobado y mergeado por orden expresa del usuario el 2026-10-06; merge commit `36341b7064edad3bc1aacc58b671bc0583d557d2`. Sistema visual premium implementado y validado 5/5; falta únicamente validar el commit documental final y devolver el repositorio a privado antes de cualquier merge.
 
 Rama: `astra/hito-12-premium-ui-system`  
 Base: `main@ebca6a939041bed578485b944e9e5200209297b0`.
@@ -36,8 +54,8 @@ Base: `main@ebca6a939041bed578485b944e9e5200209297b0`.
   - E2E H6 run `37331154438`: PASS.
   - OPS-02 run `37331154464`: PASS.
   - H7 run `37331154254`: PASS.
-- El commit documental final debe volver a obtener 5/5 PASS por política del proyecto.
-- PR #28 permanece abierto; sin merge ni despliegue productivo sin aprobación expresa posterior.
+- HEAD final `16fc1d89f03ade1a21bd08452d99a054214cf074`: CI `37332154836`, Database `37332154868`, E2E H6 `37332155055`, OPS-02 `37332154895`, H7 `37332154869` = 5/5 PASS.
+- PR #28 fue aprobado y mergeado; `main` quedó en `36341b7064edad3bc1aacc58b671bc0583d557d2`.
 
 
 ## HITO 11 — réplica visual Bundy

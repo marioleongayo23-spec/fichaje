@@ -147,3 +147,20 @@ Antes del **primer cliente real / producción**, habrá una puerta operativa sep
 | GO-08 | Simulacro de incidente con tenant sintético: detección, revocación, evidencia, rotación, evaluación, canary/invariantes y reapertura |
 | GO-09 | `COMPLIANCE.md` revisado a fecha de salida; paquete contractual y parametrización convenio/pausas por cliente |
 | GO-10 | `main` protegido y release/rollback gobernados; aprobación expresa posterior para producción/primer cliente |
+
+
+## HITO 13 — contratación + Stripe E2E
+| ID | Prueba y resultado exigido |
+|---|---|
+| STRIPE-01 | Entrada pública `/contratar`: registro/login → cuenta verificada → primera organización OWNER → pantalla Facturación, sin elegir `organization_id` ni rol en cliente |
+| STRIPE-02 | Checkout test mode: solo OWNER, cantidad de empleados calculada en servidor, URL exclusivamente `https://checkout.stripe.com`, idempotencia/replay sin doble suscripción |
+| STRIPE-03 | Webhook: firma Stripe sobre raw body; firma incorrecta rechazada; allowlist; duplicado idempotente; evento desordenado converge al snapshot actual |
+| STRIPE-04 | Customer Portal: solo OWNER, customer resuelto en servidor y URL exclusivamente `https://billing.stripe.com` |
+| STRIPE-05 | Seat sync: alta/baja confirma primero la transacción laboral; outbox duradero; fallo Stripe no revierte empleados; reintento usa revisión/idempotency key estable |
+| STRIPE-06 | Aislamiento: ADMIN/EMPLOYEE/cross-tenant no controlan billing; navegador no recibe IDs internos, claves, webhook secret ni datos de tarjeta |
+| STRIPE-07 | H13 rechaza `sk_live_*`; `FICHAJE_BILLING_ENABLED` cerrado por defecto; ningún cobro real antes de autorización posterior |
+| STRIPE-08 | Recuperación conserva mapping Stripe↔organización y estado de outbox; historial laboral permanece independiente del estado de cobro |
+| STRIPE-09 | E2E real en Stripe test mode cubre catálogo, Checkout, webhook, Portal y seat sync; sin secretos en Git/GitHub/logs/artefactos |
+
+No declarar PASS de HITO 13 solo por mocks de navegador. La prueba real Stripe test mode STRIPE-09 es obligatoria,
+además de la regresión CI + Database + E2E H6 + OPS-02 + H7 sobre el mismo HEAD.

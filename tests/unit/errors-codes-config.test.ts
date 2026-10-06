@@ -46,7 +46,10 @@ describe('out-of-band codes', () => {
 describe('public configuration', () => {
   const env = { VITE_SUPABASE_URL: 'https://example.supabase.co', VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_synthetic' };
   it('defaults server-only functions to same-origin paths', () => {
-    expect(readAppConfig(env)).toMatchObject({ kioskGatewayUrl: '/gateway/kiosk', exportLinkUrl: '/gateway/export-link' });
+    expect(readAppConfig(env)).toMatchObject({
+      kioskGatewayUrl: '/gateway/kiosk', exportLinkUrl: '/gateway/export-link',
+      billingGatewayUrl: '/gateway/billing', billingEnabled: false,
+    });
   });
   it.each(['http://evil.example.com/x', 'https://user:pw@example.com/x', 'https://example.com/x?token=1', '/../x', '//evil.example.com'])('rejects unsafe endpoint %s', (value) => {
     expect(() => readEndpoint(value, '/gateway/kiosk')).toThrow();
