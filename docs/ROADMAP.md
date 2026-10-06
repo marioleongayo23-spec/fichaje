@@ -50,3 +50,12 @@ H11 parte de H10 ya integrado y usa el PDF entregado como referencia visual estr
 
 ## HITO 12 — premium UI system Bundy
 H12 parte de H11 integrado y aplica un sistema visual global de mayor calidad al shell y a las pantallas administrativas/desktop. Mantiene la identidad Bundy, las funciones V1 y la réplica móvil ya validada. El objetivo es coherencia de márgenes, densidad, jerarquía, navegación, botones, formularios, tablas, cards y responsive; no añade funcionalidades ni datos ficticios y no toca backend/DB/security.
+
+
+## HITO 13 — contratación + Stripe E2E
+Parte de H12 integrado. Webflow es la web comercial y enlaza a la entrada pública de la app `/contratar`.
+El flujo técnico es: cuenta verificada → primera organización OWNER → Stripe Checkout alojado → webhook firmado
+→ estado de suscripción → app; Customer Portal gestiona facturación y el número de empleados se sincroniza desde
+el recuento autoritativo de PostgreSQL mediante outbox, sin bloquear una mutación laboral por una caída de Stripe.
+H13 es exclusivamente **test mode**: el runtime rechaza claves live y no se activa cobro real. La salida exige CI,
+Database, E2E H6, OPS-02 y H7 PASS, más un E2E real contra la cuenta Stripe de prueba sin secretos en GitHub.
