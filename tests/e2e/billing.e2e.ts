@@ -38,8 +38,9 @@ test('commercial /contratar entry creates a company and hands checkout to Stripe
 
   const org = sql(`select id from public.organizations where name='${company.replace(/'/g, "''")}';`);
   expect(org).toMatch(/^[0-9a-f-]{36}$/);
-  expect(checkoutBody).toMatchObject({ organization_id: org });
-  expect(String(checkoutBody?.request_id)).toMatch(/^[0-9a-f-]{36}$/);
+  const captured = checkoutBody as unknown as Record<string, unknown> | null;
+  expect(captured).toMatchObject({ organization_id: org });
+  expect(String(captured?.request_id)).toMatch(/^[0-9a-f-]{36}$/);
   expect(authHeader).toMatch(/^Bearer eyJ/);
   expect(sql(`select count(*) from public.memberships where organization_id='${org}' and auth_user_id='${owner.id}' and role='OWNER' and active;`)).toBe('1');
 });
