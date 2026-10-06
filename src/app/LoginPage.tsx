@@ -5,9 +5,9 @@ import { useAuth } from './auth';
 
 type Mode = 'login' | 'register';
 
-export function LoginPage() {
+export function LoginPage({ initialMode = 'login' }: { initialMode?: Mode }) {
   const { signIn, signUp, notice } = useAuth();
-  const [mode, setMode] = useState<Mode>('login');
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string; repeat?: string }>({});
   const [pending, setPending] = useState(false);
@@ -56,7 +56,9 @@ export function LoginPage() {
             <p className="bundy-auth-lead">
               {mode === 'login'
                 ? 'Entra para ver tu equipo y tus horas.'
-                : 'Crea tu acceso. Después podrás dar de alta tu empresa o aceptar una invitación.'}
+                : initialMode === 'register'
+                  ? 'Crea tu acceso para contratar Bundy. Tras verificar el correo darás de alta tu empresa y continuarás al pago seguro.'
+                  : 'Crea tu acceso. Después podrás dar de alta tu empresa o aceptar una invitación.'}
             </p>
           </div>
 
