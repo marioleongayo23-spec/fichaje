@@ -113,33 +113,58 @@ export function ExportPanel({ employees, ownEmployeeId }: { employees: Employee[
   };
 
   return (
-    <>
-      <form noValidate onSubmit={request} className="filters">
-        {manager && (
-          <Field label="Alcance">
+    <section className="export-panel" aria-label="Centro de exportaciones">
+      <section className="export-config-card" aria-labelledby="export-config-title">
+        <div className="export-config-heading">
+          <div>
+            <p className="surface-kicker">Preparar evidencia</p>
+            <h2 id="export-config-title">Configura tu exportación</h2>
+            <p>Elige alcance, periodo y zona horaria. La autorización vuelve a comprobarse al generar y descargar.</p>
+          </div>
+          <span className="export-shield" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 3 5 6v5c0 4.5 2.8 8 7 10 4.2-2 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>
+          </span>
+        </div>
+
+        <form noValidate onSubmit={request} className="filters export-filters">
+          {manager && (
+            <Field label="Alcance">
+              {(p) => (
+                <select {...p} value={subject} onChange={(e) => setSubject(e.target.value)}>
+                  <option value="">Toda la organización</option>
+                  {employees?.map((e) => <option key={e.id} value={e.id}>{e.display_name} ({e.code})</option>)}
+                </select>
+              )}
+            </Field>
+          )}
+          <Field label="Desde">{(p) => <input {...p} type="date" value={range.start} onChange={(e) => setRange({ ...range, start: e.target.value })} />}</Field>
+          <Field label="Hasta">{(p) => <input {...p} type="date" value={range.end} onChange={(e) => setRange({ ...range, end: e.target.value })} />}</Field>
+          <Field label="Zona horaria">
             {(p) => (
-              <select {...p} value={subject} onChange={(e) => setSubject(e.target.value)}>
-                <option value="">Toda la organización</option>
-                {employees?.map((e) => <option key={e.id} value={e.id}>{e.display_name} ({e.code})</option>)}
+              <select {...p} value={zone} onChange={(e) => setZone(e.target.value as SpanishZone)}>
+                {ZONES.map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}
               </select>
             )}
           </Field>
-        )}
-        <Field label="Desde">{(p) => <input {...p} type="date" value={range.start} onChange={(e) => setRange({ ...range, start: e.target.value })} />}</Field>
-        <Field label="Hasta">{(p) => <input {...p} type="date" value={range.end} onChange={(e) => setRange({ ...range, end: e.target.value })} />}</Field>
-        <Field label="Zona horaria">
-          {(p) => (
-            <select {...p} value={zone} onChange={(e) => setZone(e.target.value as SpanishZone)}>
-              {ZONES.map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}
-            </select>
-          )}
-        </Field>
-        <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? 'Solicitando…' : 'Solicitar exportación'}</button>
-      </form>
-      <p className="hint">Paquete CSV + JSON + PDF con fichajes originales, correcciones y totales. Se conserva 24 horas; cada descarga genera un enlace temporal de 5 minutos como máximo.</p>
+          <button type="submit" className="btn btn-primary export-submit" disabled={pending}>{pending ? 'Solicitando…' : 'Solicitar exportación'}</button>
+        </form>
+
+        <div className="export-meta-grid" aria-label="Características de la exportación">
+          <div><span>Formatos</span><strong>CSV · JSON · PDF</strong></div>
+          <div><span>Disponibilidad</span><strong>24 horas</strong></div>
+          <div><span>Enlace de descarga</span><strong>5 minutos</strong></div>
+        </div>
+      </section>
+
       <LiveRegion tone="info" message={status} />
       <LiveRegion tone="error" message={error} />
-      <h2>Solicitadas en esta sesión</h2>
+      <div className="section-heading">
+        <div>
+          <p className="surface-kicker">Actividad reciente</p>
+          <h2>Solicitadas en esta sesión</h2>
+        </div>
+        <span className="section-count">{jobs.length}</span>
+      </div>
       {jobs.length === 0 ? <EmptyState>No has solicitado exportaciones en esta sesión.</EmptyState> : (
         <ul className="card-list">
           {jobs.map((job) => (
@@ -162,7 +187,7 @@ export function ExportPanel({ employees, ownEmployeeId }: { employees: Employee[
         <DeliveryDialog job={delivering} onClose={() => setDelivering(null)}
           onDone={(reference) => { setJobs((list) => list.map((j) => j.id === delivering.id ? { ...j, delivered: reference } : j)); setDelivering(null); setStatus('Entrega registrada y auditada.'); }} />
       )}
-    </>
+    </section>
   );
 }
 

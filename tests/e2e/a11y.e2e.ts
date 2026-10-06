@@ -6,6 +6,26 @@ import { go, login } from './support/ui';
 
 test.use({ serviceWorkers: 'block' });
 
+test('HITO 12 premium desktop shell and export control center', { tag: '@desktop-only' }, async ({ page }) => {
+  const s = await scenario();
+  await login(page, s.owner);
+  await go(page, 'Exportaciones');
+
+  await expect(page.locator('.app')).toHaveCSS('display', 'grid');
+  await expect(page.locator('.nav-icon svg').first()).toBeVisible();
+  const nav = await page.getByRole('navigation', { name: 'Principal' }).boundingBox();
+  const main = await page.getByRole('main').boundingBox();
+  expect(nav).not.toBeNull();
+  expect(main).not.toBeNull();
+  expect((nav?.x ?? 9999)).toBeLessThan(main?.x ?? 0);
+
+  await expect(page.locator('.export-config-card')).toBeVisible();
+  await expect(page.getByText('Configura tu exportación', { exact: true })).toBeVisible();
+  await expect(page.locator('.export-meta-grid > div')).toHaveCount(3);
+  await targets(page);
+  await audit(page, 'premium export desktop');
+});
+
 test('Bundy visual contract is present on clean login and clock', { tag: '@desktop-only' }, async ({ page }) => {
   const s = await scenario();
   await page.goto('/');
