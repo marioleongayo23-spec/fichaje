@@ -16,6 +16,7 @@
 - Regresión 5/5 del HEAD de H13.
 - E2E real Stripe test mode: catálogo, Checkout, webhook firmado/replay/out-of-order, portal y seat sync.
 - Validación del enlace Webflow → `/contratar` una vez desplegado el candidato.
+- **Dependencia externa conocida:** la cuenta Stripe está gestionada desde la empresa y no se conectará desde esta sesión. H13 no puede declararse PASS ni mergearse hasta ejecutar allí STRIPE-09 con credenciales test, sin compartir secretos en chat ni GitHub.
 
 ## HITO 12 — premium UI system Bundy
 
