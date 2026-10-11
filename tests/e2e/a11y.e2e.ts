@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { audit, structure, targets } from './support/a11y';
 import { addMember, clock, rpc, scenario, sql } from './support/backend';
-import { go, login } from './support/ui';
+import { go, login, logout } from './support/ui';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -90,6 +90,7 @@ test('HITO 14 desktop correction uses wide content and keeps the approved sideba
   expect((await hours.boundingBox())?.width ?? 0).toBeGreaterThan(620);
   await expect(hours.getByRole('heading', { name: 'Mi registro' })).toBeVisible();
 
+  await logout(page);
   await login(page, s.owner);
   await go(page, 'Empleados');
   const team = page.locator('.bundy-team-screen');
