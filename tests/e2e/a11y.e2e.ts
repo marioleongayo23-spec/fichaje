@@ -60,6 +60,39 @@ test('Bundy visual contract is present on clean login and clock', { tag: '@deskt
   expect(Math.abs((box?.width ?? 0) - (box?.height ?? 0))).toBeLessThanOrEqual(2);
 });
 
+test('HITO 14 floating navigation preserves mobile routes, selection and touch targets', async ({ page }) => {
+  const s = await scenario();
+  await clock(s.org, s.employee, s.employee.employee!, 'CLOCK_IN', 0);
+  await clock(s.org, s.employee, s.employee.employee!, 'CLOCK_OUT', 1);
+  await page.setViewportSize({ width: 320, height: 680 });
+  await login(page, s.employee);
+
+  const nav = page.getByRole('navigation', { name: 'Accesos de jornada' });
+  await expect(nav).toBeVisible();
+  await expect(nav.getByRole('link')).toHaveCount(4);
+  const frame = await page.locator('.bundy-phone-screen').boundingBox();
+  const bar = await nav.boundingBox();
+  expect(frame).not.toBeNull();
+  expect(bar).not.toBeNull();
+  expect((bar?.x ?? 0) - (frame?.x ?? 0)).toBeGreaterThanOrEqual(8);
+  expect((frame?.y ?? 0) + (frame?.height ?? 0) - (bar?.y ?? 0) - (bar?.height ?? 0)).toBeGreaterThanOrEqual(8);
+
+  for (const link of await nav.getByRole('link').all()) {
+    const box = await link.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+  }
+  await expect(nav.getByRole('link', { name: 'Fichar' })).toHaveAttribute('aria-current', 'page');
+  await nav.getByRole('link', { name: 'Mis horas' }).click();
+  await expect(page.getByRole('heading', { name: 'Mi registro' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Mis horas' })).toHaveAttribute('aria-current', 'page');
+  await nav.getByRole('link', { name: 'Fichar' }).click();
+  await expect(page.getByRole('heading', { name: 'Fichar' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Fichar' })).toHaveAttribute('aria-current', 'page');
+  await targets(page);
+  await audit(page, 'H14 floating mobile navigation');
+});
+
 test('employee screens pass axe, structure and target-size checks', async ({ page }) => {
   const s = await scenario();
   await clock(s.org, s.employee, s.employee.employee!, 'CLOCK_IN', 0);
