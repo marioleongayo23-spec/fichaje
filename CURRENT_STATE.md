@@ -1,5 +1,27 @@
 # CURRENT_STATE — 2026-10-11
 
+## HITO 15 — invitaciones por correo + emails corporativos Bundy
+
+**ESTADO ACTUAL: IMPLEMENTADO EN RAMA / VALIDACIÓN PENDIENTE.** Desactivado por defecto. No se ha configurado SMTP Auth ni proveedor de envío remoto; no se han enviado correos reales.
+
+Rama: `astra/hito-15-email-bundy`. Base: `main@f167a58124c60836ef47691063fed6f849ab65df`. PR contra main pendiente.
+
+### Alcance
+- `supabase/templates/`: cinco templates de Supabase Auth (confirmación, recuperación, enlace de acceso, cambio de correo, invitación Auth) con colores Bundy y logo PNG; referencias locales `supabase/config.toml`.
+- `supabase/functions/send-invitation/`: nueva función HTTP con JWT Auth, validación de origen/cuerpo, RPC `create_invitation` como único autorizador, API transaccional con clave de idempotencia. Sin service_role ni tokens en base de datos o URL.
+- `src/admin/MembersPage.tsx`: envío automático solo cuando está habilitado; fallback seguro al mismo token y request_id en resultado incierto; estado de proveedor aceptado no se presenta como email entregado.
+- `src/app/OrganizationPicker.tsx`: instrucciones para invitaciones por email; `src/config.ts` y `.env.example`: flag pública apagada por defecto.
+- `tests/unit/email-invites.test.ts` y ajustes a guards/config. `docs/EMAIL.md` describe despliegue, coste mínimo, SMTP, dominio, seguridad y pruebas necesarias.
+- Ninguna alteración de fichajes, correcciones, RLS, SQL, timestamps, auditoría, Stripe, empresa/roles o entorno remoto.
+
+### Pendiente antes de PASS/producción
+- CI + Database + E2E H6 + OPS-02 + H7 sobre HEAD final.
+- Validación real en staging de correo transaccional y templates Supabase Auth; proveedor/dominio verificado, SPF/DKIM/DMARC y antispam, cuotas y rate limit. Ningún secreto en GitHub.
+- Aplicar HTML Auth en dashboard remoto (el config local no los publica); configurar remitente Bundy en SMTP; verificar correo recibido. No asumir que el plugin permite actualizar email templates hosted.
+- Mantener HITO 13 en PR #29, Stripe STRIPE-09 pendiente; no mezclar cambios ni desplegar producción.
+- HITO 14 **MERGED** en `main` por orden expresa del usuario, PR #30 y merge `f167a58124c60836ef47691063fed6f849ab65df`.
+
+
 ## HITO 14 — navegación inferior premium Bundy (demo socio)
 
 **ESTADO ACTUAL: PASS TÉCNICO del código validado; PR #30 abierto.** Faltan la aprobación explícita de merge, la repetición de gates del commit documental final y la verificación visual en staging. No se declara producto desplegado.
