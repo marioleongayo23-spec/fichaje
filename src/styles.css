@@ -3344,3 +3344,285 @@ textarea:focus {
     display: grid !important;
   }
 }
+
+
+/* HITO 14 desktop correction — use the full workspace, not a simulated phone.
+   The existing mobile replica and 4-button bottom nav remain unchanged below
+   48rem. The main sidebar already provides these same destinations on desktop. */
+@media (min-width: 48rem) {
+  .app-main {
+    container-type: inline-size;
+  }
+
+  .app-main > .bundy-phone-screen {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    display: block;
+  }
+
+  .app-main > .bundy-phone-screen > .bundy-screen-content {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: auto;
+    overflow: visible;
+    overscroll-behavior: auto;
+    padding: 0;
+  }
+
+  /* 5G and the phone-only bottom links are presentation, not desktop controls. */
+  .app-main > .bundy-phone-screen .bundy-status-bar,
+  .app-main > .bundy-phone-screen > .bundy-mobile-nav {
+    display: none;
+  }
+
+  .app-main > .bundy-phone-screen .page-header > h1 {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0 0 0.8rem;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
+    font-family: "Arial Rounded MT Bold", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    font-size: clamp(1.7rem, 2.8vw, 2.5rem);
+    font-weight: 800;
+    line-height: 1.08;
+    letter-spacing: -0.04em;
+    text-transform: none;
+    color: var(--bundy-forest);
+  }
+
+  .bundy-welcome-screen .bundy-screen-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    max-width: 45rem;
+    padding: clamp(1.4rem, 3vw, 2.5rem) !important;
+    border: 1px solid var(--premium-line);
+    border-radius: 1.4rem;
+    background: #fff;
+    box-shadow: var(--premium-shadow-xs);
+  }
+  .bundy-welcome-screen .bundy-progress-dots,
+  .bundy-welcome-screen .bundy-welcome-spacer {
+    display: none;
+  }
+  .bundy-welcome-title { font-size: clamp(2rem, 3.1vw, 2.75rem); }
+  .bundy-welcome-copy { max-width: 35rem; font-size: 0.95rem; }
+  .bundy-welcome-note { max-width: 36rem; font-size: 0.85rem; background: var(--bundy-mist); }
+  .bundy-first-bundy { width: auto; min-width: 15rem; padding: 0.85rem 1.6rem; margin-top: 1.2rem; }
+
+  .bundy-clock-screen .page-header {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: clamp(1.25rem, 2.6vw, 2rem);
+    border: 1px solid var(--premium-line);
+    border-radius: 1.4rem;
+    background: #fff;
+    box-shadow: var(--premium-shadow-xs);
+  }
+  .bundy-clock-screen .bundy-greeting strong {
+    max-width: 100%;
+    font-size: clamp(1.65rem, 2.5vw, 2.25rem);
+  }
+  .bundy-clock-screen .bundy-greeting span { font-size: 0.9rem; }
+  .bundy-clock-screen .bundy-shift-card,
+  .bundy-clock-screen .bundy-company-card {
+    max-width: 40rem;
+  }
+  .bundy-clock-screen .bundy-shift-card { margin-top: 1.1rem; }
+  .bundy-clock-screen .bundy-company-card { font-size: 0.84rem; }
+
+  .bundy-clock-screen .bundy-screen-content {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1.1rem;
+  }
+  .bundy-clock-screen .bundy-clock-action-zone,
+  .bundy-clock-screen .bundy-clock-readout {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 1.35rem;
+    border: 1px solid var(--premium-line);
+    border-radius: 1.4rem;
+    background: #fff;
+    box-shadow: var(--premium-shadow-xs);
+  }
+  .bundy-clock-screen .bundy-clock-action-zone { min-height: 17rem; }
+  .bundy-clock-screen .bundy-clock-readout {
+    min-height: 10rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .bundy-clock-screen .bundy-clock-digits { font-size: clamp(1.65rem, 3vw, 2.4rem); }
+  .bundy-clock-screen .bundy-clock-state { font-size: 0.95rem; }
+  .bundy-clock-screen .bundy-clock-meta { max-width: 25rem; font-size: 0.78rem; color: #435a4b; }
+  .bundy-clock-screen .bundy-secondary-actions .btn { font-size: 0.8rem; }
+  .bundy-clock-screen .bundy-receipt { font-size: 0.88rem; }
+  .bundy-clock-screen .bundy-main-clock-action { flex: none; }
+
+  .bundy-hours-screen .bundy-screen-title,
+  .bundy-team-screen .bundy-screen-title {
+    font-size: clamp(1.65rem, 2.8vw, 2.3rem);
+  }
+  .bundy-hours-screen .bundy-period-tabs,
+  .bundy-hours-screen .bundy-hours-summary,
+  .bundy-hours-screen .bundy-hours-controls,
+  .bundy-hours-screen .bundy-hours-list,
+  .bundy-team-screen .bundy-team-stats,
+  .bundy-team-screen .bundy-correction-banner,
+  .bundy-team-screen .table-wrap {
+    max-width: none;
+  }
+  .bundy-hours-screen .bundy-period-tabs button { font-size: 0.82rem; }
+  .bundy-hours-screen .bundy-hours-summary { padding: 1.35rem; border: 1px solid var(--premium-line); }
+  .bundy-hours-screen .bundy-hours-summary-top,
+  .bundy-hours-screen .bundy-hours-summary-meta { font-size: 0.85rem; }
+  .bundy-hours-screen .bundy-hours-controls {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 0.9rem;
+    align-items: end;
+    margin: 1rem 0;
+  }
+  .bundy-hours-screen .bundy-hours-controls .btn-link,
+  .bundy-hours-screen .bundy-hours-controls input,
+  .bundy-hours-screen .bundy-hours-controls select { font-size: 0.84rem; }
+  .bundy-hours-screen .bundy-hours-row {
+    min-height: 4.35rem;
+    grid-template-columns: minmax(3rem, 0.25fr) minmax(0, 1.4fr) minmax(4rem, 0.45fr) auto;
+    padding: 0.85rem 1.2rem;
+    gap: 0.75rem;
+  }
+  .bundy-hours-screen .bundy-hours-day,
+  .bundy-hours-screen .bundy-hours-range,
+  .bundy-hours-screen .bundy-hours-duration,
+  .bundy-hours-screen .bundy-hours-correct {
+    font-size: 0.85rem;
+  }
+  .bundy-hours-screen .bundy-hours-primary {
+    width: auto;
+    padding-inline: 1.5rem;
+    font-size: 0.85rem;
+  }
+  .bundy-hours-screen .bundy-hours-download,
+  .bundy-hours-screen .bundy-record-details { font-size: 0.85rem; }
+  .bundy-hours-screen .bundy-record-details .session { font-size: 0.85rem; }
+
+  .bundy-team-screen .bundy-team-toolbar .btn { font-size: 0.85rem; }
+  .bundy-team-screen .bundy-team-stats,
+  .bundy-team-screen .bundy-correction-banner { font-size: 0.85rem; }
+  .bundy-team-screen .table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    background: #fff;
+    border: 1px solid var(--premium-line);
+    border-radius: 1.15rem;
+  }
+  /* Undo the phone's three-cell fake table; desktop gets all six real columns. */
+  .bundy-team-screen .bundy-team-table {
+    display: table;
+    width: 100%;
+    min-width: 48rem;
+    border-collapse: collapse;
+  }
+  .bundy-team-screen .bundy-team-table thead {
+    position: static;
+    display: table-header-group;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
+    border: 0;
+  }
+  .bundy-team-screen .bundy-team-table tbody { display: table-row-group; width: auto; }
+  .bundy-team-screen .bundy-team-table tr {
+    display: table-row;
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+  }
+  .bundy-team-screen .bundy-team-table th,
+  .bundy-team-screen .bundy-team-table td,
+  .bundy-team-screen .bundy-team-table td:nth-child(2),
+  .bundy-team-screen .bundy-team-table td:nth-child(3),
+  .bundy-team-screen .bundy-team-table td:nth-child(4) {
+    display: table-cell;
+    padding: 0.85rem 0.75rem;
+    border: 0;
+    border-bottom: 1px solid var(--premium-line);
+    vertical-align: middle;
+    font-size: 0.78rem;
+    text-align: left;
+  }
+  .bundy-team-screen .bundy-team-table thead th {
+    color: #536a5a;
+    font-size: 0.7rem;
+    font-weight: 750;
+    background: #f6f8f6;
+  }
+  .bundy-team-screen .bundy-team-person strong { font-size: 0.85rem; }
+  .bundy-team-screen .bundy-team-person small { font-size: 0.7rem; }
+  .bundy-team-screen .bundy-team-table .badge { font-size: 0.73rem; }
+  .bundy-team-screen .bundy-team-table .btn-small {
+    min-height: var(--touch);
+    padding: 0.45rem 0.85rem;
+    border: 1px solid var(--premium-line);
+    border-radius: 999px;
+    background: #fff;
+    font-size: 0.76rem;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .bundy-team-screen .bundy-manager-export {
+    width: fit-content;
+    max-width: 100%;
+    margin-top: 1.3rem;
+    padding: 0.5rem 1.4rem;
+    font-size: 0.84rem;
+  }
+}
+
+/* Turn the approved circular action into a balanced desktop workspace when
+   the *content* has space. Zoomed text and narrow desktop stay single-column. */
+@container (min-width: 43rem) {
+  .bundy-clock-screen .bundy-screen-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.88fr);
+    align-items: start;
+    gap: 1.15rem;
+  }
+
+  .bundy-clock-screen .page-header,
+  .bundy-clock-screen .bundy-screen-content > .live-region,
+  .bundy-clock-screen .bundy-screen-content > .unknown-outcome,
+  .bundy-clock-screen .bundy-screen-content > .receipt,
+  .bundy-clock-screen .bundy-screen-content > .notice,
+  .bundy-clock-screen .bundy-screen-content > .loading,
+  .bundy-clock-screen .bundy-screen-content > .hint {
+    grid-column: 1 / -1;
+  }
+
+  .bundy-clock-screen .bundy-clock-action-zone { grid-column: 1; }
+  .bundy-clock-screen .bundy-clock-readout { grid-column: 2; min-height: 17rem; }
+}

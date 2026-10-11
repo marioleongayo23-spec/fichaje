@@ -1,3 +1,22 @@
+# CURRENT_STATE — 2026-10-11 (ajuste desktop H14)
+
+## HITO 14.1 — corrección responsive desktop / demo Bundy
+
+**ESTADO: EN VALIDACIÓN, sin merge ni publicación remota.**
+Rama `astra/h14-desktop-responsive-fix`, base `main@f167a58124c60836ef47691063fed6f849ab65df`.
+
+Diagnóstico: tras H14, las vistas Fichar / Mi registro / Empleados continuaban envueltas en `.bundy-phone-screen` con anchura máxima 23,5 rem y alto fijo en escritorio, mientras la navegación lateral de H12 ocupaba el resto. Los usuarios veían una réplica móvil pequeña dentro de una web de ordenador.
+
+Solución mínima: solo `src/styles.css` y `tests/e2e/a11y.e2e.ts`.
+- En escritorio desde 48 rem, estas tres pantallas usan la anchura útil, sin marco de teléfono ni estatus «5G» ficticio; se elimina solo la duplicación del menú inferior porque la navegación lateral conserva todos los enlaces. Panel de fichaje adaptativo: dos columnas solo si el área útil lo permite, y una columna con zoom o escritorio estrecho.
+- Tabla de Empleados recupera sus seis columnas reales en desktop, con scroll interno cuando no caben; controles, resumen de horas y CTA ganan legibilidad.
+- Por debajo de 48 rem no se modifican los estilos ni los enlaces/botones de H14. Kiosco, login, roles, fichajes, SQL, RPC, seguridad, Stripe, correos, datos e infraestructura permanecen sin cambios.
+- E2E: corrección de expectativas obsoletas que exigían el marco móvil incluso en desktop, y prueba nueva de paneles, menú lateral, datos de tabla, botones y tamaños.
+
+**Puertas pendientes:** CI, Database, E2E H6, OPS-02 y H7 del HEAD final; revisión del PR y aprobación independiente antes de fusionar; despliegue manual y comprobación del release exacto en `fichaje-staging.pages.dev`. Nunca publicar producción ni afirmar cambio visible antes de eso. Los PR #29 (Stripe) y #31 (email) permanecen separados.
+
+**Estado real anterior:** HITO 14 fusionado por autorización expresa, PR #30, merge `f167a58124c60836ef47691063fed6f849ab65df`. El texto histórico inferior conserva hechos anteriores al merge; no prevalece sobre el estado actualizado.
+
 # CURRENT_STATE — 2026-10-11
 
 ## HITO 14 — navegación inferior premium Bundy (demo socio)
