@@ -45,19 +45,60 @@ test('Bundy visual contract is present on clean login and clock', { tag: '@deskt
   await login(page, s.employee);
   await expect(page.getByRole('heading', { name: 'Fichar' })).toBeVisible();
   const welcome = page.locator('.bundy-welcome-screen');
-  await expect(welcome).toHaveCSS('border-color', 'rgb(31, 74, 51)');
+  await expect(welcome).toHaveCSS('border-top-width', '0px');
   await expect(page.locator('.bundy-welcome-title')).toContainText('apunto tus horas');
   await expect(page.getByRole('button', { name: 'Entrada', exact: true })).toHaveText('Hacer mi primer bundy');
 
   await page.getByRole('button', { name: 'Entrada', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Entrada registrada' })).toBeVisible();
   const frame = page.locator('.clock-page');
-  await expect(frame).toHaveCSS('border-color', 'rgb(31, 74, 51)');
+  await expect(frame).toHaveCSS('border-top-width', '0px');
   const pause = page.getByRole('button', { name: 'Iniciar pausa', exact: true });
   await expect(pause).toHaveCSS('background-color', 'rgb(242, 194, 48)');
   const box = await pause.boundingBox();
   expect(box).not.toBeNull();
   expect(Math.abs((box?.width ?? 0) - (box?.height ?? 0))).toBeLessThanOrEqual(2);
+});
+
+test('HITO 14 desktop correction uses wide content and keeps the approved sidebar', { tag: '@desktop-only' }, async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const s = await scenario();
+  await login(page, s.employee);
+
+  const main = page.getByRole('main');
+  const welcome = page.locator('.bundy-welcome-screen');
+  await expect(welcome).toHaveCSS('border-top-width', '0px');
+  await expect(welcome).toHaveCSS('height', /auto|[0-9.]+px/);
+  await expect(page.getByRole('navigation', { name: 'Principal' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Accesos de jornada' })).toBeHidden();
+  await expect(welcome.locator('.bundy-status-bar')).toBeHidden();
+  const welcomeBox = await welcome.boundingBox();
+  expect(welcomeBox?.width ?? 0).toBeGreaterThan(620);
+
+  await page.getByRole('button', { name: 'Entrada', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Entrada registrada' })).toBeVisible();
+  const clock = page.locator('.bundy-clock-screen');
+  await expect(clock).toHaveCSS('border-top-width', '0px');
+  await expect(clock.locator('.bundy-screen-content')).toHaveCSS('display', 'grid');
+  await expect(clock.getByRole('button', { name: 'Iniciar pausa' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Accesos de jornada' })).toBeHidden();
+  expect((await clock.boundingBox())?.width ?? 0).toBeGreaterThan(620);
+
+  await go(page, 'Mi registro');
+  const hours = page.locator('.bundy-hours-screen');
+  await expect(hours).toHaveCSS('border-top-width', '0px');
+  expect((await hours.boundingBox())?.width ?? 0).toBeGreaterThan(620);
+  await expect(hours.getByRole('heading', { name: 'Mi registro' })).toBeVisible();
+
+  await login(page, s.owner);
+  await go(page, 'Empleados');
+  const team = page.locator('.bundy-team-screen');
+  expect((await team.boundingBox())?.width ?? 0).toBeGreaterThan(620);
+  await expect(team.locator('thead')).toBeVisible();
+  await expect(team.getByRole('columnheader', { name: 'Acceso' })).toBeVisible();
+  await expect(team.getByRole('columnheader', { name: 'Horario vigente' })).toBeVisible();
+  await expect(main).toBeVisible();
+  await audit(page, 'H14 desktop expanded team');
 });
 
 test('HITO 14 floating navigation preserves mobile routes, selection and touch targets', async ({ page }) => {
