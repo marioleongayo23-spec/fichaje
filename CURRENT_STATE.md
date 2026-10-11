@@ -2,9 +2,9 @@
 
 ## HITO 14 — navegación inferior premium Bundy (demo socio)
 
-**ESTADO ACTUAL: IMPLEMENTADO / PENDIENTE DE VALIDACIÓN.** No declarar PASS hasta obtener CI + Database + E2E H6 + OPS-02 + H7 en el HEAD final y revisar el resultado.
+**ESTADO ACTUAL: PASS TÉCNICO del código validado; PR #30 abierto.** Faltan la aprobación explícita de merge, la repetición de gates del commit documental final y la verificación visual en staging. No se declara producto desplegado.
 
-Rama: `astra/hito-14-nav-inferior-premium` (base: `main@36341b7064edad3bc1aacc58b671bc0583d557d2`). PR: pendiente de apertura contra `main`.
+Rama: `astra/hito-14-nav-inferior-premium` (base: `main@36341b7064edad3bc1aacc58b671bc0583d557d2`). PR: [#30](https://github.com/marioleongayo23-spec/fichaje/pull/30) abierto contra `main`.
 
 ### Alcance autorizado
 - Únicamente la barra inferior de cuatro enlaces de las pantallas móviles Bundy; no alterar rutas, destinos, etiquetas, orden, permisos ni semántica.
@@ -15,7 +15,15 @@ Rama: `astra/hito-14-nav-inferior-premium` (base: `main@36341b7064edad3bc1aacc58
 ### Evidencia / limitaciones
 - `src/styles.css`: cambio acotado del bloque `.bundy-mobile-nav`.
 - `tests/e2e/a11y.e2e.ts`: escenario navegador de navegación, selección y objetivos táctiles a 320 px; la suite a11y/estructura existente sigue obligatoria.
-- Regresión del HEAD final y evaluación visual en staging pendientes. Ningún despliegue productivo ni merge autorizado.
+- HEAD de código validado: `bc47922ae74d3bc43521bdb6afd599ee4b20a336`. Los cinco gates completados en PASS:
+  - CI: run `38164586997`.
+  - Database: run `38164587055`.
+  - E2E H6 (navegador, accesibilidad, 320 px): run `38164586868`.
+  - OPS-02: run `38164586927`.
+  - H7: run `38164586972`.
+- La ejecución del test de barra inferior forma parte de la suite E2E H6 y terminó PASS. No se ha verificado visualmente un despliegue en staging.
+- Commit documental final: pendiente de repetir los cinco gates; no equivale a PASS final hasta completarse.
+- PR #30 abierto; sin merge ni despliegue de producción sin aprobación explícita y posterior del usuario.
 - HITO 13 permanece separado y BLOCKED por STRIPE-09 real con cuenta empresarial Stripe test; PR #29 abierto. Este hito visual no activa pagos ni cierra H13.
 
 
