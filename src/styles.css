@@ -1531,50 +1531,84 @@ body {
   color: var(--bundy-forest);
 }
 
+/* HITO 14 — restrained floating navigation inside the Bundy phone screen.
+   Only presentation changes: four existing links, destinations and labels remain intact. */
 .bundy-mobile-nav {
-  min-height: 4.35rem;
   flex: none;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.1rem;
-  padding: 0.45rem 0.45rem 0.5rem;
-  border-top: 1px solid #d6dfd7;
-  background: #fff;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.12rem;
+  min-height: 4.35rem;
+  margin: 0 0.7rem 0.7rem;
+  padding: 0.3rem 0.35rem;
+  border: 1px solid rgb(31 74 51 / 0.13);
+  border-radius: 1.35rem;
+  background: rgb(255 255 255 / 0.96);
+  box-shadow: 0 0.45rem 1.25rem rgb(31 74 51 / 0.12), 0 0.08rem 0.3rem rgb(31 74 51 / 0.06);
+  -webkit-backdrop-filter: blur(14px) saturate(125%);
+  backdrop-filter: blur(14px) saturate(125%);
 }
 
 .bundy-mobile-nav a {
-  position: relative;
   min-width: 0;
   min-height: 3.25rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.22rem;
-  border-radius: 0.65rem;
-  color: #214d36;
-  font-size: 0.58rem;
-  font-weight: 600;
+  gap: 0.23rem;
+  padding: 0.32rem 0.1rem;
+  border-radius: 1rem;
+  color: #52695b;
+  font-size: 0.6rem;
+  font-weight: 650;
+  line-height: 1.15;
+  text-align: center;
   text-decoration: none;
+  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
 }
 
 .bundy-mobile-nav a svg {
-  width: 1.18rem;
-  height: 1.18rem;
+  flex: none;
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.bundy-mobile-nav a span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.bundy-mobile-nav a:hover {
+  color: var(--bundy-forest);
+  background: #f2f6f2;
 }
 
 .bundy-mobile-nav a[aria-current="page"] {
+  color: var(--bundy-forest);
   font-weight: 800;
+  background: #e8f0e9;
+  box-shadow: inset 0 0 0 1px rgb(31 74 51 / 0.06);
 }
 
-.bundy-mobile-nav a[aria-current="page"]::after {
-  content: "";
-  position: absolute;
-  bottom: 0.1rem;
-  width: 0.18rem;
-  height: 0.18rem;
-  border-radius: 50%;
-  background: var(--bundy-aulaga);
+.bundy-mobile-nav a:focus-visible {
+  outline: 3px solid var(--bundy-forest);
+  outline-offset: -3px;
+}
+
+@media (max-width: 22rem) {
+  .bundy-mobile-nav {
+    margin-inline: 0.35rem;
+    margin-bottom: 0.45rem;
+    padding-inline: 0.2rem;
+    gap: 0;
+  }
+
+  .bundy-mobile-nav a { font-size: 0.55rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bundy-mobile-nav a { transition: none; }
 }
 
 /* 05 · BIENVENIDA */
