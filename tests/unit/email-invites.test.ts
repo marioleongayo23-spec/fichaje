@@ -76,7 +76,8 @@ describe('H15 invitation email handler: authorization, delivery and idempotency'
     calls.length = 0;
     const response = await handleInvitation(request(), environment(), transport);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: 'accepted_for_delivery' });
+    const result = await response.json();
+    expect(result).toEqual({ status: 'accepted_for_delivery' });
     expect(calls.map((c) => c.url)).toEqual([
       'https://project.supabase.co/auth/v1/user',
       'https://project.supabase.co/rest/v1/rpc/create_invitation',
@@ -94,7 +95,7 @@ describe('H15 invitation email handler: authorization, delivery and idempotency'
     expect(email.from).toBe('Bundy <hello@bundy.example>');
     expect(email.html).toContain('Empresa &lt;script&gt;&amp;');
     expect(email.text).toContain(org + '.' + code);
-    expect(JSON.stringify(await response.clone().json())).not.toContain(code);
+    expect(JSON.stringify(result)).not.toContain(code);
   });
 
   it('rejects non-manager RPC results and never reaches provider', async () => {
