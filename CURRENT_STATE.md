@@ -1,4 +1,23 @@
-# CURRENT_STATE — 2026-10-05
+# CURRENT_STATE — 2026-10-11
+
+## HITO 14 — navegación inferior premium Bundy (demo socio)
+
+**ESTADO ACTUAL: IMPLEMENTADO / PENDIENTE DE VALIDACIÓN.** No declarar PASS hasta obtener CI + Database + E2E H6 + OPS-02 + H7 en el HEAD final y revisar el resultado.
+
+Rama: `astra/hito-14-nav-inferior-premium` (base: `main@36341b7064edad3bc1aacc58b671bc0583d557d2`). PR: pendiente de apertura contra `main`.
+
+### Alcance autorizado
+- Únicamente la barra inferior de cuatro enlaces de las pantallas móviles Bundy; no alterar rutas, destinos, etiquetas, orden, permisos ni semántica.
+- Cápsula flotante con márgenes, bordes y sombra sobria; activos distinguibles por fondo, no solo color ni pequeño punto; colores Bundy (bosque/niebla).
+- Objetivos táctiles mínimos de 44 × 44 px, foco visible, reducción de movimiento y reflow desde 320 px.
+- Sin cambios de fichajes, SQL, RLS/RPC, backend, auditoría, Stripe, PWA ni secretos.
+
+### Evidencia / limitaciones
+- `src/styles.css`: cambio acotado del bloque `.bundy-mobile-nav`.
+- `tests/e2e/a11y.e2e.ts`: escenario navegador de navegación, selección y objetivos táctiles a 320 px; la suite a11y/estructura existente sigue obligatoria.
+- Regresión del HEAD final y evaluación visual en staging pendientes. Ningún despliegue productivo ni merge autorizado.
+- HITO 13 permanece separado y BLOCKED por STRIPE-09 real con cuenta empresarial Stripe test; PR #29 abierto. Este hito visual no activa pagos ni cierra H13.
+
 
 ## HITO 12 — premium UI system Bundy
 
