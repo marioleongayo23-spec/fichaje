@@ -21,11 +21,11 @@ const cleanOrigin = (value: string | undefined): string | null => {
   if (!value) return null;
   try {
     const u = new URL(value);
-    return u.protocol === 'https:' && u.origin === value.replace(/\\/$/, '') && !u.username && !u.password && u.pathname === '/' ? u.origin : null;
+    return u.protocol === 'https:' && u.origin === (value.endsWith('/') ? value.slice(0, -1) : value) && !u.username && !u.password && u.pathname === '/' ? u.origin : null;
   } catch { return null; }
 };
 const validEmail = (email: unknown): email is string => typeof email === 'string' && email.length <= 254 &&
-  /^[^\\s@<>]+@[^\\s@<>]+\\.[^\\s@<>]+$/.test(email) && email === email.trim().toLowerCase();
+  /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email) && email === email.trim().toLowerCase();
 
 async function readJson(request: Request): Promise<Record<string, unknown> | null> {
   const reader = request.body?.getReader();
@@ -76,7 +76,7 @@ export async function handleInvitation(request: Request, env: GetEnv, http: Fetc
     return reply(400, 'INVALID_INPUT', cors);
   }
   const authorization = request.headers.get('authorization') || '';
-  if (!/^Bearer [^\\s]+$/.test(authorization)) return reply(401, 'UNAUTHENTICATED', cors);
+  if (!/^Bearer [^\s]+$/.test(authorization)) return reply(401, 'UNAUTHENTICATED', cors);
   const organizationId = String(body.organization_id);
   const requestId = String(body.request_id);
   const token = String(body.token);
