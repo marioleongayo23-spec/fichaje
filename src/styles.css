@@ -3473,7 +3473,7 @@ textarea:focus {
   }
   .bundy-clock-screen .bundy-clock-digits { font-size: clamp(1.65rem, 3vw, 2.4rem); }
   .bundy-clock-screen .bundy-clock-state { font-size: 0.95rem; }
-  .bundy-clock-screen .bundy-clock-meta { max-width: 25rem; font-size: 0.78rem; }
+  .bundy-clock-screen .bundy-clock-meta { max-width: 25rem; font-size: 0.78rem; color: #435a4b; }
   .bundy-clock-screen .bundy-secondary-actions .btn { font-size: 0.8rem; }
   .bundy-clock-screen .bundy-receipt { font-size: 0.88rem; }
   .bundy-clock-screen .bundy-main-clock-action { flex: none; }
