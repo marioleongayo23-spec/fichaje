@@ -31,6 +31,30 @@ enable_signup = true
 # Email/password provider enabled; public signup remains disabled by auth.enable_signup.
 enable_signup = true
 enable_confirmations = true
+
+# HITO 15: Email templates apply in local Supabase CLI. Hosted projects need
+# the same HTML in Dashboard > Authentication > Email Templates (see docs).
+[auth.email.template.confirmation]
+subject = "Bundy · Confirma tu correo"
+content_path = "./supabase/templates/confirmation.html"
+[auth.email.template.recovery]
+subject = "Bundy · Restablece tu contraseña"
+content_path = "./supabase/templates/recovery.html"
+[auth.email.template.magic_link]
+subject = "Bundy · Accede a tu cuenta"
+content_path = "./supabase/templates/magic_link.html"
+[auth.email.template.email_change]
+subject = "Bundy · Confirma tu nuevo correo"
+content_path = "./supabase/templates/email_change.html"
+[auth.email.template.invite]
+subject = "Bundy · Te han invitado"
+content_path = "./supabase/templates/invite.html"
+
+# No outbound invitation is delivered until the provider and verified sender
+# have been configured in the runtime; never store credentials in this file.
+[functions.send-invitation]
+verify_jwt = true
+
 [analytics]
 enabled = false
 # H7: both functions validate every JWT against Auth themselves and refuse any request
