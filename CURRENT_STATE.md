@@ -2,6 +2,13 @@
 
 ## HITO 15 — invitaciones por correo + emails corporativos Bundy
 
+### Verificación posdemo 2026-10-12 (staging, sin activación)
+- 2026-10-12: desplegada la función `send-invitation` **versión 1** en el proyecto Supabase **fichaje-staging** (`pvfjffeszsedslmwdvgh`). Consulta posterior de funciones: `ACTIVE`, `verify_jwt=true`; código desplegado desde HEAD `22586b6be7f22b06a2a81ed29060c963c7578636`. Producción intacta.
+- Validación de código del mismo HEAD del PR #31: cinco workflows GitHub Actions CI, Database, E2E H6, OPS-02 y H7 terminaron `success` (runs `38166887798`, `38166887776`, `38166887764`, `38166887757`, `38166887774` respectivamente). Estas pruebas **no** equivalen a correo real recibido.
+- **Función segura/inactiva hasta configuración**: no se activó `BUNDY_INVITES_ENABLED`, no se habilitó `VITE_BUNDY_INVITES_ENABLED`, no se configuraron dominio remitente ni API key/SMTP ni se enviaron correos. No probar con datos reales. El listado de funciones verifica publicación/configuración JWT pero **no** prueba aceptación HTTP, JWT/RPC ni proveedor externo; la obtención del bundle remoto falló y no se considera validación.
+- Falta remitente bajo dominio propio validado, proveedor transaccional, DNS SPF/DKIM/DMARC, Auth email templates hosted, políticas contra abusos/cuotas, pruebas E2E con correo de pruebas y autorización cross-tenant, antes de cualquier activación para clientes.
+- El PR #31 sigue abierto; su rama todavía diverge de `main` (H14.1 ya fusionado), por lo que se exige reconciliar y validar el HEAD de merge antes de solicitar aprobación. No fusionar sin orden expresa posterior.
+
 **ESTADO ACTUAL: IMPLEMENTADO EN RAMA / VALIDACIÓN PENDIENTE.** Desactivado por defecto. No se ha configurado SMTP Auth ni proveedor de envío remoto; no se han enviado correos reales.
 
 Rama: `astra/hito-15-email-bundy`. Base: `main@f167a58124c60836ef47691063fed6f849ab65df`. PR contra main pendiente.
