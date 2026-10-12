@@ -2,8 +2,8 @@
 
 ## HITO 16 — alta de empleados con política y acceso por invitación
 
-**ESTADO: IMPLEMENTADO EN RAMA / VALIDACIÓN PENDIENTE.** Sin merge ni despliegue.
-Rama `astra/hito-16-alta-empleados-politica`, desde `main`; PR por abrir.
+**ESTADO: PASS TÉCNICO DE CÓDIGO; PR #33 abierto (draft).** Sin merge ni despliegue.
+Rama `astra/hito-16-alta-empleados-politica`, base `main`; PR [#33](https://github.com/marioleongayo23-spec/fichaje/pull/33).
 
 ### Alcance autorizado tras demo 2026-10-12
 - La ficha nueva solicita código, nombre, cuenta vinculada opcional para correo/kiosco, estado activo y **política de trabajo** del tenant en el mismo formulario. Sin políticas, no se permite confirmar el alta hasta configurar una.
@@ -11,6 +11,14 @@ Rama `astra/hito-16-alta-empleados-politica`, desde `main`; PR por abrir.
 - Un usuario autenticado sin empresa ve primero «Aceptar una invitación»; la creación de empresa queda tras acción explícita «Soy propietario». No cambia la autorización OWNER ni el alta de cuentas.
 - Solo frontend/tests E2E/documentación; sin SQL, RLS/RPC, motor de fichaje, Stripe, SMTP, kiosco o datos reales.
 - Una `work_policy` sigue siendo **zona horaria + cómputo de pausas**, NO un calendario de turnos ni horas previstas. No calcular supuestas horas extra, ni habilitar aprobación automática de correcciones.
+
+### Evidencia validada sobre el commit de código `7fce564ed798eda5ddbdd54f17aad9d8afe74657`
+- **CI**: PASS, GitHub run `38302227198`.
+- **Database**: PASS, run `38302227277`.
+- **E2E H6**: PASS, run `38302227290` (incluye el nuevo test de error de asignación y reintento idempotente).
+- **OPS-02**: PASS, run `38302227204`.
+- **H7**: PASS, run `38302227364`.
+- **Resultado: 5/5 PASS del código.** La actualización documental siguiente genera un HEAD distinto, que debe repetir los cinco gates antes de declarar PASS final. Ninguna prueba equivale a despliegue remoto.
 
 ### Pruebas y limitaciones
 - Cambios: `src/admin/EmployeesPage.tsx`, `src/app/OrganizationPicker.tsx`, E2E manager/onboarding.
