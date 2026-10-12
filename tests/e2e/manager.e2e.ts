@@ -78,7 +78,7 @@ test('employee management: no-email employee, edit, policy, deactivate; members 
   await page.getByRole('button', { name: 'Ver ficha de Nuevo Sin Correo' }).click();
   await expect(page.getByRole('heading', { name: 'Ficha de Nuevo Sin Correo' })).toBeVisible();
   await expect(page.getByText('Sin horario asignado')).toHaveCount(0);
-  await expect(page.getByText('Horario v', { exact: false }).first()).toBeVisible();
+  await expect(page.getByText(/horario v\d+/i).first()).toBeVisible();
   expect(sql(`select count(*) from public.employee_policy_assignments where employee_id='${id}';`)).toBe('1');
   expect(sql(`select policy_id from public.employee_policy_assignments where employee_id='${id}';`)).toBe(s.policy);
   await page.getByRole('button', { name: 'Editar datos' }).click();
@@ -112,6 +112,35 @@ test('employee management: no-email employee, edit, policy, deactivate; members 
   await manage.getByRole('button', { name: 'Guardar' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Acceso retirado' })).toBeVisible();
   expect(sql(`select active from public.memberships where id='${s.employee.membership}';`)).toBe('f');
+});
+
+test('employee onboarding retries a failed policy assignment without duplicating the employee', async ({ page }) => {
+  const s = await scenario();
+  await login(page, s.owner);
+  await go(page, 'Empleados');
+  await page.getByRole('button', { name: 'Nuevo empleado' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nuevo empleado' });
+  await dialog.getByLabel('Código de empleado').fill('K-RETRY');
+  await dialog.getByLabel('Nombre visible').fill('Empleado Reintento');
+  await dialog.getByLabel('Política de trabajo al crear la ficha').selectOption(s.policy);
+
+  let failed = false;
+  await page.route('**/rest/v1/rpc/assign_work_policy', async (route) => {
+    if (!failed) {
+      failed = true;
+      await route.fulfill({ status: 503, contentType: 'application/json',
+        body: JSON.stringify({ code: 'SERVICE_UNAVAILABLE', message: 'Temporary failure' }) });
+    } else await route.continue();
+  });
+  await dialog.getByRole('button', { name: 'Guardar' }).click();
+  await expect(dialog.getByRole('alert')).toContainText('La ficha ya se ha creado');
+  expect(sql(`select count(*) from public.employees where organization_id='${s.org}' and code='K-RETRY';`)).toBe('1');
+  expect(sql(`select count(*) from public.employee_policy_assignments where employee_id=(select id from public.employees where organization_id='${s.org}' and code='K-RETRY');`)).toBe('0');
+
+  await dialog.getByRole('button', { name: 'Reintentar asignación' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Empleado «Empleado Reintento» creado' })).toBeVisible();
+  expect(sql(`select count(*) from public.employees where organization_id='${s.org}' and code='K-RETRY';`)).toBe('1');
+  expect(sql(`select count(*) from public.employee_policy_assignments where employee_id=(select id from public.employees where organization_id='${s.org}' and code='K-RETRY');`)).toBe('1');
 });
 
 test('an ADMIN manages only EMPLOYEE accounts; server refusals are shown plainly', async ({ page }) => {
