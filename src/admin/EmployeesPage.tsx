@@ -136,7 +136,10 @@ function EmployeeForm({ directory, employee, onClose, onSaved }: {
   const { client } = useServices();
   const tenant = useCurrentTenant();
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<{ code?: string; name?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{ code?: string; name?: string; policy?: string }>({});
+  // Only the profile RPC can commit before the policy RPC. Keep its result in
+  // memory to retry the latter with exactly the same idempotency key.
+  const [created, setCreated] = useState<{ name: string; policyId: string; requestId: string } | null>(null);
   const [pending, setPending] = useState(false);
   const attempt = useRef<{ key: string; requestId: string } | null>(null);
   const newId = useRef(crypto.randomUUID());
@@ -145,31 +148,50 @@ function EmployeeForm({ directory, employee, onClose, onSaved }: {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const code = String(form.get('code') ?? '').trim();
-    const name = String(form.get('name') ?? '').trim();
-    const membership = String(form.get('membership') ?? '') || null;
-    const active = form.get('active') === 'on';
+    if (pending) return;
+    const form = created ? null : new FormData(event.currentTarget);
+    const code = String(form?.get('code') ?? '').trim();
+    const name = String(form?.get('name') ?? '').trim();
+    const membership = String(form?.get('membership') ?? '') || null;
+    const active = form?.get('active') === 'on';
+    const policyId = created?.policyId ?? String(form?.get('policy') ?? '');
     const errors = {
-      code: code.length >= 1 && code.length <= 50 ? undefined : 'El código es obligatorio (máximo 50 caracteres).',
-      name: name.length >= 1 && name.length <= 200 ? undefined : 'El nombre es obligatorio (máximo 200 caracteres).',
+      code: !created && (code.length < 1 || code.length > 50) ? 'El código es obligatorio (máximo 50 caracteres).' : undefined,
+      name: !created && (name.length < 1 || name.length > 200) ? 'El nombre es obligatorio (máximo 200 caracteres).' : undefined,
+      policy: !employee && !directory.policies.some((p) => p.id === policyId) ? 'Crea primero una política en «Horarios» y selecciónala.' : undefined,
     };
     setFieldErrors(errors);
-    if (errors.code || errors.name) { setError('Revisa los campos marcados.'); return; }
+    if (errors.code || errors.name || errors.policy) { setError('Revisa los campos marcados.'); return; }
+
     const args = { p_organization_id: tenant.current.organization.id, p_employee_id: employee?.id ?? newId.current,
       p_expected_version: employee?.version ?? 0, p_code: code, p_display_name: name, p_membership_id: membership, p_active: active };
     const key = JSON.stringify(args);
-    if (attempt.current?.key !== key) attempt.current = { key, requestId: newRequestId() };
-    const requestId = attempt.current.requestId;
+    if (!created && attempt.current?.key !== key) attempt.current = { key, requestId: newRequestId() };
     setPending(true);
     setError(null);
+    let profileSaved = false;
     try {
-      await rpc(client, 'manage_employee', { ...args, p_request_id: requestId });
+      if (!created) {
+        await rpc(client, 'manage_employee', { ...args, p_request_id: attempt.current!.requestId });
+        profileSaved = true;
+      }
+      if (!employee) {
+        const assignment = created ?? { name, policyId, requestId: newRequestId() };
+        // Once manage_employee has committed, never repeat it with a new
+        // request_id: a transient assignment failure must not duplicate profiles.
+        if (!created) setCreated(assignment);
+        await rpc(client, 'assign_work_policy', {
+          p_organization_id: tenant.current.organization.id, p_request_id: assignment.requestId,
+          p_employee_id: newId.current, p_policy_id: assignment.policyId, p_effective_from: null,
+        });
+      }
       attempt.current = null;
-      onSaved(name);
+      onSaved(created?.name ?? name);
     } catch (failure) {
       tenant.handleError(failure);
-      setError(errorMessage(failure).replace('Revisa los datos introducidos.', 'Revisa los datos: el código no puede repetirse en la organización.'));
+      setError(created || profileSaved
+        ? 'La ficha ya se ha creado, pero no hemos podido confirmar la asignación de la política. Reintenta solo este paso, sin crear otra ficha.'
+        : errorMessage(failure).replace('Revisa los datos introducidos.', 'Revisa los datos: el código no puede repetirse en la organización.'));
     } finally {
       setPending(false);
     }
@@ -178,15 +200,18 @@ function EmployeeForm({ directory, employee, onClose, onSaved }: {
   return (
     <Dialog open title={employee ? `Editar ${employee.display_name}` : 'Nuevo empleado'} onClose={onClose}>
       <form noValidate onSubmit={submit}>
+        {created && <Notice tone="warning" title="Ficha creada; falta confirmar la política de trabajo">
+          <p>La ficha se conserva. Reintenta la asignación sin crear otra, o termina desde su ficha en «Empleados».</p>
+        </Notice>}
         <Field label="Código de empleado" hint="Único en la organización. Es el que se teclea en el kiosco." error={fieldErrors.code}>
-          {(p) => <input {...p} name="code" defaultValue={employee?.code} maxLength={50} autoComplete="off" />}
+          {(p) => <input {...p} name="code" defaultValue={employee?.code} maxLength={50} autoComplete="off" disabled={!!created} />}
         </Field>
         <Field label="Nombre visible" error={fieldErrors.name}>
-          {(p) => <input {...p} name="name" defaultValue={employee?.display_name} maxLength={200} autoComplete="off" />}
+          {(p) => <input {...p} name="name" defaultValue={employee?.display_name} maxLength={200} autoComplete="off" disabled={!!created} />}
         </Field>
         <Field label="Cuenta vinculada" hint="Sin cuenta, la persona ficha en el kiosco con código y PIN.">
           {(p) => (
-            <select {...p} name="membership" defaultValue={employee?.membership_id ?? ''}>
+            <select {...p} name="membership" defaultValue={employee?.membership_id ?? ''} disabled={!!created}>
               <option value="">Sin cuenta (kiosco)</option>
               {linkable.map((m) => (
                 <option key={m.id} value={m.id}>{`Cuenta ${ROLE_LABEL[m.role].toLowerCase()} dada de alta el ${formatDateTime(m.created_at, DEFAULT_ZONE)}`}</option>
@@ -194,11 +219,23 @@ function EmployeeForm({ directory, employee, onClose, onSaved }: {
             </select>
           )}
         </Field>
-        <label className="checkbox"><input type="checkbox" name="active" defaultChecked={employee?.active ?? true} /> Activo (puede fichar)</label>
+        {!employee && (
+          <Field label="Política de trabajo al crear la ficha" hint="Zona horaria y cómputo de pausas; no establece turnos ni horas semanales." error={fieldErrors.policy}>
+            {(p) => (
+              <select {...p} name="policy" defaultValue={directory.policies[directory.policies.length - 1]?.id ?? ''} disabled={!!created}>
+                {directory.policies.length === 0 && <option value="">No hay políticas creadas</option>}
+                {directory.policies.map((policy) => (
+                  <option key={policy.id} value={policy.id}>v{policy.version} · {zoneLabel(policy.timezone)} · pausas {policy.break_counts_as_work ? 'computables' : 'no computables'}</option>
+                ))}
+              </select>
+            )}
+          </Field>
+        )}
+        <label className="checkbox"><input type="checkbox" name="active" defaultChecked={employee?.active ?? true} disabled={!!created} /> Activo (puede fichar)</label>
         <p className="hint">Desactivar impide fichar pero conserva todo su historial.</p>
         <LiveRegion tone="error" message={error} />
         <div className="button-row">
-          <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? 'Guardando…' : 'Guardar'}</button>
+          <button type="submit" className="btn btn-primary" disabled={pending || (!employee && directory.policies.length === 0)}>{pending ? 'Guardando…' : created ? 'Reintentar asignación' : 'Guardar'}</button>
           <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
         </div>
       </form>
