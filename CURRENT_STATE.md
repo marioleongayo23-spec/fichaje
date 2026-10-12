@@ -1,3 +1,27 @@
+# CURRENT_STATE — 2026-10-12 (HITO 16, posdemo)
+
+## HITO 16 — alta de empleados con política y acceso por invitación
+
+**ESTADO: IMPLEMENTADO EN RAMA / VALIDACIÓN PENDIENTE.** Sin merge ni despliegue.
+Rama `astra/hito-16-alta-empleados-politica`, desde `main`; PR por abrir.
+
+### Alcance autorizado tras demo 2026-10-12
+- La ficha nueva solicita código, nombre, cuenta vinculada opcional para correo/kiosco, estado activo y **política de trabajo** del tenant en el mismo formulario. Sin políticas, no se permite confirmar el alta hasta configurar una.
+- Se conservan las RPC independientes `manage_employee` y `assign_work_policy`, ambas con autorización y auditoría del servidor. **No existe transacción atómica entre estas dos llamadas**: si la segunda falla, se informa de la ficha ya creada y se permite reintentar solo asignación con el mismo request_id; nunca se comunica alta completa sin confirmación.
+- Un usuario autenticado sin empresa ve primero «Aceptar una invitación»; la creación de empresa queda tras acción explícita «Soy propietario». No cambia la autorización OWNER ni el alta de cuentas.
+- Solo frontend/tests E2E/documentación; sin SQL, RLS/RPC, motor de fichaje, Stripe, SMTP, kiosco o datos reales.
+- Una `work_policy` sigue siendo **zona horaria + cómputo de pausas**, NO un calendario de turnos ni horas previstas. No calcular supuestas horas extra, ni habilitar aprobación automática de correcciones.
+
+### Pruebas y limitaciones
+- Cambios: `src/admin/EmployeesPage.tsx`, `src/app/OrganizationPicker.tsx`, E2E manager/onboarding.
+- Caso E2E nuevo: fallo simulado en la asignación tras creación, reintento sin ficha duplicada ni asignaciones dobles. Test anterior de alta kiosco debe verificar política seleccionada desde el alta.
+- Gate pendiente: CI, Database, E2E H6, OPS-02 y H7 sobre HEAD final. No declarar PASS con workflows pendientes o fallidos.
+- **Fuera del alcance de este hito:** capturar email del empleado en la ficha, vincular invitaciones futuras a la ficha sin operación manual, nombre/email de membresías sin ficha, definición de turnos planificados, team leaders, y corrección histórica de horarios. Dependen de diseño y autorización específica; H15/Stripe siguen separados.
+- Si el formulario se cierra durante un fallo parcial, se puede abrir la ficha y asignar la política desde su sección «Horario».
+- Merge **solo con aprobación explícita posterior**. No activar producción ni afirmar visible en staging.
+
+---
+
 # CURRENT_STATE — 2026-10-11 (ajuste desktop H14)
 
 ## HITO 14.1 — corrección responsive desktop / demo Bundy
