@@ -13,6 +13,7 @@ export function OrganizationPicker() {
   const tenant = useTenant();
   const { signOut } = useAuth();
   const empty = tenant.entries.length === 0;
+  const [showCreate, setShowCreate] = useState(false);
   useEffect(() => { document.title = `${empty ? 'Configurar empresa' : 'Elegir organización'} · ${BRAND}`; }, [empty]);
   return (
     <main id="contenido" className="auth-page">
@@ -25,8 +26,16 @@ export function OrganizationPicker() {
         {tenant.error && <Notice tone="error" title={tenant.error} />}
         {empty ? (
           <>
-            <p>Tu cuenta todavía no pertenece a ninguna empresa. Puedes crear tu primera empresa o aceptar una invitación existente.</p>
-            <CreateOrganization />
+            <p>¿Tu empresa te ha invitado? Acepta la invitación para acceder a tu equipo. No necesitas crear una empresa nueva.</p>
+            <AcceptInvitation />
+            {showCreate ? (
+              <>
+                <CreateOrganization />
+                <button type="button" className="btn btn-secondary" onClick={() => setShowCreate(false)}>Volver a la invitación</button>
+              </>
+            ) : (
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCreate(true)}>Soy propietario: dar de alta mi empresa</button>
+            )}
           </>
         ) : (
           <>
@@ -41,9 +50,9 @@ export function OrganizationPicker() {
                 </li>
               ))}
             </ul>
+            <AcceptInvitation />
           </>
         )}
-        <AcceptInvitation />
         <button type="button" className="btn btn-secondary" onClick={() => void signOut()}>Cerrar sesión</button>
       </div>
     </main>
@@ -83,7 +92,7 @@ function CreateOrganization() {
 
   return (
     <section aria-labelledby="create-org-title" className="subsection">
-      <p className="bundy-step-label">01 · TU EMPRESA</p>
+      <p className="bundy-step-label">02 · TU EMPRESA</p>
       <h2 id="create-org-title">Dar de alta mi empresa</h2>
       <form noValidate onSubmit={onSubmit}>
         <Field label="Nombre de la empresa" hint="Puedes cambiar la configuración operativa después del alta.">
@@ -131,7 +140,7 @@ function AcceptInvitation() {
 
   return (
     <section aria-labelledby="accept-title" className="subsection">
-      <p className="bundy-step-label">02 · INVITACIÓN</p>
+      <p className="bundy-step-label">01 · INVITACIÓN</p>
       <h2 id="accept-title">Aceptar una invitación</h2>
       <form noValidate onSubmit={onSubmit}>
         <Field label="Código de invitación" hint="Te lo entrega tu empresa en persona o por un canal seguro. Caduca a las 24 horas.">
