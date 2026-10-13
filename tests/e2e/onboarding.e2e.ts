@@ -36,6 +36,9 @@ test('verified account creates its first company from the app and becomes OWNER'
 
   await login(page, owner);
   await expect(page.getByRole('heading', { name: 'Configura tu acceso' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Aceptar una invitación' })).toBeVisible();
+  await expect(page.getByLabel('Nombre de la empresa')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Soy propietario: dar de alta mi empresa' }).click();
   await page.getByLabel('Nombre de la empresa').fill(name);
   await page.getByRole('button', { name: 'Crear empresa' }).click();
 
