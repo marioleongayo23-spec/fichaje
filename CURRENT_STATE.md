@@ -1,3 +1,18 @@
+# CURRENT_STATE — 2026-10-14 (HITO 17)
+
+## HITO 17 — invitaciones vinculadas a fichas de empleados
+
+**ESTADO: IMPLEMENTADO EN RAMA, VALIDACIÓN CI PENDIENTE.** Rama `astra/hito-17-invitaciones-vinculacion`, PR independiente contra `main`; no hay merge ni despliegue.
+
+- Migración `20261014000100_employee_invitation_binding.sql`: FK tenant de `private.invitations.employee_id` opcional, política de acceso mínima a fichas para rol aceptador, RPC `create_employee_invitation` restringida OWNER/ADMIN y `accept_invitation` que vincula membresía y empleado atómicamente bajo token válido y correo Auth verificado.
+- En «Personas y roles» la invitación EMPLOYEE permite elegir una ficha existente activa y sin cuenta. Sin ficha seleccionada, la invitación genérica de H1 sigue igual; OWNER puede seguir invitando ADMIN sin vinculación.
+- La ficha de empleado no adquiere dirección de email pública; no hay nueva edición de horarios, fichajes, políticas, nóminas, kiosco, Stripe, SMTP ni producción.
+- Cobertura agregada: `tests/integration/h1.py` (Auth real, roles, tenant, reintentos, expiración, vínculo único, rollback si empleado ocupado, RLS) y `tests/e2e/manager.e2e.ts` (flujo de interfaz y aceptación con ficha real).
+- 5 puertas obligatorias: CI, Database, E2E H6, OPS-02, H7 sobre HEAD final. No declarar PASS sin resultados verificados. Sin merge hasta orden explícita posterior.
+- HITO 16 fusionado mediante PR #33, commit `c467a462e8cc58fcb664a4cbb4dc3264b1eb0ee0`, 5/5 PASS; el texto antiguo inmediatamente inferior se conserva como evidencia histórica. Sin despliegue remoto verificado.
+
+---
+
 # CURRENT_STATE — 2026-10-12 (HITO 16, posdemo)
 
 ## HITO 16 — alta de empleados con política y acceso por invitación
