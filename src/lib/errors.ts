@@ -14,7 +14,7 @@ const CONFLICTS = new Set(['VERSION_CONFLICT', 'IDEMPOTENCY_CONFLICT', 'ALREADY_
 const VALIDATION = new Set([
   'INVALID_INPUT', 'INVALID_TRANSITION', 'POLICY_REQUIRED', 'CLOCK_REGRESSION', 'INVALID_TIMEZONE',
   'INVALID_TIMELINE', 'INVALID_ORDINAL', 'FUTURE_TIME', 'POLICY_BACKDATE', 'HOURS_MISMATCH',
-  'INCOMPLETE_PERIOD', 'LAST_OWNER', 'EMAIL_NOT_VERIFIED',
+  'INCOMPLETE_PERIOD', 'LAST_OWNER', 'EMAIL_NOT_VERIFIED', 'POLICY_OVERRIDE_NOT_REQUIRED',
 ]);
 
 interface ErrorBody { message?: unknown; code?: unknown; error?: unknown }
@@ -66,7 +66,8 @@ const MESSAGES: Record<string, string> = {
   ALREADY_DECIDED: 'Otra persona ya ha decidido esta solicitud.',
   INVALID_INPUT: 'Revisa los datos introducidos.',
   INVALID_TRANSITION: 'Esa acción no es posible con el estado actual.',
-  POLICY_REQUIRED: 'No hay un horario asignado. La empresa debe asignarlo antes de fichar.',
+  POLICY_REQUIRED: 'No existía una política vigente en la fecha solicitada. Para aprobar una jornada histórica, un gestor debe acreditar explícitamente la política aplicable; para fichar ahora, asigna una vigente.',
+  POLICY_OVERRIDE_NOT_REQUIRED: 'Ya existía una política válida para esa jornada. No se permite sustituirla retroactivamente.',
   CLOCK_REGRESSION: 'El servicio no ha podido garantizar la hora y no ha registrado nada. Inténtalo más tarde o avisa a la empresa.',
   INVALID_TIMEZONE: 'La zona horaria no coincide con la de la jornada o del horario aplicable.',
   INVALID_TIMELINE: 'La propuesta dejaría la jornada en un orden imposible, por ejemplo una salida antes de la entrada o dos jornadas solapadas.',
