@@ -1,3 +1,18 @@
+# CURRENT_STATE — 2026-10-14 (HITO 19)
+
+## HITO 19 — preflight de sincronización de staging, con parada segura
+
+**ESTADO: BLOCKED PARA CAMBIOS REMOTOS.** Rama `astra/hito-19-preflight-staging`, PR propio a `main`; aún no autorizado su merge. No hay migraciones remotas, despliegues ni nueva infraestructura; **producción intacta**.
+
+- Autorización expresa: sincronizar `fichaje-staging` con `main` únicamente tras copia cifrada, recuperación real probada y revisión de credenciales; prohibidos costes y cambios a producción. Si faltan garantías, detenerse.
+- Inventario remoto 2026-10-14 de solo lectura: Supabase `pvfjffeszsedslmwdvgh` ACTIVE_HEALTHY; **17** migraciones, última `20260930000200`. Cinco pendientes: `20261002000100`, `20261002000200`, `20261002000300`, `20261014000100`, `20261014000200`. H17 y H18 aún sin RPC en staging. Release previo de Pages observado `3d63c7775ff71e514dd5a29946f7b29018cc9f33`, distinto de `main` (H18 merge `75054aa98118ecae93eb056320924b166681d88e`).
+- **Bloqueo verificado:** herramientas conectadas no acreditan backup cifrado/restaurado aislado del staging actual con replay de journal ni acceso de despliegue a Cloudflare Pages. Un CI local PASS no sustituye backup/restore remoto. Ningún `db push`, `apply_migration`, `db reset`, despliegue Edge ni Pages ejecutado.
+- Trabajo preparado en rama: `docs/H19_STAGING.md` documenta lista exacta, precondiciones, secuencia de operador y detenciones; `scripts/staging/h19_preflight.py` evalúa read-only target/deriva y coherencia de evidencia, declara que un precheck no autoriza un deploy; `tests/ops/test_h19_preflight.py` cubre faltantes, destino producción, drift, backup/restore invalidado. La suite Python se ejecuta en CI y OPS-02.
+- **Puertas técnicas** para el PR: CI, Database, E2E H6, OPS-02 y H7 sobre SHA final; un 5/5 no cambia el estado remoto BLOCKED. No hacer merge sin aprobación explícita posterior.
+- H17 PR #34 fusionado en `main` (merge `66742d0254bc20e3d37351d423f09f5074f7890d`) y H18 PR #35 fusionado en `main` (merge `75054aa98118ecae93eb056320924b166681d88e`); las secciones históricas inferiores que digan «PR abierto» describen instantes anteriores y no el estado actual.
+
+---
+
 # CURRENT_STATE — 2026-10-14 (HITO 18)
 
 ## HITO 18 — corrección histórica con política expresamente acreditada
