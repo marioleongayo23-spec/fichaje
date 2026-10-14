@@ -1,3 +1,19 @@
+# CURRENT_STATE — 2026-10-14 (HITO 18)
+
+## HITO 18 — corrección histórica con política expresamente acreditada
+
+**ESTADO: IMPLEMENTADO EN RAMA, GATES PENDIENTES.** Rama `astra/hito-18-correcciones-historicas-auditadas`, PR contra `main` pendiente de apertura. No merge ni despliegue.
+
+- Diagnóstico de demo del 12/10: al aprobar jornada previa a la primera asignación de política, `decide_correction` rechaza con `POLICY_REQUIRED`. Es un requisito de vigencia, no fallo del botón.
+- Nueva RPC optativa `decide_correction_with_policy` preserva el flujo estricto original y permite que el segundo gestor declare expresamente una política ya asignada al empleado para esa solicitud histórica. Selección por usuario, motivo, independencia, vigencia al revisar, zona del turno, bloqueo tenant, control de versión y reintento idempotente.
+- Sin alterar `work_policies.valid_from`, `employee_policy_assignments.effective_from`, `time_events` ni correcciones anteriores. La sesión nueva referencia la política seleccionada; decision, audit y recibo identifican la excepción.
+- UI de aprobación exige selección y confirmación, con advertencia clara; `POLICY_REQUIRED` y excepción innecesaria explicados.
+- Tests sintéticos integrados en `tests/integration/h3.py` y `tests/e2e/manager.e2e.ts`; 5 gates obligatorios sobre HEAD final. No declarar PASS si fallan o siguen pendientes.
+- HITO 17: PR #34 **fusionado** en `main` por aprobación expresa, merge `66742d0254bc20e3d37351d423f09f5074f7890d`, 5/5 PASS. Los párrafos históricos inferiores no están actualizados, y no prevalecen.
+- Sin tocar H13 Stripe, H15 correo, despliegue staging/producción ni nuevos roles/horarios semanales.
+
+---
+
 # CURRENT_STATE — 2026-10-14 (HITO 17)
 
 ## HITO 17 — invitaciones vinculadas a fichas de empleados
