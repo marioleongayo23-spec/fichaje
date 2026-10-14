@@ -83,7 +83,10 @@ begin
    jsonb_build_object('before',null,'after',jsonb_build_object('role','EMPLOYEE','employee_id',p_employee_id)));
 exception when unique_violation then raise exception using errcode='22023',message='INVALID_INPUT';
 end $$;
+-- Transfer ownership without leaving permanent CREATE capability on public.
+grant create on schema public to fichaje_writer;
 alter function public.create_employee_invitation(uuid,uuid,uuid,text,text) owner to fichaje_writer;
+revoke create on schema public from fichaje_writer;
 revoke all on function public.create_employee_invitation(uuid,uuid,uuid,text,text) from public,anon,authenticated,service_role;
 grant execute on function public.create_employee_invitation(uuid,uuid,uuid,text,text) to authenticated;
 
@@ -142,6 +145,6 @@ begin
  return private.receipt(p_organization_id,p_request_id,'accept_invitation',v_payload,v_response,
   'memberships',v_id,jsonb_build_object('before',null,'after',jsonb_build_object('role',v_inv.role,'active',true,'version',1)));
 end $$;
-alter function public.accept_invitation(uuid,uuid,text) owner to fichaje_acceptor;
+-- CREATE OR REPLACE preserves the existing restricted fichaje_acceptor owner.
 revoke all on function public.accept_invitation(uuid,uuid,text) from public,anon,service_role;
 grant execute on function public.accept_invitation(uuid,uuid,text) to authenticated;
