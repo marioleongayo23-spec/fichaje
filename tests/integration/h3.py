@@ -278,6 +278,43 @@ for table in ['correction_requests','correction_decisions','event_adjustments']:
         check(code==403,f'direct {method} denied {table}: {code}, {err}')
 check(timeline(token=other['token'])==[],'effective timeline RPC cannot leak foreign tenant')
 check(timeline(u=owner,token=user['token'])==[],'effective timeline RPC cannot leak another employee')
+# H18: an earlier missed day is not implicitly covered by a policy assigned
+# today. An independent ADMIN must make an explicit, scoped attestation.
+historical_session = uid()
+past = (datetime.now(timezone.utc)-timedelta(days=4)).replace(microsecond=0)
+historical_ops = [op('CLOCK_IN',historical_session,past.isoformat(),ordinal=1),
+                  op('CLOCK_OUT',historical_session,(past+timedelta(hours=6)).isoformat(),ordinal=2)]
+historical_request, _ = submit(historical_ops)
+historical_args = decide_args(historical_request)
+before_historical = snapshot()
+code, err = decide(historical_request,admin,args=historical_args)
+check(code == 400 and err.get('message') == 'POLICY_REQUIRED' and snapshot() == before_historical,
+      'H18 legacy approval refuses to silently adopt later policy; entire transaction rolled back')
+foreign_policy = sql(f"select policy_id from public.employee_policy_assignments where employee_id='{other['employee']}' limit 1;")
+code, _ = rpc('decide_correction_with_policy',admin['token'],{**historical_args,'p_historical_policy_id':foreign_policy})
+check(code == 403 and snapshot() == before_historical,
+      'H18 cross-tenant policy cannot be attested; no partial decision')
+code, _ = rpc('decide_correction_with_policy',user['token'],{**historical_args,'p_historical_policy_id':policy_id})
+check(code == 403 and snapshot() == before_historical,
+      'H18 employee cannot approve own historical correction')
+code, _ = rpc('decide_correction_with_policy',admin['token'],{**historical_args,'p_historical_policy_id':policy_id})
+check(code == 200, 'H18 independent reviewer explicitly approves retrospective policy')
+code, historical_receipt = rpc('decide_correction_with_policy',admin['token'],
+                              {**historical_args,'p_historical_policy_id':policy_id})
+check(code == 200 and historical_receipt['historical_policy_id'] == policy_id,
+      'H18 exact retry returns same audited receipt')
+check(sql(f"select policy_id from public.work_sessions where id='{historical_session}';") == policy_id,
+      'H18 historical session permanently pins explicitly selected policy')
+check(sql(f"select (safe_details->>'historical_policy_id')||':'||(safe_details->>'historical_sessions') from public.audit_log where request_id='{historical_args['p_request_id']}' and action='decide_correction';")
+      == policy_id + ':1', 'H18 audit preserves explicit retroactive exception without changing policy validity')
+check(sql(f"select count(*) from public.time_events where organization_id='{org}' and session_id='{historical_session}';") == '0',
+      'H18 no original clock events fabricated or mutated')
+check(sql(f"select count(*) from public.employee_policy_assignments where employee_id='{user['employee']}';") == '1',
+      'H18 no retroactive policy assignments inserted')
+code, _ = rpc('decide_correction_with_policy',admin['token'],{**historical_args,
+  'p_request_id':uid(),'p_historical_policy_id':policy_id})
+check(code == 409, 'H18 historical approval cannot be applied twice')
+
 # Revocation takes shared H1 tenant lock; waiting approval must recheck identity.
 session=uid(); t=now(); request,_=submit([op('CLOCK_IN',session,t),op('CLOCK_OUT',session,t,ordinal=2)])
 dargs=decide_args(request)
