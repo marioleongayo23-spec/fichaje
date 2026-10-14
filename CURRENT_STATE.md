@@ -2,13 +2,14 @@
 
 ## HITO 17 — invitaciones vinculadas a fichas de empleados
 
-**ESTADO: IMPLEMENTADO EN RAMA, VALIDACIÓN CI PENDIENTE.** Rama `astra/hito-17-invitaciones-vinculacion`, PR independiente contra `main`; no hay merge ni despliegue.
+**ESTADO: 5/5 PASS TÉCNICO DEL CÓDIGO; PR #34 ABIERTO.** Rama `astra/hito-17-invitaciones-vinculacion`, [PR #34](https://github.com/marioleongayo23-spec/fichaje/pull/34) contra `main`; no hay merge ni despliegue.
 
 - Migración `20261014000100_employee_invitation_binding.sql`: FK tenant de `private.invitations.employee_id` opcional, política de acceso mínima a fichas para rol aceptador, RPC `create_employee_invitation` restringida OWNER/ADMIN y `accept_invitation` que vincula membresía y empleado atómicamente bajo token válido y correo Auth verificado.
 - En «Personas y roles» la invitación EMPLOYEE permite elegir una ficha existente activa y sin cuenta. Sin ficha seleccionada, la invitación genérica de H1 sigue igual; OWNER puede seguir invitando ADMIN sin vinculación.
 - La ficha de empleado no adquiere dirección de email pública; no hay nueva edición de horarios, fichajes, políticas, nóminas, kiosco, Stripe, SMTP ni producción.
 - Cobertura agregada: `tests/integration/h1.py` (Auth real, roles, tenant, reintentos, expiración, vínculo único, rollback si empleado ocupado, RLS) y `tests/e2e/manager.e2e.ts` (flujo de interfaz y aceptación con ficha real).
-- 5 puertas obligatorias: CI, Database, E2E H6, OPS-02, H7 sobre HEAD final. No declarar PASS sin resultados verificados. Sin merge hasta orden explícita posterior.
+- **Verificación sobre HEAD de código `82ae6b901767e98f463c311766c8360640a4efb1`: 5/5 PASS**: CI `38535859768`; Database `38535859705`; E2E H6 `38535860145`; OPS-02 `38535859828`; H7 `38535859697`. La primera iteración falló por CREATE temporal de schema en migración; corregido revocando el privilegio en la misma migración. Ningún fallo ignorado.
+- La actualización documental genera un SHA posterior: hay que validar de nuevo los 5 gates de ese HEAD antes de PASS final. Sin merge hasta orden explícita posterior.
 - HITO 16 fusionado mediante PR #33, commit `c467a462e8cc58fcb664a4cbb4dc3264b1eb0ee0`, 5/5 PASS; el texto antiguo inmediatamente inferior se conserva como evidencia histórica. Sin despliegue remoto verificado.
 
 ---
