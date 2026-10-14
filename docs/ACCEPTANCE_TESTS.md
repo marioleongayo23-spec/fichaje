@@ -147,3 +147,9 @@ Antes del **primer cliente real / producción**, habrá una puerta operativa sep
 | GO-08 | Simulacro de incidente con tenant sintético: detección, revocación, evidencia, rotación, evaluación, canary/invariantes y reapertura |
 | GO-09 | `COMPLIANCE.md` revisado a fecha de salida; paquete contractual y parametrización convenio/pausas por cliente |
 | GO-10 | `main` protegido y release/rollback gobernados; aprobación expresa posterior para producción/primer cliente |
+
+## HITO 18 — alcance de validación
+- Solicitud ADD de jornada anterior a cualquier política asignada: aprobación estricta rechazada `POLICY_REQUIRED`, sin decisiones, ajustes, nuevas sesiones ni recibos.
+- Acreditación expresa por gestor distinto del solicitante/afectado: política ya asignada al empleado y tenant, zona compatible, motivo obligatorio, recibo idempotente, nueva sesión con `policy_id` fijo, audit con identificador y recuento. No hay `UPDATE` de vigencias ni `INSERT` de eventos originales.
+- Rechazar identidad EMPLOYEE, política de otra organización, doble aprobación y excepción no necesaria; reproducción exacta de resultado tras timeout con clave idéntica.
+- E2E real del flujo de corrección de turno pasado y selección obligatoria de la política. Gates CI, Database, E2E H6, OPS-02 y H7 sobre HEAD final.

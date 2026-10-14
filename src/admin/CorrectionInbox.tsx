@@ -60,8 +60,8 @@ export function CorrectionInbox() {
             ))}
           </ul>
         ))}
-      {deciding && (
-        <DecisionDialog item={deciding.item} decision={deciding.decision} onClose={() => setDeciding(null)}
+      {deciding && directory.data && (
+        <DecisionDialog item={deciding.item} directory={directory.data} decision={deciding.decision} onClose={() => setDeciding(null)}
           onDone={(message) => { setDeciding(null); setStatus(message); void requests.reload(); }} />
       )}
     </>
@@ -112,8 +112,8 @@ function RequestCard({ item, directory, context, self, onDecide }: {
   );
 }
 
-function DecisionDialog({ item, decision, onClose, onDone }: {
-  item: RequestWithDecision; decision: 'APPROVE' | 'REJECT'; onClose: () => void; onDone: (message: string) => void;
+function DecisionDialog({ item, directory, decision, onClose, onDone }: {
+  item: RequestWithDecision; directory: Directory; decision: 'APPROVE' | 'REJECT'; onClose: () => void; onDone: (message: string) => void;
 }) {
   const { client } = useServices();
   const tenant = useCurrentTenant();
@@ -123,19 +123,44 @@ function DecisionDialog({ item, decision, onClose, onDone }: {
   const [pending, setPending] = useState(false);
   const attempt = useRef<{ key: string; requestId: string } | null>(null);
   const approve = decision === 'APPROVE';
-  const submit = async (event: FormEvent) => {
+  // Advisory UI detection only; the authoritative time/policy checks are in SQL.
+  // An ADD CLOCK_IN earlier than every applicable assignment needs explicit
+  // independent reviewer attestation, scoped to THIS correction only.
+  const historical = approve && item.request.proposal.some((op) => op.operation === 'ADD' && op.event_type === 'CLOCK_IN'
+    && !!op.effective_at && !directory.assignments.some((a) =>
+      a.employee_id === item.request.employee_id
+      && new Date(a.effective_from).getTime() <= new Date(op.effective_at!).getTime()
+      && directory.policies.some((p) => p.id === a.policy_id
+        && new Date(p.valid_from).getTime() <= new Date(op.effective_at!).getTime())));
+  const historicalPolicies = directory.policies.filter((policy) =>
+    new Date(policy.valid_from).getTime() <= Date.now()
+    && directory.assignments.some((a) => a.employee_id === item.request.employee_id
+      && a.policy_id === policy.id && new Date(a.effective_from).getTime() <= Date.now()));
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const invalid = reasonError(reason);
     setFieldError(invalid);
     if (invalid) return;
-    const args = { p_organization_id: tenant.current.organization.id, p_correction_request_id: item.request.id, p_decision: decision, p_reason: reason.trim() };
+    const form = new FormData(event.currentTarget);
+    const policyId = historical ? String(form.get('historical_policy') ?? '') : null;
+    if (historical && (!policyId || !historicalPolicies.some((p) => p.id === policyId)
+      || form.get('historical_confirm') !== 'on')) {
+      setError('Selecciona una política ya asignada y confirma expresamente su aplicación a esta jornada histórica.');
+      return;
+    }
+    const args = {
+      p_organization_id: tenant.current.organization.id, p_correction_request_id: item.request.id,
+      p_decision: decision, p_reason: reason.trim(),
+      ...(historical ? { p_historical_policy_id: policyId } : {}),
+    };
     const key = JSON.stringify(args);
     if (attempt.current?.key !== key) attempt.current = { key, requestId: newRequestId() };
     const requestId = attempt.current.requestId;
     setPending(true);
     setError(null);
     try {
-      await rpc(client, 'decide_correction', { ...args, p_request_id: requestId });
+      await rpc(client, historical ? 'decide_correction_with_policy' : 'decide_correction',
+        { ...args, p_request_id: requestId });
       onDone(approve ? 'Corrección aprobada. Los fichajes originales se conservan; el registro vigente se ha actualizado.' : 'Corrección rechazada. El registro no cambia.');
     } catch (failure) {
       const apiError = asApiError(failure);
@@ -160,6 +185,27 @@ function DecisionDialog({ item, decision, onClose, onDone }: {
         <Field label="Motivo de la decisión (obligatorio)" error={fieldError}>
           {(p) => <textarea {...p} rows={3} maxLength={REASON_MAX} value={reason} onChange={(e) => setReason(e.target.value)} />}
         </Field>
+        {historical && (
+          <>
+            <Notice tone="warning" title="Jornada anterior a la vigencia del horario">
+              <p>El horario asignado ahora no demuestra por sí solo cuál correspondía en la fecha solicitada.
+                Comprueba las condiciones reales de aquella jornada y acredita expresamente la política.
+                El sistema no retrocede su vigencia: dejará constancia de esta declaración solo para la corrección.</p>
+            </Notice>
+            <Field label="Política acreditada para jornada histórica" hint="Solo se ofrecen políticas previamente asignadas a esta persona.">
+              {(p) => (
+                <select {...p} name="historical_policy" defaultValue="">
+                  <option value="">Selecciona una política</option>
+                  {historicalPolicies.map((policy) =>
+                    <option key={policy.id} value={policy.id}>Horario v{policy.version} · {policy.timezone} · pausas {policy.break_counts_as_work ? 'computables' : 'no computables'}</option>)}
+                </select>
+              )}
+            </Field>
+            <label className="checkbox">
+              <input type="checkbox" name="historical_confirm" /> Confirmo que he comprobado la política que correspondía a esa jornada histórica.
+            </label>
+          </>
+        )}
         <LiveRegion tone="error" message={error} />
         <div className="button-row">
           <button type="submit" className={approve ? 'btn btn-primary' : 'btn btn-danger'} disabled={pending}>

@@ -1,3 +1,20 @@
+# CURRENT_STATE — 2026-10-14 (HITO 18)
+
+## HITO 18 — corrección histórica con política expresamente acreditada
+
+**ESTADO: 5/5 PASS TÉCNICO DEL CÓDIGO; PR #35 ABIERTO.** Rama `astra/hito-18-correcciones-historicas-auditadas`, [PR #35](https://github.com/marioleongayo23-spec/fichaje/pull/35) contra `main`. Sin merge ni despliegue.
+
+- Diagnóstico de demo del 12/10: al aprobar jornada previa a la primera asignación de política, `decide_correction` rechaza con `POLICY_REQUIRED`. Es un requisito de vigencia, no fallo del botón.
+- Nueva RPC optativa `decide_correction_with_policy` preserva el flujo estricto original y permite que el segundo gestor declare expresamente una política ya asignada al empleado para esa solicitud histórica. Selección por usuario, motivo, independencia, vigencia al revisar, zona del turno, bloqueo tenant, control de versión y reintento idempotente.
+- Sin alterar `work_policies.valid_from`, `employee_policy_assignments.effective_from`, `time_events` ni correcciones anteriores. La sesión nueva referencia la política seleccionada; decision, audit y recibo identifican la excepción.
+- UI de aprobación exige selección y confirmación, con advertencia clara; `POLICY_REQUIRED` y excepción innecesaria explicados.
+- Tests sintéticos integrados en `tests/integration/h3.py` y `tests/e2e/manager.e2e.ts`. **Código HEAD `65a27f41220232c6d52d3221906bd05796d927a1` 5/5 PASS**: CI `38550082303`; Database `38550082336`; E2E H6 `38550082286` (63 escenarios incluyendo escritorio y móvil); OPS-02 `38550082274`; H7 `38550082290`. La primera iteración falló E2E por el cambio de texto `POLICY_REQUIRED`: se restauró la frase original y se mantuvo la aclaración histórica; fallo corregido, no ignorado.
+- El commit documental posterior al código debe volver a superar los cinco gates. No declarar PASS final hasta verificación del SHA definitivo.
+- HITO 17: PR #34 **fusionado** en `main` por aprobación expresa, merge `66742d0254bc20e3d37351d423f09f5074f7890d`, 5/5 PASS. Los párrafos históricos inferiores no están actualizados, y no prevalecen.
+- Sin tocar H13 Stripe, H15 correo, despliegue staging/producción ni nuevos roles/horarios semanales.
+
+---
+
 # CURRENT_STATE — 2026-10-14 (HITO 17)
 
 ## HITO 17 — invitaciones vinculadas a fichas de empleados
