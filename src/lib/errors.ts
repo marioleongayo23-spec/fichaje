@@ -66,7 +66,7 @@ const MESSAGES: Record<string, string> = {
   ALREADY_DECIDED: 'Otra persona ya ha decidido esta solicitud.',
   INVALID_INPUT: 'Revisa los datos introducidos.',
   INVALID_TRANSITION: 'Esa acción no es posible con el estado actual.',
-  POLICY_REQUIRED: 'No existía una política vigente en la fecha solicitada. Para aprobar una jornada histórica, un gestor debe acreditar explícitamente la política aplicable; para fichar ahora, asigna una vigente.',
+  POLICY_REQUIRED: 'No hay un horario asignado. La empresa debe asignarlo antes de fichar. Para aprobar una corrección histórica sin cobertura vigente, un gestor debe acreditar explícitamente la política aplicable.',
   POLICY_OVERRIDE_NOT_REQUIRED: 'Ya existía una política válida para esa jornada. No se permite sustituirla retroactivamente.',
   CLOCK_REGRESSION: 'El servicio no ha podido garantizar la hora y no ha registrado nada. Inténtalo más tarde o avisa a la empresa.',
   INVALID_TIMEZONE: 'La zona horaria no coincide con la de la jornada o del horario aplicable.',
