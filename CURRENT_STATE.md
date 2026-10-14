@@ -51,6 +51,35 @@ Solución mínima: solo `src/styles.css` y `tests/e2e/a11y.e2e.ts`.
 
 # CURRENT_STATE — 2026-10-11
 
+## HITO 15 — invitaciones por correo + emails corporativos Bundy
+
+### Verificación posdemo 2026-10-12 (staging, sin activación)
+- 2026-10-12: desplegada la función `send-invitation` **versión 1** en el proyecto Supabase **fichaje-staging** (`pvfjffeszsedslmwdvgh`). Consulta posterior de funciones: `ACTIVE`, `verify_jwt=true`; código desplegado desde HEAD `22586b6be7f22b06a2a81ed29060c963c7578636`. Producción intacta.
+- Validación de código del mismo HEAD del PR #31: cinco workflows GitHub Actions CI, Database, E2E H6, OPS-02 y H7 terminaron `success` (runs `38166887798`, `38166887776`, `38166887764`, `38166887757`, `38166887774` respectivamente). Estas pruebas **no** equivalen a correo real recibido.
+- **Función segura/inactiva hasta configuración**: no se activó `BUNDY_INVITES_ENABLED`, no se habilitó `VITE_BUNDY_INVITES_ENABLED`, no se configuraron dominio remitente ni API key/SMTP ni se enviaron correos. No probar con datos reales. El listado de funciones verifica publicación/configuración JWT pero **no** prueba aceptación HTTP, JWT/RPC ni proveedor externo; la obtención del bundle remoto falló y no se considera validación.
+- Falta remitente bajo dominio propio validado, proveedor transaccional, DNS SPF/DKIM/DMARC, Auth email templates hosted, políticas contra abusos/cuotas, pruebas E2E con correo de pruebas y autorización cross-tenant, antes de cualquier activación para clientes.
+- El PR #31 sigue abierto; su rama todavía diverge de `main` (H14.1 ya fusionado), por lo que se exige reconciliar y validar el HEAD de merge antes de solicitar aprobación. No fusionar sin orden expresa posterior.
+
+**ESTADO ACTUAL: IMPLEMENTADO EN RAMA / VALIDACIÓN PENDIENTE.** Desactivado por defecto. No se ha configurado SMTP Auth ni proveedor de envío remoto; no se han enviado correos reales.
+
+Rama: `astra/hito-15-email-bundy`. Base: `main@f167a58124c60836ef47691063fed6f849ab65df`. PR contra main pendiente.
+
+### Alcance
+- `supabase/templates/`: cinco templates de Supabase Auth (confirmación, recuperación, enlace de acceso, cambio de correo, invitación Auth) con colores Bundy y logo PNG; referencias locales `supabase/config.toml`.
+- `supabase/functions/send-invitation/`: nueva función HTTP con JWT Auth, validación de origen/cuerpo, RPC `create_invitation` como único autorizador, API transaccional con clave de idempotencia. Sin service_role ni tokens en base de datos o URL.
+- `src/admin/MembersPage.tsx`: envío automático solo cuando está habilitado; fallback seguro al mismo token y request_id en resultado incierto; estado de proveedor aceptado no se presenta como email entregado.
+- `src/app/OrganizationPicker.tsx`: instrucciones para invitaciones por email; `src/config.ts` y `.env.example`: flag pública apagada por defecto.
+- `tests/unit/email-invites.test.ts` y ajustes a guards/config. `docs/EMAIL.md` describe despliegue, coste mínimo, SMTP, dominio, seguridad y pruebas necesarias.
+- Ninguna alteración de fichajes, correcciones, RLS, SQL, timestamps, auditoría, Stripe, empresa/roles o entorno remoto.
+
+### Pendiente antes de PASS/producción
+- CI + Database + E2E H6 + OPS-02 + H7 sobre HEAD final.
+- Validación real en staging de correo transaccional y templates Supabase Auth; proveedor/dominio verificado, SPF/DKIM/DMARC y antispam, cuotas y rate limit. Ningún secreto en GitHub.
+- Aplicar HTML Auth en dashboard remoto (el config local no los publica); configurar remitente Bundy en SMTP; verificar correo recibido. No asumir que el plugin permite actualizar email templates hosted.
+- Mantener HITO 13 en PR #29, Stripe STRIPE-09 pendiente; no mezclar cambios ni desplegar producción.
+- HITO 14 **MERGED** en `main` por orden expresa del usuario, PR #30 y merge `f167a58124c60836ef47691063fed6f849ab65df`.
+
+
 ## HITO 14 — navegación inferior premium Bundy (demo socio)
 
 **ESTADO ACTUAL: PASS TÉCNICO del código validado; PR #30 abierto.** Faltan la aprobación explícita de merge, la repetición de gates del commit documental final y la verificación visual en staging. No se declara producto desplegado.

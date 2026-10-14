@@ -143,7 +143,7 @@ function AcceptInvitation() {
       <p className="bundy-step-label">01 · INVITACIÓN</p>
       <h2 id="accept-title">Aceptar una invitación</h2>
       <form noValidate onSubmit={onSubmit}>
-        <Field label="Código de invitación" hint="Te lo entrega tu empresa en persona o por un canal seguro. Caduca a las 24 horas.">
+        <Field label="Código de invitación" hint="Te llegará en el correo de invitación de Bundy o te lo facilitará tu empresa por un canal seguro. Caduca a las 24 horas.">
           {(p) => <input {...p} name="invitation" type="text" autoComplete="off" spellCheck={false} autoCapitalize="none" />}
         </Field>
         <LiveRegion tone="error" message={error} />

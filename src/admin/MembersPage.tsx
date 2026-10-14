@@ -129,11 +129,16 @@ function MembershipDialog({ membership, label, owner, onClose, onSaved }: {
 
 // The invitation token is generated here; only its SHA-256 reaches the server.
 // The resulting code is shown once for out-of-band delivery and then discarded.
+// A provider-accepted message is not proof that it reached the inbox. If the
+// delivery result is unknown, replaying the same idempotent RPC validates the
+// existing invitation before the fallback code can be shown. No auto-retries.
 function InviteDialog({ owner, onClose }: { owner: boolean; onClose: () => void }) {
-  const { client } = useServices();
+  const { client, config } = useServices();
   const tenant = useCurrentTenant();
   const org = tenant.current.organization.id;
   const [code, setCode] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [deliveryUnknown, setDeliveryUnknown] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -144,9 +149,29 @@ function InviteDialog({ owner, onClose }: { owner: boolean; onClose: () => void 
     if (!/^[^\s@]+@[^\s@]+$/.test(email) || email.length > 254) { setError('Escribe un correo electrónico válido.'); return; }
     setPending(true);
     setError(null);
+    setDeliveryUnknown(false);
     try {
       const token = randomHex(32);
-      await rpc(client, 'create_invitation', { p_organization_id: org, p_request_id: newRequestId(), p_email: email, p_role: role, p_token_hash: await sha256Hex(token) });
+      const requestId = newRequestId();
+      const hash = await sha256Hex(token);
+      const args = { p_organization_id: org, p_request_id: requestId, p_email: email, p_role: role, p_token_hash: hash };
+      if (config.inviteMailEnabled) {
+        try {
+          const result = await client.functions.invoke('send-invitation', {
+            body: { organization_id: org, request_id: requestId, email, role, token },
+          });
+          if (result.error || result.data?.status !== 'accepted_for_delivery') throw new Error('DELIVERY_NOT_CONFIRMED');
+          setSentTo(email);
+          return;
+        } catch {
+          // The provider may already have accepted the message. We must not
+          // create another token or claim the email failed definitively.
+          await rpc(client, 'create_invitation', args);
+          setDeliveryUnknown(true);
+        }
+      } else {
+        await rpc(client, 'create_invitation', args);
+      }
       setCode(encodeInvitation(org, token));
     } catch (failure) {
       tenant.handleError(failure);
@@ -155,18 +180,30 @@ function InviteDialog({ owner, onClose }: { owner: boolean; onClose: () => void 
       setPending(false);
     }
   };
+  const close = () => { setCode(null); setSentTo(null); onClose(); };
   return (
-    <Dialog open title="Invitar a una persona" onClose={() => { setCode(null); onClose(); }}>
-      {code ? (
+    <Dialog open title="Invitar a una persona" onClose={close}>
+      {sentTo ? (
         <>
-          <p>Entrega este código a la persona invitada por un canal seguro. Caduca en 24 horas, sirve una sola vez y solo funciona con una cuenta verificada con ese correo.</p>
+          <p>La invitación para <strong>{sentTo}</strong> se ha aceptado para envío por correo.</p>
+          <p className="hint">No significa que ya haya llegado a la bandeja de entrada. Caduca en 24 horas, es de un solo uso y exige verificar ese mismo correo.</p>
+          <button type="button" className="btn btn-primary" onClick={close}>Cerrar</button>
+        </>
+      ) : code ? (
+        <>
+          <p>{deliveryUnknown
+            ? 'No hemos podido confirmar la entrega del email. Puede haberse enviado igualmente. Comparte este mismo código por un canal seguro si hace falta; no crees otra invitación para reintentar.'
+            : 'Comparte este código con la persona invitada mediante un canal seguro.'}</p>
+          <p>Caduca en 24 horas, se usa una vez y requiere una cuenta verificada con el mismo correo.</p>
           <p className="secret-value secret-code">{code}</p>
-          <p className="hint">No se volverá a mostrar. Si se pierde, crea otra invitación.</p>
-          <button type="button" className="btn btn-primary" onClick={() => { setCode(null); onClose(); }}>Cerrar</button>
+          <p className="hint">Solo se muestra una vez. Si se pierde, crea otra invitación.</p>
+          <button type="button" className="btn btn-primary" onClick={close}>Cerrar</button>
         </>
       ) : (
         <form noValidate onSubmit={submit}>
-          <Field label="Correo electrónico de la persona" hint="Debe coincidir con el de su cuenta verificada. No se envía ningún correo.">
+          <Field label="Correo electrónico de la persona" hint={config.inviteMailEnabled
+            ? 'Si el servicio está disponible, Bundy enviará el código automáticamente. Si el resultado es incierto, podrás entregarlo manualmente.'
+            : 'Modo manual: recibirás un código de un solo uso para entregarlo por un canal seguro; no se enviará email.'}>
             {(p) => <input {...p} name="email" type="email" autoComplete="off" />}
           </Field>
           {owner ? (
@@ -182,7 +219,7 @@ function InviteDialog({ owner, onClose }: { owner: boolean; onClose: () => void 
           <LiveRegion tone="error" message={error} />
           <div className="button-row">
             <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? 'Creando…' : 'Crear invitación'}</button>
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn btn-secondary" onClick={close}>Cancelar</button>
           </div>
         </form>
       )}
