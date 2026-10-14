@@ -1,4 +1,38 @@
 # STAGING real — procedimiento del operador (HITO 7)
+
+## HITO 19 — auditoría y control de sincronización (2026-10-14)
+
+**BLOCKED, sin operaciones remotas de escritura.** Esta sección es la evidencia de preflight realizada bajo autorización de HITO 19, no una certificación de despliegue.
+
+### Objetivo y estado observado (solo lecturas)
+- Repositorio GitHub `marioleongayo23-spec/fichaje`, `main` merge H18 `75054aa98118ecae93eb056320924b166681d88e`.
+- Cloudflare Pages `https://fichaje-staging.pages.dev/`: responde y publica metadato `fichaje-release=3d63c7775ff71e514dd5a29946f7b29018cc9f33`. No coincide con el candidato de GitHub. Que la web responda HTTP 200 no prueba despliegue de H16-H18.
+- Supabase **solo staging**, ref `pvfjffeszsedslmwdvgh`, región `eu-west-1`, estado `ACTIVE_HEALTHY`: **17 migraciones aplicadas, 5 pendientes**. El proyecto separado `Fichaje APP` no se ha consultado ni modificado mediante SQL.
+- Pendientes exactas y en orden:
+  1. `20261002000100_billing_readiness.sql`
+  2. `20261002000200_billing_checkout.sql`
+  3. `20261002000300_billing_sync_authorization.sql`
+  4. `20261014000100_employee_invitation_binding.sql`
+  5. `20261014000200_historical_correction_policy.sql`
+- Antes del intento: no había un manifest de copia cifrada **reciente y recuperable** acompañado del resultado validado de una restauración aislada. Un SHA-256 antiguo localizado en Drive (2026-10-02) **no constituye restore ni prueba de integridad actual**. El runtime disponible no tiene `pg_dump`, `pg_restore`, `psql`, `age`, `supabase` ni `wrangler` y no tiene las credenciales de operador del despliegue de Cloudflare, del backup ni de Supabase.
+- Supabase Free no ofrece backups automáticos gestionados; los dumps cifrados y la custodia son responsabilidad del operador. Fuentes: https://supabase.com/docs/guides/platform/backups y `docs/RECOVERY.md`. No se autoriza contratación ni creación de un tercer proyecto Supabase.
+
+### Puertas obligatorias secuenciales (ninguna puede omitirse)
+**GATE A — custodio / origen.** Desde un equipo de operación confiable y autorizado, comprobar que la URL, proyecto y ref son *exactamente* staging y que los datos son exclusivamente sintéticos. Verificar origen `main` y HEAD 5/5 PASS; comparar migraciones instaladas con las cinco pendientes; capturar identificador de release previo como candidato de rollback. Comprobar permisos, clientes y conexión TLS `verify-full`, sin exportar secretos a GitHub ni al navegador. Ausencia de cualquier requisito = **STOP**.
+
+**GATE B — copia y restore probados antes de migrar.** Usar `scripts/backup_database.sh` con los secretos SOLO desde custodia privada en equipo confiable, PostgreSQL cliente compatible, destinatario `age` público, destino privado fuera del repositorio, CA/PGSERVICEFILE/PGPASSFILE con permisos correctos. Verificar que se generen el fichero `.dump.age`, manifest y checksum, y sus hashes. En **PostgreSQL local aislado y vacío** con el esquema exacto anterior a la migración, usar `scripts/restore_database.sh`, recuperar journal según `docs/RECOVERY.md` y ejecutar verificaciones de Auth, relaciones tenant, estados, secuencias, referencias e invariantes. Verificar `scripts/ops/backup_monitor.py` y su comprobante de restore. Los objetos binarios de Supabase Storage y configuraciones/credenciales fuera de la base requieren protección independiente; la mera copia de metadatos no basta. No hace falta contratar una tercera base remota: el ensayo local aislado sirve **solo si todas las pruebas reales de recuperación pasan**. Guardar artefactos y claves privados y separados; **al PR únicamente resultados PASS/FAIL sin datos sensibles**. Si no hay archivo, claves, restore aislado o evidencia completa, **STOP sin ejecutar `supabase db push`**.
+
+**GATE C — migraciones solo en staging.** Tras GATE B PASS, inspeccionar `supabase migration list` y plan de `supabase db push --dry-run`, sin drift. Aplicar exclusivamente las cinco migraciones mencionadas en su orden mediante el procedimiento oficial desde el checkout exacto. Validar 22/22 migraciones, RPC/RLS/roles/permiso/grants; verificar `create_employee_invitation` y `decide_correction_with_policy` en la **base staging**. Cualquier divergencia, estado parcial o secreto no disponible: STOP, documentar y activar runbook; **nunca reparar mediante reset remoto** ni modificar `Fichaje APP`.
+
+**GATE D — frontend y funciones de staging.** En operador autenticado con credenciales de Cloudflare y Supabase Edge conservadas fuera de GitHub, construir release inmutable del commit anterior y desplegar **exclusivamente** `fichaje-staging` con el `PlatformDeployer` de `scripts/ops/deployers.py`. Antes de mover release confirmar compatibilidad con el esquema ya migrado, disponibilidad de release sano anterior y rollback del código (el rollback NO deshace migraciones). No configurar Stripe real ni producción. Comprobar el metadato `fichaje-release` y checksum del manifest publicados, sin aceptar solo un HTTP 200.
+
+**GATE E — validación remota sintética.** Ejecutar `scripts/staging/verify_staging.py` en modo **remoto** (no `--local`), canary, health, alertas, pruebas Auth/RLS y dos empresas sintéticas: alta con política (H16), invitación aceptada y vinculada sin duplicado (H17), jornada anterior y revisión independiente con evidencia append-only (H18); fichaje, kiosco y exportación; todas las rutas de seguridad y 5 gates 5/5 PASS del release correspondiente. Si falta alguna capacidad o prueba, **BLOCKED**; documentar resultado y no declarar comercializable ni pasar a producción.
+
+### Estado y límites
+El HITO 19 llegó únicamente a lectura/diagnóstico y a redactar el plan controlado. **GATE B no ejecutado ni PASS; por dependencia GATE C/D/E no ejecutados**. Ninguna migración o publicación remota realizada. PR propio y rama independiente; no hacer merge sin una orden posterior expresa del usuario. No usar SQL Editor de staging para simular un backup/restauración ni subir dumps, JWT, PIN o secretos al repositorio.
+
+---
+
 ## Estado remoto más reciente — 2026-09-29 (PR #15)
 
 `verify_staging.py` se ejecutó contra Pages y Supabase reales, sin `--local`,
