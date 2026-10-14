@@ -75,7 +75,8 @@ Identidad humana se obtiene de auth.uid(); ninguna RPC acepta un actor arbitrari
 |---|---|---|
 | record_time_event | employee_id, action, expected_version | Recibo descrito en MASTER_SPEC; empleado propio activo |
 | submit_correction | employee_id, base_version, reason, operations[] | request_id persistido; propio o gestor; sin cambiar jornada |
-| decide_correction | correction_request_id, APPROVE/REJECT, reason | decision_id y nueva versión si aprueba; gestor independiente |
+| decide_correction | correction_request_id, APPROVE/REJECT, reason | Ruta estricta por defecto: exige política vigente en la fecha efectiva; sin backdate |
+| decide_correction_with_policy | correction_request_id, APPROVE, reason, historical_policy_id | Excepción por solicitud: gestor independiente acredita una política **ya asignada** al empleado; si no había ninguna vigente ese día, fija la política en la sesión nueva y la evidencia en el recibo/audit; no modifica vigencias, originales ni otras jornadas |
 | manage_employee | code, display_name, membership vinculada opcional, active | ID/version; ADMIN/OWNER, nunca cambiar tenant |
 | manage_membership | target, role, active | ID/version; OWNER para ADMIN/OWNER; ADMIN solo EMPLOYEE |
 | transfer_ownership | nuevo_owner_membership_id | Cambio atómico de roles y audit, solo OWNER |
