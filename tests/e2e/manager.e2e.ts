@@ -237,6 +237,43 @@ test('correction inbox: independent approval, self-involvement, stale request an
   expect(sql(`select count(*) from public.correction_decisions where employee_id='${x}';`)).toBe('0');
 });
 
+test('H18: an independent reviewer explicitly attests the policy for a past missed shift', async ({ page }) => {
+  const s = await scenario();
+  const session = randomUUID();
+  const entry = new Date(Date.now() - 4 * 86400_000);
+  const leave = new Date(entry.getTime() + 6 * 3600_000);
+  const submitted = await rpc('submit_correction', s.employee.token, {
+    p_organization_id: s.org, p_request_id: randomUUID(),
+    p_employee_id: s.employee.employee, p_base_version: 0,
+    p_reason: 'Olvidé fichar el turno anterior a la configuración inicial.',
+    p_operations: [
+      { operation: 'ADD', session_id: session, event_type: 'CLOCK_IN',
+        effective_at: entry.toISOString(), timezone: 'Europe/Madrid', ordinal: 1 },
+      { operation: 'ADD', session_id: session, event_type: 'CLOCK_OUT',
+        effective_at: leave.toISOString(), timezone: 'Europe/Madrid', ordinal: 2 },
+    ],
+  });
+  expect(submitted.status).toBe(200);
+  await login(page, s.admin);
+  await go(page, 'Solicitudes de corrección');
+  const card = page.locator('.card').filter({ hasText: 'Olvidé fichar el turno anterior' });
+  await card.getByRole('button', { name: /Aprobar/ }).click();
+  const modal = page.getByRole('dialog', { name: 'Aprobar corrección' });
+  await expect(modal.getByText('Jornada anterior a la vigencia del horario')).toBeVisible();
+  await modal.getByLabel('Motivo de la decisión (obligatorio)').fill('Verificado el turno mediante el parte horario');
+  await modal.getByRole('button', { name: 'Confirmar aprobación' }).click();
+  await expect(modal.getByRole('alert')).toContainText('Selecciona una política');
+  await modal.getByLabel('Política acreditada para jornada histórica').selectOption(s.policy);
+  await modal.getByLabel('Confirmo que he comprobado la política').check();
+  await modal.getByRole('button', { name: 'Confirmar aprobación' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Corrección aprobada' })).toBeVisible();
+  expect(sql(`select policy_id from public.work_sessions where id='${session}';`)).toBe(s.policy);
+  expect(sql(`select count(*) from public.time_events where session_id='${session}';`)).toBe('0');
+  expect(sql(`select safe_details->>'historical_policy_id' from public.audit_log
+    where action='decide_correction' and entity_id=(select id from public.correction_decisions
+      where request_id='${submitted.data.correction_request_id}');`)).toBe(s.policy);
+});
+
 test('hour classification of a closed month is declared and validated server-side', async ({ page }) => {
   const s = await scenario();
   const e = s.employee.employee!;
