@@ -1,3 +1,17 @@
+# CURRENT_STATE — 2026-10-14 (HITO 19 — staging)
+
+**HITO 19: BLOCKED por la puerta de recuperación previa, SIN MIGRACIONES NI DESPLIEGUE.** Autorizado: sincronizar únicamente `fichaje-staging`, con copia cifrada y restore verificados **antes** de migrar, 0 € adicionales, rama y PR separados, y ningún merge sin autorización posterior.
+
+- GitHub main `75054aa98118ecae93eb056320924b166681d88e` (H18 merged; H16/H17 también merged). La app Pages staging aún anuncia release `3d63c7775ff71e514dd5a29946f7b29018cc9f33`, que no coincide con `main`.
+- Proyecto Supabase staging `pvfjffeszsedslmwdvgh` sano pero con solo 17 migraciones frente a 22 del repositorio. Faltan exactamente `20261002000100`, `20261002000200`, `20261002000300`, `20261014000100`, `20261014000200`.
+- GATE B: se localizó en Google Drive la **terna completa cifrada del 02/10/2026** (ciphertext `age`, manifiesto y SHA-256). Verificación de lectura efectuada el 14/10: tamaño y SHA-256 del ciphertext coinciden, `artifact_integrity=PASS`. Su manifiesto conserva `restore_test=null`, corresponde a migración `20260930000200` y tiene 12 días: **no demuestra recuperación ni constituye backup fresco**. No hay restore aislado actual verificado. Herramientas/credenciales de backup y Cloudflare ausentes en este entorno; no se utilizó clave privada ni se descifró dato alguno. No se presume que CI equivalga a backup de staging.
+- Se incorpora verificador **solo lectura**, `scripts/staging/h19_backup_artifact.py`, con cobertura en `tests/ops/test_h19_backup_artifact.py`. Comprobará presencia, formato age, SHA-256, tamaño, migración y antigüedad de un backup nuevo; por diseño **nunca** afirma `ready_for_migration=true` ni sustituye el restore, replay del journal y verificaciones del operador. Ensayos 5/5 workflows deben repetirse sobre el HEAD final.
+- Según las instrucciones del usuario, **no se ejecutaron** `apply_migration`, `supabase db push`, `reset`, cambios en tablas o Edge Functions, despliegues de Pages, compras, ni accesos de escritura al proyecto de producción `Fichaje APP`.
+- Rama `astra/hito-19-staging-preflight-seguro`; PR de preflight abierto contra `main` y pendiente de revisión. El procedimiento íntegro GATE A–E y requisitos para desbloquear constan en `docs/STAGING.md`; documentación y verificador offline con pruebas, sin cambios de motor/DB/UI/configuración de producción.
+- Estado de tests del PR: gates CI, Database, E2E H6, OPS-02 y H7 obligatorios sobre HEAD de la rama; el éxito de esos tests locales **no convierte HITO 19 en PASS**, ya que siguen pendientes el restore y la validación **remota**. No hacer merge sin orden expresa posterior.
+
+---
+
 # CURRENT_STATE — 2026-10-14 (HITO 18)
 
 ## HITO 18 — corrección histórica con política expresamente acreditada
