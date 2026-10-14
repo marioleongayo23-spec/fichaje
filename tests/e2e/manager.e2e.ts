@@ -2,7 +2,7 @@ import { readFileSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { addMember, assignPolicy, clock, createAccount, createEmployee, createPolicy, rpc, scenario, sql, stack } from './support/backend';
-import { go, login } from './support/ui';
+import { go, login, logout } from './support/ui';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -141,6 +141,38 @@ test('employee onboarding retries a failed policy assignment without duplicating
   await expect(page.getByRole('status').filter({ hasText: 'Empleado «Empleado Reintento» creado' })).toBeVisible();
   expect(sql(`select count(*) from public.employees where organization_id='${s.org}' and code='K-RETRY';`)).toBe('1');
   expect(sql(`select count(*) from public.employee_policy_assignments where employee_id=(select id from public.employees where organization_id='${s.org}' and code='K-RETRY');`)).toBe('1');
+});
+
+test('HITO 17: an invited employee is bound to the selected existing record on acceptance', async ({ page }) => {
+  const s = await scenario();
+  const pending = await createEmployee(s.org, s.owner, { name: 'Persona Invitada H17', code: 'H17-001' });
+  await assignPolicy(s.org, s.owner, pending.id, s.policy);
+  const invited = await createAccount('h17-browser');
+
+  await login(page, s.owner);
+  await go(page, 'Personas y roles');
+  await page.getByRole('button', { name: 'Invitar a una persona' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Invitar a una persona' });
+  await dialog.getByLabel('Correo electrónico de la persona').fill(invited.email);
+  await dialog.getByLabel('Vincular a ficha de empleado').selectOption(pending.id);
+  await dialog.getByRole('button', { name: 'Crear invitación' }).click();
+  const code = (await dialog.locator('.secret-code').textContent())!.trim();
+  expect(code.startsWith(s.org + '.')).toBe(true);
+  await dialog.getByRole('button', { name: 'Cerrar' }).click();
+
+  expect(sql(`select membership_id is null from public.employees where id='${pending.id}';`)).toBe('t');
+  await logout(page);
+  await login(page, invited);
+  await expect(page.getByRole('heading', { name: 'Configura tu acceso' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Aceptar una invitación' })).toBeVisible();
+  await page.getByLabel('Código de invitación').fill(code);
+  await page.getByRole('button', { name: 'Aceptar invitación' }).click();
+  await expect(page.getByRole('heading', { name: 'Fichar' })).toBeVisible();
+
+  expect(sql(`select m.auth_user_id from public.employees e join public.memberships m
+    on m.organization_id=e.organization_id and m.id=e.membership_id
+    where e.organization_id='${s.org}' and e.id='${pending.id}';`)).toBe(invited.id);
+  expect(sql(`select count(*) from public.employees where organization_id='${s.org}' and code='H17-001';`)).toBe('1');
 });
 
 test('an ADMIN manages only EMPLOYEE accounts; server refusals are shown plainly', async ({ page }) => {
