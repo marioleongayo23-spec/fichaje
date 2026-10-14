@@ -30,7 +30,7 @@
 **GATE E — validación remota sintética.** Ejecutar `scripts/staging/verify_staging.py` en modo **remoto** (no `--local`), canary, health, alertas, pruebas Auth/RLS y dos empresas sintéticas: alta con política (H16), invitación aceptada y vinculada sin duplicado (H17), jornada anterior y revisión independiente con evidencia append-only (H18); fichaje, kiosco y exportación; todas las rutas de seguridad y 5 gates 5/5 PASS del release correspondiente. Si falta alguna capacidad o prueba, **BLOCKED**; documentar resultado y no declarar comercializable ni pasar a producción.
 
 ### Estado y límites
-El HITO 19 llegó únicamente a lectura/diagnóstico y a redactar el plan controlado. **GATE B no ejecutado ni PASS; por dependencia GATE C/D/E no ejecutados**. Ninguna migración o publicación remota realizada. PR propio y rama independiente; no hacer merge sin una orden posterior expresa del usuario. No usar SQL Editor de staging para simular un backup/restauración ni subir dumps, JWT, PIN o secretos al repositorio.
+El HITO 19 llegó a lectura/diagnóstico, verificación de integridad de la copia antigua y creación de un comprobador offline de solo lectura, además del plan controlado. **GATE B no ejecutado ni PASS; por dependencia GATE C/D/E no ejecutados**. Ninguna migración o publicación remota realizada. PR propio y rama independiente; no hacer merge sin una orden posterior expresa del usuario. No usar SQL Editor de staging para simular un backup/restauración ni subir dumps, JWT, PIN o secretos al repositorio.
 
 ---
 
