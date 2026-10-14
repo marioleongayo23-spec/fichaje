@@ -1,3 +1,16 @@
+# CURRENT_STATE — 2026-10-14 (HITO 19 — staging)
+
+**HITO 19: BLOCKED por la puerta de recuperación previa, SIN MIGRACIONES NI DESPLIEGUE.** Autorizado: sincronizar únicamente `fichaje-staging`, con copia cifrada y restore verificados **antes** de migrar, 0 € adicionales, rama y PR separados, y ningún merge sin autorización posterior.
+
+- GitHub main `75054aa98118ecae93eb056320924b166681d88e` (H18 merged; H16/H17 también merged). La app Pages staging aún anuncia release `3d63c7775ff71e514dd5a29946f7b29018cc9f33`, que no coincide con `main`.
+- Proyecto Supabase staging `pvfjffeszsedslmwdvgh` sano pero con solo 17 migraciones frente a 22 del repositorio. Faltan exactamente `20261002000100`, `20261002000200`, `20261002000300`, `20261014000100`, `20261014000200`.
+- Bloqueo de seguridad de GATE B: no hay copia cifrada reciente completa ni restore aislado verificado; la única huella antigua observada en Drive no es una copia recuperable demostrada. Herramientas/credenciales de backup y Cloudflare no disponibles en el entorno de ejecución actual. No se presume que un proyecto sano o las suites CI equivalgan a backup remoto.
+- Según las instrucciones del usuario, **no se ejecutaron** `apply_migration`, `supabase db push`, `reset`, cambios en tablas o Edge Functions, despliegues de Pages, compras, ni accesos de escritura al proyecto de producción `Fichaje APP`.
+- Rama `astra/hito-19-staging-preflight-seguro`; PR de preflight abierto contra `main` y pendiente de revisión. El procedimiento íntegro GATE A–E y requisitos para desbloquear constan en `docs/STAGING.md`; solo documentación, sin cambios de motor/DB/UI/configuración de producción.
+- Estado de tests del PR: gates CI, Database, E2E H6, OPS-02 y H7 obligatorios sobre HEAD de la rama; el éxito de esos tests locales **no convierte HITO 19 en PASS**, ya que siguen pendientes el restore y la validación **remota**. No hacer merge sin orden expresa posterior.
+
+---
+
 # CURRENT_STATE — 2026-10-14 (HITO 18)
 
 ## HITO 18 — corrección histórica con política expresamente acreditada
