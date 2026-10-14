@@ -167,6 +167,84 @@ check(code == 403, 'cannot invite OWNER')
 sql(f"update private.invitations set expires_at=clock_timestamp()-interval '1 second' where id='{receipt['id']}';")
 code, _ = accept(org, new, token)
 check(code == 403, 'expired invitation denied')
+# H17: an issuer chooses a pre-existing employee; acceptance creates and links
+# membership atomically under tenant + verified-email + single-use constraints.
+target = employee_args(org)
+check(rpc('manage_employee', owner['token'], target)[0] == 200, 'H17 owner prepares an unlinked employee')
+target_id = target['p_employee_id']
+joiner = account('h17-joiner')
+secret = secrets.token_hex(32)
+create_args = dict(p_organization_id=org,p_request_id=uid(),p_employee_id=target_id,
+                   p_email=joiner['email'],p_token_hash=hashlib.sha256(secret.encode()).hexdigest())
+code, invite_receipt = rpc('create_employee_invitation', admin['token'], create_args)
+check(code == 200, 'H17 ADMIN issues a bound invitation to their own unlinked employee')
+code, replay = rpc('create_employee_invitation', admin['token'], create_args)
+check(code == 200 and replay == invite_receipt, 'H17 issue idempotency')
+code, _ = rpc('create_employee_invitation', employee['token'], {**create_args,'p_request_id':uid()})
+check(code == 403, 'H17 EMPLOYEE cannot issue a bound invitation')
+code, _ = rpc('create_employee_invitation', teams[1][0]['token'], {**create_args,'p_request_id':uid()})
+check(code == 403, 'H17 cross-tenant issuer refused')
+code, _ = rpc('create_employee_invitation', owner['token'], {**create_args,
+  'p_employee_id':teams[1][2]['employee'],'p_request_id':uid()})
+check(code == 403, 'H17 cross-tenant employee refused')
+code, _ = accept(org, employee, secret)
+check(code == 403, 'H17 bound token rejects another authenticated email')
+code, _ = accept(orgs[1], joiner, secret)
+check(code == 403, 'H17 bound token rejects another organization')
+request = uid()
+code, linked = accept(org, joiner, secret, request)
+check(code == 200 and linked['employee_id'] == target_id, 'H17 acceptance atomically returns its own bound employee')
+check(sql(f"select membership_id||':'||version from public.employees where organization_id='{org}' and id='{target_id}';")
+      == linked['id'] + ':2', 'H17 pre-existing employee linked exactly once and version incremented')
+check(sql(f"select count(*) from public.audit_log where organization_id='{org}' and request_id='{request}';")
+      == '2', 'H17 member and employee linkage audit in one request')
+code, replay = accept(org, joiner, secret, request)
+check(code == 200 and replay == linked, 'H17 accepted invitation same-request replay safe')
+check(accept(org, joiner, secret)[0] == 403, 'H17 consumed token denies new request')
+code, rows = api('/rest/v1/employees?select=id&organization_id=eq.' + org, joiner['token'])
+check(code == 200 and rows == [{'id':target_id}], 'H17 invitee reads only own linked employee')
+check(rpc('create_employee_invitation',owner['token'],{**create_args,'p_request_id':uid(),
+      'p_token_hash':hashlib.sha256(secrets.token_hex(32).encode()).hexdigest()})[0] == 403,
+      'H17 bound invites deny an already-linked employee')
+check(api('/rest/v1/employees?id=eq.'+target_id,joiner['token'],
+     {'membership_id':employee['membership']},'PATCH')[0] == 403,
+     'H17 invitee cannot directly reassign their own employee record')
+
+# An invitation with a stale target must not create an orphan membership.
+stale = employee_args(org)
+check(rpc('manage_employee',owner['token'],stale)[0] == 200, 'H17 second unlinked employee prepared')
+target2 = stale['p_employee_id']
+later_user = account('h17-stale')
+other_user = account('h17-other')
+def bound_inv(user):
+    t = secrets.token_hex(32)
+    code, _ = rpc('create_employee_invitation',owner['token'],{
+      'p_organization_id':org,'p_request_id':uid(),'p_employee_id':target2,
+      'p_email':user['email'],'p_token_hash':hashlib.sha256(t.encode()).hexdigest()})
+    check(code == 200, 'H17 alternate invite created for same pending target')
+    return t
+first = bound_inv(later_user)
+second = bound_inv(other_user)
+code, _ = accept(org,later_user,first)
+check(code == 200, 'H17 first invite binds target')
+code, _ = accept(org,other_user,second)
+check(code == 403, 'H17 concurrent/stale bound token cannot rebind linked target')
+check(sql(f"select count(*) from public.memberships where organization_id='{org}' and auth_user_id='{other_user['id']}';")
+      == '0', 'H17 stale acceptance rolls back new membership atomically')
+
+expiry = employee_args(org)
+check(rpc('manage_employee',owner['token'],expiry)[0] == 200, 'H17 expired target created')
+expired_user = account('h17-expired')
+expires_token = secrets.token_hex(32)
+code, expires_row = rpc('create_employee_invitation',owner['token'],{
+ 'p_organization_id':org,'p_request_id':uid(),'p_employee_id':expiry['p_employee_id'],
+ 'p_email':expired_user['email'],'p_token_hash':hashlib.sha256(expires_token.encode()).hexdigest()})
+check(code == 200, 'H17 bound invitation created for expiry test')
+sql(f"update private.invitations set expires_at=clock_timestamp()-interval '1 second' where id='{expires_row['id']}';")
+check(accept(org,expired_user,expires_token)[0] == 403, 'H17 expired bound invitation refused')
+check(sql(f"select count(*) from public.memberships where organization_id='{org}' and auth_user_id='{expired_user['id']}';")
+      == '0', 'H17 expiry never created a membership')
+
 # A real unverified Auth account cannot sign in; direct SQL gate is additionally covered below.
 unverified = account('unverified', False)
 token_u, _, _ = invite(org, owner, unverified, 'EMPLOYEE')

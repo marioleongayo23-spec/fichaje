@@ -9,7 +9,7 @@ import { randomHex, sha256Hex } from '../lib/crypto';
 import { errorMessage } from '../lib/errors';
 import { DEFAULT_ZONE, formatDateTime } from '../lib/time';
 import { Badge, Dialog, EmptyState, Field, LiveRegion, Loading, Notice, PageHeader, TableWrap } from '../ui/components';
-import { employeeName, useDirectory } from './data';
+import { employeeName, useDirectory, type Directory } from './data';
 
 // Members are identified by their linked employee record; e-mail addresses are
 // not exposed by the backend contracts and are never shown here.
@@ -62,7 +62,7 @@ export function MembersPage() {
       ))}
       {editing && <MembershipDialog membership={editing} label={describe(editing)} owner={owner} onClose={() => setEditing(null)}
         onSaved={(message) => { setEditing(null); refresh(message); }} />}
-      {inviting && <InviteDialog owner={owner} onClose={() => setInviting(false)} />}
+      {inviting && data && <InviteDialog owner={owner} directory={data} onClose={() => setInviting(false)} />}
       {transferring && data && <TransferDialog candidates={data.memberships.filter((m) => m.active && m.id !== self)} describe={describe}
         onClose={() => setTransferring(false)} onDone={(message) => { setTransferring(false); refresh(message); }} />}
     </>
@@ -129,24 +129,41 @@ function MembershipDialog({ membership, label, owner, onClose, onSaved }: {
 
 // The invitation token is generated here; only its SHA-256 reaches the server.
 // The resulting code is shown once for out-of-band delivery and then discarded.
-function InviteDialog({ owner, onClose }: { owner: boolean; onClose: () => void }) {
+function InviteDialog({ owner, directory, onClose }: { owner: boolean; directory: Directory; onClose: () => void }) {
   const { client } = useServices();
   const tenant = useCurrentTenant();
   const org = tenant.current.organization.id;
   const [code, setCode] = useState<string | null>(null);
+  const [role, setRole] = useState<Role>('EMPLOYEE');
+  const availableEmployees = directory.employees.filter((e) => e.active && !e.membership_id);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const email = String(form.get('email') ?? '').trim().toLowerCase();
-    const role = (owner ? String(form.get('role')) : 'EMPLOYEE') as Role;
+    const selectedRole = owner ? role : 'EMPLOYEE';
+    const employeeId = selectedRole === 'EMPLOYEE' ? String(form.get('employee') ?? '') : '';
+    if (employeeId && !availableEmployees.some((employee) => employee.id === employeeId)) {
+      setError('La ficha seleccionada ya no está disponible. Actualiza la lista.'); return;
+    }
     if (!/^[^\s@]+@[^\s@]+$/.test(email) || email.length > 254) { setError('Escribe un correo electrónico válido.'); return; }
     setPending(true);
     setError(null);
     try {
       const token = randomHex(32);
-      await rpc(client, 'create_invitation', { p_organization_id: org, p_request_id: newRequestId(), p_email: email, p_role: role, p_token_hash: await sha256Hex(token) });
+      const requestId = newRequestId();
+      const tokenHash = await sha256Hex(token);
+      if (employeeId) {
+        await rpc(client, 'create_employee_invitation', {
+          p_organization_id: org, p_request_id: requestId, p_employee_id: employeeId,
+          p_email: email, p_token_hash: tokenHash,
+        });
+      } else {
+        await rpc(client, 'create_invitation', {
+          p_organization_id: org, p_request_id: requestId, p_email: email, p_role: selectedRole, p_token_hash: tokenHash,
+        });
+      }
       setCode(encodeInvitation(org, token));
     } catch (failure) {
       tenant.handleError(failure);
@@ -172,13 +189,25 @@ function InviteDialog({ owner, onClose }: { owner: boolean; onClose: () => void 
           {owner ? (
             <Field label="Rol">
               {(p) => (
-                <select {...p} name="role" defaultValue="EMPLOYEE">
+                <select {...p} name="role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
                   <option value="EMPLOYEE">{ROLE_LABEL.EMPLOYEE}</option>
                   <option value="ADMIN">{ROLE_LABEL.ADMIN}</option>
                 </select>
               )}
             </Field>
           ) : <p>Rol: {ROLE_LABEL.EMPLOYEE}</p>}
+          {(!owner || role === 'EMPLOYEE') && (
+            <Field label="Vincular a ficha de empleado" hint="Al aceptar la invitación con el correo verificado, la cuenta se vinculará automáticamente a la ficha elegida.">
+              {(p) => (
+                <select {...p} name="employee" defaultValue="">
+                  <option value="">Sin vincular (invitación genérica)</option>
+                  {availableEmployees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>{employee.display_name} · {employee.code}</option>
+                  ))}
+                </select>
+              )}
+            </Field>
+          )}
           <LiveRegion tone="error" message={error} />
           <div className="button-row">
             <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? 'Creando…' : 'Crear invitación'}</button>

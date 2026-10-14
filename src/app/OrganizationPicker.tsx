@@ -123,10 +123,10 @@ function AcceptInvitation() {
     setError(null);
     setPending(true);
     try {
-      await rpc(client, 'accept_invitation', { p_organization_id: parsed.organizationId, p_request_id: attempt.current.requestId, p_token: parsed.token });
+      const accepted = await rpc<{ id: string; employee_id?: string }>(client, 'accept_invitation', { p_organization_id: parsed.organizationId, p_request_id: attempt.current.requestId, p_token: parsed.token });
       attempt.current = null;
       (event.target as HTMLFormElement).reset();
-      setDone('Invitación aceptada. Ya puedes elegir la organización.');
+      setDone(accepted.employee_id ? 'Invitación aceptada. Tu ficha de empleado ya está vinculada.' : 'Invitación aceptada. Ya puedes elegir la organización.');
       await tenant.reload();
     } catch (failure) {
       const apiError = asApiError(failure);

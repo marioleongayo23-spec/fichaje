@@ -16,6 +16,7 @@ JSONB acotado y validado por RPC; no metadatos arbitrarios de cliente ni datos c
 | public.organizations | id PK (tenant raíz), name, status ACTIVE/SUSPENDED, created_at; id es el ámbito RLS |
 | public.memberships | id, organization_id, auth_user_id FK auth.users RESTRICT, role, active, created_at; UNIQUE(org,auth_user_id) |
 | public.employees | id, organization_id, code, display_name, membership_id nullable, active, created_at; UNIQUE(org,code), UNIQUE(org,membership_id); FK compuesta membresía |
+| private.invitations | organization_id, email verificado de destino, role, token_hash, expires_at, accepted_by; H17: employee_id nullable FK compuesta a public.employees, y si no NULL solo role EMPLOYEE. No visible por Data API |
 | public.work_policies | id, organization_id, version, timezone IANA validada, break_counts_as_work boolean, valid_from, created_by, created_at; UNIQUE(org,version); append-only |
 | public.employee_policy_assignments | id, organization_id, employee_id, policy_id, effective_from, created_by, created_at; append-only, sin vigencias ambiguas; selección bajo lock empleado |
 | private.employee_state | organization_id, employee_id PK compuesto, state, open_session_id nullable, version bigint >=0, last_sequence bigint >=0, last_event_at; proyección mutable reconstruible |

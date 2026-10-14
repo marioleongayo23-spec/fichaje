@@ -44,6 +44,9 @@ verificado/no bloqueado solo para el escritor. No consultan ni modifican tablas 
 Los helpers de membresía mantienen propietario lector mínimo y las mutaciones propietario
 escritor sin BYPASSRLS. No se heredan roles autenticados ni service_role para acceder a Auth.
 
+## HITO 17 — invitación vinculada a empleado
+El OWNER/ADMIN puede emitir `create_employee_invitation` solo para una ficha activa y sin membresía del mismo tenant. La invitación privada guarda la FK compuesta `(organization_id,employee_id)`, el correo de destino y el hash del token. En `accept_invitation` no se acepta ningún `employee_id` del usuario: la cuenta Auth con correo verificado debe coincidir con la invitación, no estar ya vinculada al tenant y presentar el token válido. La aceptación crea membresía EMPLOYEE y enlaza la ficha mediante un único commit PostgreSQL (o rollback íntegro). El rol técnico `fichaje_acceptor` conserva NOLOGIN/NOINHERIT, RLS FORCE, SELECT filtrado por invitación validada y UPDATE de solo `membership_id`/`version`. No puede cambiar roles, empleados ajenos ni históricos. La invitación genérica se conserva sin vinculación automática. Registro auditado de membresía y vínculo con el mismo request_id, sin correo/token en auditoría.
+
 ## Kiosco sin email (H4)
 OWNER/ADMIN provisiona dispositivo: identidad Auth técnica única, sin memberships; token renovable
 solo en dispositivo autorizado y revocable. Gateway valida JWT, device_id activo, tenant y caducidad.
